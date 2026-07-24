@@ -15,15 +15,28 @@ that GENE writes to disk.
 Quick start
 ===========
 
+This is a nonlinear diagnostic: a linear run holds a single mode, so it
+has no ``(kx, ky)`` spectrum to build, and pyrokinetics raises
+``NotImplementedError`` if you ask for one. The example below uses the
+small nonlinear run that ships with pyrokinetics, which you can swap for
+your own output directory:
+
 .. code-block:: python
 
-   from pyrokinetics import Pyro
+   from pyrokinetics import Pyro, template_dir
 
-   pyro = Pyro(gk_file="parameters_0001", gk_code="GENE")
-   pyro.load_gk_output(kxky_flux_spectra=True)
+   run_directory = template_dir / "outputs" / "GENE_nonlinear_cbc"
+
+   pyro = Pyro(gk_file=run_directory / "parameters.dat", gk_code="GENE")
+   pyro.load_gk_output(output_convention="gene", kxky_flux_spectra=True)
 
    heat = pyro.gk_output["heat"]
    print(heat.dims)   # ('field', 'species', 'kx', 'ky', 'time')
+
+``output_convention="gene"`` keeps the output in GENE's own units. It is
+needed for this particular run because its ``parameters`` file carries no
+reference values, so pyrokinetics has nothing to convert to its own
+normalisation with; drop it for a run that does record them.
 
 What you get
 ============
@@ -47,12 +60,26 @@ Summing over ``kx`` and ``ky`` recovers the volume-integrated values in
 
    heat.sel(field="phi").sum(dim=["kx", "ky"])
 
-The spectra share the standard ``time`` coordinate with the fields, and
-can be time-averaged over a saturated window in the usual way:
+The spectra share the standard ``time`` coordinate with the fields, so a
+saturated window is averaged over in the usual way. Choose the window
+from the run's own time axis, which is in units of
+:math:`L_\mathrm{ref} / v_\mathrm{ref}`:
 
 .. code-block:: python
 
-   heat.sel(time=slice(t0, t1)).mean(dim="time")
+   print(heat["time"].values)
+   # [0.   0.48 0.96 1.44 1.92 2.4  2.88 3.36 3.84 4.32 4.8  5.28 5.76]
+
+   t0, t1 = 3.0, 5.76   # second half of this run
+   saturated = heat.sel(time=slice(t0, t1)).mean(dim="time")
+
+   # ExB heat flux per species, summed over the spectrum
+   print(saturated.sel(field="phi").sum(dim=["kx", "ky"]).data)
+   # [24.404942678311933 6.636105534624077] nref_electron * rhoref_pyro ** 2
+   #     * tref_electron * vref_nrl / lref_major_radius ** 2
+
+The example run is far too short to have saturated — pick ``t0`` and
+``t1`` from the part of your own run where the fluxes have levelled off.
 
 What the underlying formula is
 ==============================
