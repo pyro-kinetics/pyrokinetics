@@ -63,13 +63,20 @@ For each species :math:`s`, per ``(kx, ky)``:
 
    \Gamma^\phi_s = \big\langle \hat n_s^*\, v_{Ex} \big\rangle_\theta \cdot n_s
 
-   Q^\phi_s = \big\langle (\tfrac{1}{2}\hat T_\parallel + \hat T_\perp
-       + \tfrac{3}{2}\hat n_s)^*\, v_{Ex} \big\rangle_\theta \cdot n_s T_s
+.. math::
 
-   \Gamma^{A_\parallel}_s = \big\langle \hat u_{\parallel,s}^*\, B_x \big\rangle_\theta \cdot n_s
+   Q^\phi_s = \big\langle (\tfrac{1}{2}\hat T_\parallel + \hat T_\perp
+   + \tfrac{3}{2}\hat n_s)^*\, v_{Ex} \big\rangle_\theta \cdot n_s T_s
+
+.. math::
+
+   \Gamma^{A_\parallel}_s = \big\langle \hat u_{\parallel,s}^*\, B_x
+   \big\rangle_\theta \cdot n_s
+
+.. math::
 
    Q^{A_\parallel}_s = \big\langle (\hat q_\parallel + \hat q_\perp)^*\,
-       B_x \big\rangle_\theta \cdot n_s T_s
+   B_x \big\rangle_\theta \cdot n_s T_s
 
 where :math:`v_{Ex} = -i k_y \hat\phi / B_\mathrm{ref}`,
 :math:`B_x = +i k_y \hat A_\parallel / B_\mathrm{ref}`, and
