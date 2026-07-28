@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 
+import f90nml
 import numpy as np
 import pytest
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputGENE
+from pyrokinetics.gk_code.gene import read_gene_geometry_data
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
@@ -15,6 +17,7 @@ sys.path.append(str(docs_dir))
 from examples import example_JETTO  # noqa
 
 template_file = template_dir / "input.gene"
+geometry_file = template_dir / "outputs" / "GENE_linear" / "miller_0001"
 
 
 @pytest.fixture
@@ -160,3 +163,57 @@ def test_drop_species(tmp_path):
     pyro.update_gk_code()
     n_species = pyro.local_species.nspec
     assert len(pyro.gk_input.data["species"]) == n_species
+
+
+def _write_geometry_file(path, extra_header_lines=()):
+    """Copy the reference geometry file, optionally adding entries to its
+    ``&parameters`` header, so the header length changes."""
+    lines = geometry_file.read_text().split("\n")
+    end_of_header = lines.index("/")
+    lines[end_of_header:end_of_header] = list(extra_header_lines)
+    path.write_text("\n".join(lines))
+    return path
+
+
+def test_read_gene_geometry_data():
+    """All gridpoints rows of data should be read, none dropped."""
+    data = read_gene_geometry_data(geometry_file)
+    gridpoints = f90nml.read(geometry_file)["parameters"]["gridpoints"]
+    assert len(data) == gridpoints
+
+
+@pytest.mark.parametrize(
+    "extra_header_lines",
+    [
+        (),
+        ("edge_opt =   0.0000000000000000E+00",),
+        ("edge_opt =   0.0000000000000000E+00", "my_parameter =   1"),
+    ],
+)
+def test_read_gene_geometry_data_header_length(tmp_path, extra_header_lines):
+    """The header holds a different number of entries depending on what GENE was
+    asked to do, so its length has to be found rather than assumed."""
+    reference = read_gene_geometry_data(geometry_file)
+    path = _write_geometry_file(tmp_path / "miller_0001", extra_header_lines)
+
+    np.testing.assert_allclose(read_gene_geometry_data(path), reference)
+
+
+def test_read_gene_geometry_data_row_count_mismatch(tmp_path):
+    """A header length that doesn't line up with 'gridpoints' should be reported
+    rather than silently returning short data."""
+    path = tmp_path / "miller_0001"
+    lines = geometry_file.read_text().split("\n")
+    del lines[lines.index("/") + 1]
+    path.write_text("\n".join(lines))
+
+    with pytest.raises(ValueError, match="gridpoints"):
+        read_gene_geometry_data(path)
+
+
+def test_read_gene_geometry_data_no_header(tmp_path):
+    path = tmp_path / "miller_0001"
+    path.write_text("1.0 2.0\n3.0 4.0\n")
+
+    with pytest.raises(ValueError, match="namelist"):
+        read_gene_geometry_data(path)

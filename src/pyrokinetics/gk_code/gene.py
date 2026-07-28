@@ -37,6 +37,49 @@ from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
+def read_gene_geometry_data(filename: PathLike) -> np.ndarray:
+    """
+    Read the columns of data that follow the ``&parameters`` header of a GENE
+    geometry output file.
+
+    The length of that header depends on which parameters GENE wrote, so it is
+    found by looking for the line closing the namelist rather than assumed. The
+    number of rows read is checked against the ``gridpoints`` entry of the
+    header, which should equal ``nz0``.
+
+    Parameters
+    ----------
+    filename
+        Path to a GENE geometry file, e.g. ``miller_0001``.
+
+    Returns
+    -------
+    np.ndarray
+        2D array of geometry data, with one row per point along the field line.
+    """
+    with open(filename) as f:
+        for line_number, line in enumerate(f):
+            if line.strip() == "/":
+                skiprows = line_number + 1
+                break
+        else:
+            raise ValueError(
+                f"Could not find the end of the '&parameters' namelist in the GENE "
+                f"geometry file {filename}"
+            )
+
+    geometry_data = np.loadtxt(filename, skiprows=skiprows)
+
+    gridpoints = f90nml.read(filename)["parameters"].get("gridpoints", None)
+    if gridpoints is not None and len(geometry_data) != gridpoints:
+        raise ValueError(
+            f"Read {len(geometry_data)} rows of geometry data from {filename}, but "
+            f"its header declares gridpoints = {gridpoints}"
+        )
+
+    return geometry_data
+
+
 class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     """
     Class that can read GENE input files, and produce
@@ -587,15 +630,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 if geo_dict["Lref"] == 0.0:
                     geo_dict["Lref"] = 1.0
 
-                # TODO: this drops the first row of geometry data — the header
-                # is 18 lines, not 19 (see ``_read_geom_jacobian``). Harmless
-                # here as the results are column sums or a Z0 shift, but it
-                # should be fixed alongside the golden-answer files.
-                skiprows = 19
-                if "edge_opt" in geometry_nml["parameters"].keys():
-                    skiprows += 1
-
-                geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+                geometry_data = read_gene_geometry_data(geometry_filename)
 
                 Z0 = self.data["geometry"].get("major_z", False)
                 if Z0:
@@ -2585,16 +2620,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if gk_input.data["geometry"].get("norm_flux_projection", False):
             geometry_type = gk_input.data["geometry"]["magn_geometry"]
 
-            geometry_filename = raw_data[geometry_type]
-            geometry_nml = f90nml.read(geometry_filename)
-
-            # TODO: same off-by-one as ``get_gene_geometry`` above; kept for
-            # now as ``flux_norm`` is a ratio of sums over theta.
-            skiprows = 19
-            if "edge_opt" in geometry_nml["parameters"].keys():
-                skiprows += 1
-
-            geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+            geometry_data = read_gene_geometry_data(raw_data[geometry_type])
 
             grho = np.sqrt(geometry_data[:, 0])
             jacob = geometry_data[:, -6]
