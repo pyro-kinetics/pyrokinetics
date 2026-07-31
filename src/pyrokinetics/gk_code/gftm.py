@@ -40,7 +40,6 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
     code_name = "GFTM"
     default_file_name = "input.GFTM"
     norm_convention = "cgyro"
-    gftm_max_ntheta = 32
     _convention_dict = {}
 
     pyro_gftm_miller = {
@@ -779,7 +778,7 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
         self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
-        self.data["nxgrid"] = min(numerics.ntheta, self.gftm_max_ntheta)
+        self.data["nxgrid"] = numerics.ntheta
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
