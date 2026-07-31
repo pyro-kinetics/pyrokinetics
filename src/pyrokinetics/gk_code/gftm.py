@@ -519,7 +519,9 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
 
         numerics_data["nky"] = self.data.get("nky", 1)
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
-        numerics_data["ntheta"] = self.data.get("nxgrid", 16)
+        # nxgrid is a grid-point COUNT: coerce so a deck written with a
+        # float literal ("NXGRID = 65.0") still yields an integer ntheta.
+        numerics_data["ntheta"] = int(self.data.get("nxgrid", 16))
         numerics_data["nonlinear"] = self.is_nonlinear()
 
         numerics_data["beta"] = self.data["betae"]
@@ -778,7 +780,9 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
         self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
-        self.data["nxgrid"] = numerics.ntheta
+        # int() so a float-valued ntheta (e.g. a PyroScan axis built with
+        # dtype=float) cannot write "NXGRID = 65.0" into the deck.
+        self.data["nxgrid"] = int(numerics.ntheta)
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
@@ -1007,7 +1011,9 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
             ky /= bunit_over_b0
 
             local_geometry = gk_input.get_local_geometry()
-            metric_ntheta = gk_input.data["nxgrid"]
+            # int() is required, not cosmetic: metric_ntheta * 4 is passed
+            # to MetricTerms -> np.linspace(num=...), which rejects a float.
+            metric_ntheta = int(gk_input.data["nxgrid"])
             metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta * 4)
             theta_mod = np.mod(theta, 2 * np.pi)
             Jacobian = np.interp(
