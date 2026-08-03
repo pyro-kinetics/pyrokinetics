@@ -56,7 +56,9 @@ docs = [
     "sphinx_autodoc_typehints >= 1.19",
     "sphinx-book-theme >= 0.4.0rc1",
     "myst_parser >= 0.14.0",
+    "ruamel.yaml",
 ]
+
 tests = [
     "pytest >= 3.3.0",
     "pytest-cov",
@@ -103,9 +105,14 @@ distance-dirty = "{next_version}.dev{distance}+{vcs}{rev}.d{build_date:%Y%m%d}"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = ["pyrokinetics.templates.outputs*"]
 
 [tool.setuptools.package-data]
-pyrokinetics = ["templates/*"]
+pyrokinetics = ["templates/**"]
+
+[tool.setuptools.exclude-package-data]
+pyrokinetics = ["templates/outputs", "templates/outputs/**"]
+"pyrokinetics.templates" = ["outputs", "outputs/**"]
 
 [tool.pytest.ini_options]
 addopts = [

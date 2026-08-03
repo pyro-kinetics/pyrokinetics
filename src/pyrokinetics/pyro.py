@@ -1299,7 +1299,10 @@ class Pyro:
         drop_nan: bool, default False
             If NaNs are found in the output then that data is dropped. Off by default
         **kwargs
-            Arguments to pass to the ``GKOutputReader``.
+            Arguments to pass to the ``GKOutputReader``. GENE additionally accepts
+            ``kxky_flux_spectra``: when set, the fluxes are computed from the moment
+            and field files with dims ``(field, species, kx, ky, time)``, instead of
+            being read from the volume-integrated ``nrg`` file. Nonlinear runs only.
 
         Returns
         -------

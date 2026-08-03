@@ -252,7 +252,20 @@ class Fields(GKOutputArgs):
 
 @dataclasses.dataclass
 class Fluxes(GKOutputArgs):
-    """Utility dataclass type used to pass fluxes to ``GKOutput``."""
+    """Utility dataclass type used to pass fluxes to ``GKOutput``.
+
+    The dimensionality depends on what the code writes to disk, and is set by
+    each reader: most codes only provide fluxes summed over the perpendicular
+    wavenumbers, while others resolve them in ``ky`` and/or ``kx``.
+
+    The ``field`` dimension separates the contributions driven by each field,
+    i.e. ``phi`` is the electrostatic (ExB) contribution, ``apar`` the
+    electromagnetic (flutter) one. GENE fluxes are read from the ``nrg`` file
+    with dims ``(field, species, time)``, unless
+    ``kxky_flux_spectra=True`` is passed to the reader, in which case they are
+    computed from the moment and field files with dims
+    ``(field, species, kx, ky, time)``.
+    """
 
     #: Units of ``[nref * vref * (rhoref / lref)**2]``.
     particle: Optional[ArrayLike] = None
