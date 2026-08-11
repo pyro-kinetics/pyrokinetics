@@ -44,6 +44,12 @@ redl_bs = psi_ns * 0.0
 sauter_jdotb = psi_ns * 0.0
 sauter_bs = psi_ns * 0.0
 
+# Toroidal current density and its decomposition
+jphi_total = psi_ns * 0.0
+jphi_bs = psi_ns * 0.0
+jphi_ext = psi_ns * 0.0
+jphi_psdia = psi_ns * 0.0
+
 for i, psi_n in enumerate(psi_ns[1:]):
     try:
         pyro.load_local(psi_n=psi_n, local_geometry="MXH")
@@ -55,6 +61,11 @@ for i, psi_n in enumerate(psi_ns[1:]):
     redl = Redl2021(pyro)
     redl_jdotb[i + 1] = redl.JbsdotB.to("ampere * tesla / cm**2").m
     redl_bs[i + 1] = redl.Jbs.to("ampere / cm**2").m
+
+    jphi_total[i + 1] = redl.Jphi_fsa.to("ampere / cm**2").m
+    jphi_bs[i + 1] = redl.Jphi_bs_fsa.to("ampere / cm**2").m
+    jphi_ext[i + 1] = redl.Jphi_ext_fsa.to("ampere / cm**2").m
+    jphi_psdia[i + 1] = redl.Jphi_psdia_fsa.to("ampere / cm**2").m
 
     sauter = Sauter1999(pyro)
     sauter_jdotb[i + 1] = sauter.JbsdotB.to("ampere * tesla / cm**2").m
@@ -92,6 +103,27 @@ plt.plot(transp_psi_ns, bs_sauter_transp, label="SAUTER (1999) TRANSP")
 plt.plot(psi_ns, redl_bs, ls="--", lw=2, label="Redl (2021) Pyro")
 plt.plot(psi_ns, sauter_bs, ls="--", lw=2, label="Sauter (1999) Pyro")
 plt.title(r"$\frac{\langle J_{bs} \cdot B\rangle}{\langle B^2\rangle^{1/2}}$")
+plt.xlabel(r"$\psi_N$")
+plt.ylabel(r"$A cm^{-2}$")
+plt.grid()
+plt.legend()
+plt.show()
+
+# Decomposition of the toroidal current density. Note the external contribution
+# is auxiliary + ohmic combined, as a local calculation cannot separate them.
+plt.plot(psi_ns, jphi_total, lw=2, color="k", label="Total")
+plt.plot(psi_ns, jphi_bs, ls="--", lw=2, label="Bootstrap")
+plt.plot(psi_ns, jphi_ext, ls="--", lw=2, label="External (auxiliary + ohmic)")
+plt.plot(psi_ns, jphi_psdia, ls="--", lw=2, label="Pfirsch-Schluter + diamagnetic")
+plt.plot(
+    psi_ns,
+    jphi_bs + jphi_ext + jphi_psdia,
+    ls=":",
+    lw=2,
+    color="C3",
+    label="Sum of components",
+)
+plt.title(r"$\langle J_\phi \rangle$ (Redl 2021)")
 plt.xlabel(r"$\psi_N$")
 plt.ylabel(r"$A cm^{-2}$")
 plt.grid()

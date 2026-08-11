@@ -125,6 +125,31 @@ def test_metric_terms_input():
     assert isinstance(metric_terms, MetricTerms)
 
 
+def test_flux_surface_average():
+    """The flux surface average of unity is unity, and units are preserved"""
+    pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
+    metric_terms = MetricTerms(pyro.local_geometry, ntheta=512)
+
+    ones = np.ones(len(metric_terms.regulartheta))
+    np.testing.assert_allclose(metric_terms.flux_surface_average(ones), 1.0, rtol=1e-10)
+
+    # A quantity carrying units keeps them
+    R_fsa = metric_terms.flux_surface_average(metric_terms.R)
+    assert R_fsa.units == metric_terms.R.units
+    assert np.min(metric_terms.R) < R_fsa < np.max(metric_terms.R)
+
+
+def test_dVdr_matches_local_geometry():
+    """MetricTerms.dVdr agrees with the LocalGeometry quad-based calculation"""
+    pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
+    local_geometry = pyro.local_geometry
+    metric_terms = MetricTerms(local_geometry, ntheta=1024)
+
+    _, _, dVdr = local_geometry.get_flux_surface_area_volume_derivatives()
+
+    np.testing.assert_allclose(metric_terms.dVdr.m, dVdr.m, rtol=1e-3)
+
+
 # Scan geometry parameters
 @pytest.mark.parametrize(
     "q,betaprime,shat",
