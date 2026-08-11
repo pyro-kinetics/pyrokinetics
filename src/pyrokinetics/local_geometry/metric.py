@@ -359,10 +359,17 @@ class MetricTerms:  # CleverDict
             V' = \frac{\partial V}{\partial r}
                = 2\pi \oint \mathcal{J} d\theta
 
-        Uses the same quadrature as :func:`flux_surface_average`, so that identities
-        combining :math:`V'` with flux-surface averages hold to machine precision.
-        ``LocalGeometry.get_flux_surface_area_volume_derivatives`` computes the same
-        quantity with an adaptive quadrature on the fitted surface.
+        The :math:`\theta` integral is normalised by ``theta_range`` so that the
+        result is independent of how many poloidal turns the grid spans, in the
+        same way as :attr:`Y` and the :math:`\partial B_\zeta / \partial r` terms.
+
+        ``LocalGeometry.get_flux_surface_area_volume_derivatives`` returns this same
+        quantity as its third element, integrating the identical Jacobian with an
+        adaptive quadrature over the fitted surface. This property is kept because
+        it is roughly three orders of magnitude cheaper -- it reuses the Jacobian
+        already evaluated on the :math:`\theta` grid, whereas the ``LocalGeometry``
+        routine runs three adaptive quadratures and discards two of the results.
+        The two are cross-checked in ``test_dVdr_matches_local_geometry``.
 
         Returns
         -------
@@ -371,9 +378,10 @@ class MetricTerms:  # CleverDict
         """
 
         return (
-            2
-            * np.pi
+            4
+            * np.pi**2
             * simpson(self.Jacobian.m, x=self.regulartheta)
+            / self.theta_range
             * self.Jacobian.units
         )
 

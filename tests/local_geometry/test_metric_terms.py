@@ -139,11 +139,17 @@ def test_flux_surface_average():
     assert np.min(metric_terms.R) < R_fsa < np.max(metric_terms.R)
 
 
-def test_dVdr_matches_local_geometry():
-    """MetricTerms.dVdr agrees with the LocalGeometry quad-based calculation"""
+@pytest.mark.parametrize("nturns", [1, 3, 5])
+def test_dVdr_matches_local_geometry(nturns):
+    """
+    MetricTerms.dVdr agrees with the LocalGeometry quad-based calculation, and is
+    independent of how many poloidal turns the theta grid spans
+    """
     pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
     local_geometry = pyro.local_geometry
-    metric_terms = MetricTerms(local_geometry, ntheta=1024)
+
+    theta = np.linspace(-nturns * np.pi, nturns * np.pi, 1024 * nturns)
+    metric_terms = MetricTerms(local_geometry, theta=theta)
 
     _, _, dVdr = local_geometry.get_flux_surface_area_volume_derivatives()
 
