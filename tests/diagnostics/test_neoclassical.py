@@ -173,3 +173,47 @@ def test_integrate_toroidal_current():
 
     # Integrating outwards, the enclosed current grows monotonically in magnitude
     assert np.all(np.diff(np.abs(result["Ip"].m)) > 0)
+
+
+def test_Fprime_from_total_current_round_trip():
+    """
+    get_Fprime_from_total_current inverts the Grad-Shafranov relation that
+    get_total_current uses, both for the equilibrium <J.B> and for a modified
+    one (the workflow in docs/examples/example_modify_shear.py).
+    """
+
+    pyro = Pyro(
+        eq_file=template_dir / "step.geqdsk",
+        eq_type="GEQDSK",
+        kinetics_file=template_dir / "scene.cdf",
+        kinetics_type="SCENE",
+    )
+
+    for psi_n in [0.3, 0.5, 0.7]:
+        pyro.load_local(psi_n=psi_n, local_geometry="MXH")
+
+        redl = Redl2021(pyro)
+        metric = pyro.metric_terms
+
+        # The F' that get_total_current used to build <J.B> must come back out
+        dpsidr = metric.dpsidr * -redl.ip_ccw
+        expected = metric.dB_zeta_dr / dpsidr * redl.bt_ccw
+
+        recovered = redl.get_Fprime_from_total_current(redl.JdotB)
+        assert_allclose(recovered.to(expected.units).m, expected.m, rtol=1e-10)
+
+        # A modified <J.B> must give an F' that reproduces it when pushed back
+        # through the Grad-Shafranov relation
+        modified = 1.5 * redl.JdotB
+        modified_Fprime = redl.get_Fprime_from_total_current(modified)
+
+        _, F, _, mu0_dpdpsi, mu0 = redl._get_grad_shafranov_terms()
+        rebuilt = (modified_Fprime * redl.B2_fsa + F * mu0_dpdpsi) / mu0
+
+        assert_allclose(rebuilt.to(modified.units).m, modified.m, rtol=1e-10)
+
+        # Changing the current really does change F', so the round trip above
+        # is not passing simply because the two inputs coincide
+        assert not np.isclose(
+            modified_Fprime.to(expected.units).m, recovered.to(expected.units).m
+        )
