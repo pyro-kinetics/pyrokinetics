@@ -519,7 +519,14 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         )
 
         numerics_data["nky"] = self.data.get("nky", 1)
-        numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
+        # Inverse of the kx0_loc = ky*shat*theta0 relation used on write.
+        _ky_deck = self.data.get("ky", 0.3)
+        _shat = self.get_local_geometry().shat
+        _shat = getattr(_shat, "m", _shat)
+        _denom = _ky_deck * _shat
+        numerics_data["theta0"] = (
+            self.data.get("kx0_loc", 0.0) / _denom if _denom else 0.0
+        )
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
 
@@ -780,7 +787,17 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         self.data["nky"] = numerics.nky
 
         self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
-        self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
+        # kx0_loc is the ballooning-angle offset expressed as a RADIAL
+        # WAVENUMBER. tglf_geometry.f90:257 / gftm_geometry.f90:282 compute
+        #     kx0 = kx0_loc / ky      ! "note that kx0 is kx/ky"
+        # and subtract kx0 from kxx, itself the normalised kx/ky (~ shat*theta).
+        # Hence kx0_loc = kx = ky * shat * theta0 -- the same ballooning relation
+        # used for GS2 in gk_code/gs2.py (akx = ky * shat * theta0).
+        # The former theta0/(2*pi) was dimensionally wrong and made a theta0 scan
+        # of TGLF/GFTM barely change the growth rate.
+        self.data["kx0_loc"] = (
+            self.data["ky"] * local_geometry.shat.m * numerics.theta0
+        )
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
