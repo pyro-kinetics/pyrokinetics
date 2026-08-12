@@ -183,9 +183,16 @@ def stack_runs(arrays, last):
                 units = data.units
                 data = data.magnitude
             take = tuple(
-                np.asarray([index[dim][v] for v in np.asarray(a.coords[dim].values).ravel()])
-                if dim in a.coords
-                else np.arange(a.sizes[dim])
+                (
+                    np.asarray(
+                        [
+                            index[dim][v]
+                            for v in np.asarray(a.coords[dim].values).ravel()
+                        ]
+                    )
+                    if dim in a.coords
+                    else np.arange(a.sizes[dim])
+                )
                 for dim in dims
             )
             out[np.ix_(*take)] = np.asarray(data)

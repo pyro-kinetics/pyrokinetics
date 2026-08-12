@@ -795,9 +795,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         # used for GS2 in gk_code/gs2.py (akx = ky * shat * theta0).
         # The former theta0/(2*pi) was dimensionally wrong and made a theta0 scan
         # of TGLF/GFTM barely change the growth rate.
-        self.data["kx0_loc"] = (
-            self.data["ky"] * local_geometry.shat.m * numerics.theta0
-        )
+        self.data["kx0_loc"] = self.data["ky"] * local_geometry.shat.m * numerics.theta0
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
