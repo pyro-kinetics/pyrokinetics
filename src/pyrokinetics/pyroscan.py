@@ -8,6 +8,7 @@ import warnings
 from contextlib import contextmanager
 from functools import reduce
 from itertools import product
+from typing import Any, Dict, NamedTuple, Tuple
 
 import numpy as np
 import pint
@@ -125,12 +126,46 @@ def normalize_failed_runs(buffers: dict[str, list]) -> None:
 
 
 # ---- dataset assembly ----
-def add_quantity(ds, name, arrays, base_shape, scan_coords):
+def add_quantity(
+    ds, name, arrays, base_shape, scan_coords, scan_dims=None, squeeze_dims=None
+):
+    """
+    Stack one quantity from every run of a scan into ``ds``.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset to add the quantity to.
+    name : str
+        Name of the quantity.
+    arrays : list
+        One entry per run, in run order.
+    base_shape : tuple
+        Shape of the scan itself, which the run entries are reshaped onto: the
+        lengths of the scan dimensions, in ``scan_dims`` order.
+    scan_coords : dict
+        Coordinates describing the scan points, in any form accepted by xarray.
+        In a gridded scan these are the scan dimensions themselves; in a
+        non-gridded one (see ``PyroHypercube``) the varied parameters are
+        non-dimension coordinates along a single sample dimension.
+    scan_dims : tuple, default None
+        Names of the scan dimensions. Defaults to the keys of ``scan_coords``,
+        i.e. the gridded case.
+    squeeze_dims : iterable, default None
+        Names of varied parameters that may also appear as a dimension of an
+        individual run's output (e.g. ``ky``), and so must be squeezed out of it
+        before stacking. Defaults to the keys of ``scan_coords``.
+    """
     if not any(isinstance(a, xr.DataArray) for a in arrays):
         return ds
 
+    if scan_dims is None:
+        scan_dims = tuple(scan_coords.keys())
+    if squeeze_dims is None:
+        squeeze_dims = tuple(scan_coords.keys())
+
     last = arrays[-1]
-    for dim in scan_coords:
+    for dim in squeeze_dims:
         if dim in last.dims:
             last = last.squeeze(dim, drop=True)
             arrays = [
@@ -156,7 +191,7 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
     if units is not None:
         stacked = stacked * units
 
-    dims = tuple(scan_coords.keys()) + last.dims
+    dims = tuple(scan_dims) + last.dims
 
     arr = xr.DataArray(
         stacked,
@@ -171,6 +206,62 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
     ds[name] = arr
 
     return ds
+
+
+def coord_quantity(coord):
+    """
+    A coordinate's values as a pint ``Quantity``, or ``None`` if it has no units.
+
+    Units are held in one of two places depending on the coordinate. An xarray
+    index cannot hold a pint array, so a dimension coordinate keeps its units in
+    ``attrs``; a non-dimension coordinate — how ``PyroHypercube`` carries its
+    varied parameters — is quantified in place.
+    """
+    data = coord.data
+    if hasattr(data, "units"):
+        return data
+
+    units = coord.attrs.get("units", None)
+    if units is None:
+        return None
+    if isinstance(units, str):
+        units = ureg(units).units
+    return data * units
+
+
+def magnitude_and_units(values):
+    """
+    Split a scan parameter's values into a plain array and a unit.
+
+    Unitless scan parameters are stored as plain arrays/lists, and are given
+    dimensionless units.
+    """
+    if isinstance(values, Quantity):
+        return np.asarray(values.magnitude), values.units
+    return np.asarray(values), ureg.dimensionless
+
+
+class ScanLayout(NamedTuple):
+    """
+    How the runs of a scan map onto the dimensions of its output Dataset.
+
+    A gridded ``PyroScan`` has one dimension per varied parameter; a
+    non-gridded ``PyroHypercube`` has a single sample dimension carrying every
+    varied parameter as a non-dimension coordinate. Everything else about
+    loading a scan's outputs is common to both, so only this mapping is
+    overridden.
+    """
+
+    #: Coordinates of the output Dataset, in any form accepted by xarray.
+    coords: Dict[str, Any]
+    #: Units of each coordinate that has them, keyed by coordinate name.
+    coord_units: Dict[str, Any]
+    #: Lengths of the scan dimensions, in ``dims`` order.
+    shape: Tuple[int, ...]
+    #: Names of the scan dimensions.
+    dims: Tuple[str, ...]
+    #: Varied parameters that may clash with a dimension of a single run.
+    squeeze_dims: Tuple[str, ...]
 
 
 class PyroScan:
@@ -330,6 +421,12 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
+        self.build_pyro_dict()
+
+    def build_pyro_dict(self):
+        """
+        Create one Pyro per run of the scan, and record their run directories.
+        """
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -382,11 +479,20 @@ class PyroScan:
                 )
             )
 
-    def create_single_run(self, parameters: dict):
+    def create_single_run(self, parameters: dict, name: str = None):
         """
         Create a new Pyro instance from the PyroScan base with new run parameters
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameter values for this run.
+        name: str, default None
+            Name of the run directory. If unset, it is generated from the
+            parameter values by ``format_single_run_name``.
         """
-        name = self.format_single_run_name(parameters)
+        if name is None:
+            name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
 
         new_run.gk_file = self.base_directory / name / self.file_name
@@ -676,25 +782,7 @@ class PyroScan:
             self.gk_output = gk_output
             return
 
-        parameter_dict = {}
-        coords = {}
-        attrs = {}
-        coord_units = {}
-        for name, values in self.parameter_dict.items():
-            # Unitless scan parameters are stored as plain arrays/lists.
-            if isinstance(values, Quantity):
-                vals = np.asarray(values.magnitude)
-                unit = values.units
-            else:
-                vals = np.asarray(values)
-                unit = ureg.dimensionless
-
-            parameter_dict[name] = ((name,), vals)
-            coords[name] = vals
-            attrs[name + "_units"] = str(unit)
-            coord_units[name] = unit
-
-        output_shape = tuple(len(v) for v in self.parameter_dict.values())
+        layout = self.output_layout()
 
         load_specs = {
             "linear": {
@@ -842,16 +930,52 @@ class PyroScan:
         if all(all(x is None for x in arrays) for arrays in buffers.values()):
             raise FileNotFoundError("Unable to load any gk_output files in this scan")
 
-        ds = xr.Dataset(parameter_dict)
+        ds = xr.Dataset(coords=layout.coords)
         for name, arrays in buffers.items():
-            ds = add_quantity(ds, name, arrays, output_shape, coords)
+            ds = add_quantity(
+                ds,
+                name,
+                arrays,
+                layout.shape,
+                layout.coords,
+                scan_dims=layout.dims,
+                squeeze_dims=layout.squeeze_dims,
+            )
 
-        for coord, units in coord_units.items():
+        for coord, units in layout.coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
         self.gk_output = PyroScanGKOutput(ds, norms=self.base_pyro.norms)
 
         self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
+
+    def output_layout(self) -> ScanLayout:
+        """
+        Map the runs of this scan onto the dimensions of its output Dataset.
+
+        A ``PyroScan`` is a grid: one dimension per varied parameter, whose
+        length is the number of values that parameter takes.
+        """
+        coords = {}
+        coord_units = {}
+        for name, values in self.parameter_dict.items():
+            vals, unit = magnitude_and_units(values)
+            # Carry the units on the coordinate itself: a coordinate rebuilt
+            # from bare values when each quantity is stacked would otherwise
+            # lose them again.
+            coords[name] = ((name,), vals, {"units": unit})
+            coord_units[name] = unit
+
+        dims = tuple(self.parameter_dict.keys())
+        shape = tuple(len(values) for values in self.parameter_dict.values())
+
+        return ScanLayout(
+            coords=coords,
+            coord_units=coord_units,
+            shape=shape,
+            dims=dims,
+            squeeze_dims=dims,
+        )
 
     @property
     def gk_code(self):
@@ -994,15 +1118,17 @@ class PyroScanGKOutput(DatasetWrapper):
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
-            if hasattr(self[coord], "units"):
-                if self[coord].units is None:
-                    continue
-                new_coord = (self[coord].data * self[coord].units).to(norms, *contexts)
-                new_coords[coord] = (
-                    coord,
-                    new_coord.m,
-                    {"units": new_coord.units},
-                )
+            quantity = coord_quantity(self[coord])
+            if quantity is None:
+                continue
+            new_coord = quantity.to(norms, *contexts)
+            # Use the coordinate's own dims: a non-dimension coordinate (a
+            # varied parameter along ``sample``) is not its own dimension.
+            new_coords[coord] = (
+                self[coord].dims,
+                new_coord.m,
+                {"units": new_coord.units},
+            )
 
         self.data = self.data.assign_coords(coords=new_coords)
 
@@ -1020,13 +1146,13 @@ class PyroScanGKOutput(DatasetWrapper):
 
         new_coords = {}
         for coord in self.coords:
-            if not hasattr(self[coord], "units") or self[coord].units is None:
+            quantity = coord_quantity(self[coord])
+            if quantity is None:
                 continue
-            quantity = self[coord].data * self[coord].units
             if hasattr(quantity, "convert_physical_units"):
                 new_coord = quantity.convert_physical_units(norms)
                 new_coords[coord] = (
-                    coord,
+                    self[coord].dims,
                     new_coord.m,
                     {"units": new_coord.units},
                 )

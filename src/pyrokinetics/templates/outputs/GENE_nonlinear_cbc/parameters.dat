@@ -1,0 +1,151 @@
+&parallelization
+n_procs_s =   2
+n_procs_v =   1
+n_procs_w =   8
+n_procs_x =   1
+n_procs_y =   1
+n_procs_z =   4
+n_procs_sim =     64
+/
+
+&box
+n_spec =    2
+nx0    =    16
+nky0   =    4
+nz0    =   16
+nv0    =   16
+nw0    =    8
+
+kymin =   0.10000000    
+lv    =   3.00000    
+lw    =   9.00000    
+lx    =   123.576    
+nexc  = 10
+adapt_lx = F
+x0    =   0.18000000    
+/
+
+&in_out
+diagdir = './/'
+
+read_checkpoint  = F
+write_checkpoint = T
+
+istep_field  =     400
+istep_mom    =     400
+istep_nrg    =      50
+istep_vsp    =       0
+istep_schpt  =   10000
+
+write_std = T
+/
+
+&general
+nonlinear =   T
+comp_type = 'IV'
+perf_vec  =  2 2 1 1 1 1 2 1 2
+nblocks   =       4
+hypz_compensation =   F
+
+timescheme = 'RK4'
+dt_max     =   0.1200E-02
+courant    =     1.25
+
+timelim    =       1200
+ntimesteps =    1000000
+simtimelim =    6.000    
+
+beta       =   0.10000000E-02
+debye2     =    0.0000000    
+collision_op = 'none'
+
+init_cond = 'ppj'
+
+hyp_z_with_dz_prefactor = F
+hyp_z =    2.000    
+hyp_v_with_dv_prefactor = F
+hyp_v =   0.2000    
+
+perf_tsteps =  -1
+
+/
+
+&geometry
+magn_geometry = 'miller'
+q0       =    1.4000000    
+shat     =   0.79600000    
+amhd     =    0.0000000    
+major_R  =    1.0000000    
+minor_r  =    1.0000000    
+trpeps   =   0.18000000    
+kappa    =    1.0000000    
+delta    =    0.0000000    
+zeta     =    0.0000000    
+s_kappa  =    0.0000000    
+s_delta  =    0.0000000    
+s_zeta   =    0.0000000    
+drR      =    0.0000000    
+dpdx_term= 'gradB_eq_curv'
+dpdx_pm  =    0.0000000    
+norm_flux_projection  = F
+sign_Ip_CW =       1
+sign_Bt_CW =       1
+/
+
+&species
+name   = 'ions'
+omn    =    2.2200000    
+omt    =    6.9600000    
+
+mass   =    1.0000000    
+temp   =    1.0000000    
+dens   =    1.0000000    
+charge =    1.0000000    
+/
+
+&species
+name   = 'electrons'
+omn    =    2.2200000    
+omt    =    6.9600000    
+
+mass   =   0.27244000E-03
+temp   =    1.0000000    
+dens   =    1.0000000    
+charge =   -1.0000000    
+/
+
+&info
+probdir = '/lustre/home/yd1639/simulations/GENE/cbc_fluxspectra_fixture'
+step_time  =     0.0033
+number of computed time steps =    5001
+time for initial value solver =     16.657
+calc_dt = T
+nltdt_off = F
+axpy_ij_use_blas = F
+init_time =     2.4735
+n_fields = 2
+n_moms   =  6
+nrgcols  = 10
+lx =   123.576    
+ly =   62.8319    
+Zeff_species =   1.000000
+PRECISION  = DOUBLE
+ENDIANNESS = LITTLE
+NUMBER_OF_NODES = 2       
+JOB_ID = 9906    
+OMP_NUM_THREADS =   1
+GIT_BRANCH = b9fd00d8545f5463890360d78c2aa356719fcc9b                    
+RELEASE = 3.2 - alpha 0
+MACHINE = cclr
+FCVERSION = 'ifort (IFORT) 2021.9.0 20230302'
+FFTLIB = mkl
+DATETIME = 20260424 140424.182
+/
+
+&units
+/
+
+&bsgrid
+is_bsg = F
+/
+
