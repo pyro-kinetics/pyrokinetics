@@ -126,6 +126,75 @@ def normalize_failed_runs(buffers: dict[str, list]) -> None:
 
 
 # ---- dataset assembly ----
+def stack_runs(arrays, last):
+    """Put every run's array for one quantity onto a single set of non-scan axes.
+
+    Runs of a scan need not agree on the shape of their output. A TGLF cell run
+    at ``NMODES=2`` and one run at ``NMODES=4`` give ``mode`` axes of different
+    length; cells run at different ``NXGRID`` give different ``theta`` grids.
+    Stacking those raw fails outright, so each ragged dimension is replaced by
+    the UNION of the runs' coordinate values -- in first-seen order, so a scan
+    whose runs all agree is untouched -- and a run contributes NaN wherever it
+    has no value on that axis. A ragged dimension carrying no coordinate has
+    nothing to align on and is padded to the longest run instead.
+
+    Returns ``(magnitudes, units, dims, coords, shape)``: the per-run arrays on
+    the common axes, the pint units stripped off them (``None`` if unitless),
+    and the dimensions, coordinates and shape those axes make up.
+    """
+    data_arrays = [a for a in arrays if isinstance(a, xr.DataArray)]
+    ragged = len({a.shape for a in data_arrays}) > 1
+
+    if not ragged:
+        raw, units = [], None
+        for a in arrays:
+            data = a.data
+            if hasattr(data, "magnitude"):
+                raw.append(data.magnitude)
+                units = data.units
+            else:
+                raw.append(np.asarray(data))
+        return raw, units, last.dims, dict(last.coords), last.shape
+
+    dims = last.dims
+    axes = {}
+    for dim in dims:
+        if dim in last.coords:
+            seen = {}
+            for a in data_arrays:
+                for v in np.asarray(a.coords[dim].values).ravel():
+                    seen.setdefault(v, None)
+            axes[dim] = np.asarray(list(seen))
+        else:
+            axes[dim] = np.arange(max(a.sizes[dim] for a in data_arrays))
+
+    shape = tuple(len(axes[dim]) for dim in dims)
+    index = {dim: {v: i for i, v in enumerate(axes[dim])} for dim in dims}
+
+    raw, units = [], None
+    complex_valued = any(
+        np.iscomplexobj(getattr(a.data, "magnitude", a.data)) for a in data_arrays
+    )
+    for a in arrays:
+        out = np.full(shape, np.nan, dtype=complex if complex_valued else float)
+        if isinstance(a, xr.DataArray):
+            data = a.data
+            if hasattr(data, "magnitude"):
+                units = data.units
+                data = data.magnitude
+            take = tuple(
+                np.asarray([index[dim][v] for v in np.asarray(a.coords[dim].values).ravel()])
+                if dim in a.coords
+                else np.arange(a.sizes[dim])
+                for dim in dims
+            )
+            out[np.ix_(*take)] = np.asarray(data)
+        raw.append(out)
+
+    coords = {dim: axes[dim] for dim in dims if dim in last.coords}
+    return raw, units, dims, coords, shape
+
+
 def add_quantity(
     ds, name, arrays, base_shape, scan_coords, scan_dims=None, squeeze_dims=None
 ):
@@ -173,32 +242,22 @@ def add_quantity(
                 for a in arrays
             ]
 
-    shape = base_shape + last.shape
+    raw, units, run_dims, run_coords, run_shape = stack_runs(arrays, last)
 
-    raw = []
-    units = None
-
-    for a in arrays:
-        data = a.data
-        if hasattr(data, "magnitude"):
-            raw.append(data.magnitude)
-            units = data.units
-        else:
-            raw.append(np.asarray(data))
-
+    shape = base_shape + run_shape
     stacked = np.stack(raw).reshape(shape)
 
     if units is not None:
         stacked = stacked * units
 
-    dims = tuple(scan_dims) + last.dims
+    dims = tuple(scan_dims) + run_dims
 
     arr = xr.DataArray(
         stacked,
         dims=dims,
         coords={
             **scan_coords,
-            **last.coords,
+            **run_coords,
         },
     )
 
@@ -729,6 +788,7 @@ class PyroScan:
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        load_eigenfunctions=True,
         sum_ky=True,
         drop_nan=False,
         **kwargs,
@@ -747,6 +807,11 @@ class PyroScan:
         load_fields (bool, default True) – Flag to load fields or not
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
+        load_eigenfunctions (bool, default True) – Flag to load eigenfunctions or
+            not. They carry a ``theta`` axis, which a scan whose runs use
+            different resolutions does not share, so the union axis
+            ``stack_runs`` builds for them can be far larger than any one run's.
+            Turn them off when only the eigenvalues are wanted.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
@@ -823,6 +888,11 @@ class PyroScan:
         if load_fields:
             load_specs["linear"]["fields"].extend(["phi", "bpar", "apar"])
             load_specs["nonlinear"]["fields"].extend(["phi", "bpar", "apar"])
+
+        if not load_eigenfunctions:
+            for load_spec in load_specs.values():
+                if "eigenfunctions" in load_spec["scalars"]:
+                    load_spec["scalars"].remove("eigenfunctions")
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
