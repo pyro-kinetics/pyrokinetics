@@ -167,6 +167,56 @@ def test_merge_fuel_impurity(
         )
 
 
+@pytest.mark.parametrize(
+    "keep_z,expected_zeff",
+    (
+        # After merging every ion into one, zeff = n_i Z_i^2 / n_e, and
+        # quasineutrality gives n_i Z_i = n_e, so zeff collapses to the merged Z.
+        (True, 1.0),
+        (False, 18.0 / 13.0),
+    ),
+)
+def test_merge_update_zeff(
+    simple_local_species: LocalSpecies, keep_z: bool, expected_zeff: float
+):
+    """``update_zeff`` recalculates zeff from the species left after the merge."""
+    simple_local_species.set_zeff()
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+    simple_local_species.merge_species(
+        "deuterium",
+        ["carbon12", "carbon13"],
+        keep_base_species_z=keep_z,
+        update_zeff=True,
+    )
+
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, expected_zeff)
+    np.testing.assert_allclose(
+        simple_local_species["deuterium"].z.magnitude, expected_zeff
+    )
+
+
+def test_merge_leaves_zeff_stale_by_default(simple_local_species: LocalSpecies):
+    """Without ``update_zeff`` the cached multi-species zeff survives the merge."""
+    simple_local_species.set_zeff()
+    simple_local_species.merge_species(
+        "deuterium", ["carbon12", "carbon13"], keep_base_species_z=True
+    )
+    # Only hydrogenic species remain, but zeff still describes the original plasma
+    assert simple_local_species.names == ["electron", "deuterium"]
+    np.testing.assert_allclose(simple_local_species["deuterium"].z.magnitude, 1.0)
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+
+def test_merge_update_zeff_isotopes(simple_local_species: LocalSpecies):
+    """Merging equal-charge isotopes conserves sum(n Z^2), so zeff is unchanged."""
+    simple_local_species.set_zeff()
+    simple_local_species.merge_species(
+        "carbon12", ["carbon13"], keep_base_species_z=True, update_zeff=True
+    )
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+
 def test_normalisation():
     """Test that a local species can be renormalised with simulation units."""
     pyro = pk.Pyro(gk_file=pk.gk_templates["GS2"])

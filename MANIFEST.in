@@ -1,0 +1,2 @@
+recursive-exclude src/pyrokinetics/templates/outputs *
+prune src/pyrokinetics/templates/outputs

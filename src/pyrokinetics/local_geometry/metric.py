@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.integrate as integrate
+from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from ..units import ureg
@@ -310,6 +311,79 @@ class MetricTerms:  # CleverDict
             index2 = np.argwhere(self.field_coords == coord2)
 
         return self._field_aligned_contravariant_metric[index1, index2][0][0]
+
+    def flux_surface_average(self, quantity):
+        r"""
+        Flux-surface average of a quantity defined on ``regulartheta``
+
+        .. math::
+            \langle A \rangle = \frac{\oint A \mathcal{J} d\theta}
+                                     {\oint \mathcal{J} d\theta}
+
+        where :math:`\mathcal{J}` is the Jacobian of the flux surface. This is the
+        standard :math:`dV`-weighted average, since :math:`dV = \mathcal{J}\,dr\,
+        d\theta\,d\zeta`.
+
+        Parameters
+        ----------
+        quantity : ArrayLike
+            Quantity to average, defined on the same :math:`\theta` grid as
+            ``regulartheta``. May be a plain array or a ``pint`` quantity; units
+            are preserved.
+
+        Returns
+        -------
+        Float
+            Flux-surface average of ``quantity``, with the same units as the input
+        """
+
+        jacobian = self.Jacobian.m
+
+        # scipy cannot integrate pint quantities, so strip units explicitly and
+        # re-attach them afterwards (UnitStrippedWarning is an error project-wide)
+        units = getattr(quantity, "units", None)
+        magnitude = quantity.m if units is not None else np.asarray(quantity)
+
+        average = simpson(magnitude * jacobian, x=self.regulartheta) / simpson(
+            jacobian, x=self.regulartheta
+        )
+
+        return average * units if units is not None else average
+
+    @property
+    def dVdr(self):
+        r"""
+        Derivative of the flux surface volume with respect to :math:`r`
+
+        .. math::
+            V' = \frac{\partial V}{\partial r}
+               = 2\pi \oint \mathcal{J} d\theta
+
+        The :math:`\theta` integral is normalised by ``theta_range`` so that the
+        result is independent of how many poloidal turns the grid spans, in the
+        same way as :attr:`Y` and the :math:`\partial B_\zeta / \partial r` terms.
+
+        ``LocalGeometry.get_flux_surface_area_volume_derivatives`` returns this same
+        quantity as its third element, integrating the identical Jacobian with an
+        adaptive quadrature over the fitted surface. This property is kept because
+        it is roughly three orders of magnitude cheaper -- it reuses the Jacobian
+        already evaluated on the :math:`\theta` grid, whereas the ``LocalGeometry``
+        routine runs three adaptive quadratures and discards two of the results.
+        The two are cross-checked in ``test_dVdr_matches_local_geometry``.
+
+        Returns
+        -------
+        Float, units [lref**2]
+            :math:`\partial V / \partial r`
+        """
+
+        return (
+            4
+            * np.pi**2
+            * simpson(self.Jacobian.m, x=self.regulartheta)
+            / self.theta_range
+            * self.Jacobian.units
+        )
 
     @property
     def B_zeta(self):

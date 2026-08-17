@@ -368,8 +368,9 @@ class LocalSpecies(CleverDict):
         merge_species: Iterable[str],
         keep_base_species_z: bool = False,
         keep_base_species_mass: bool = False,
+        update_zeff: bool = False,
     ) -> None:
-        """
+        r"""
         Merge multiple species into one. Performs a weighted average depending on the
         densities of each species to preserve quasineutrality.
 
@@ -387,6 +388,28 @@ class LocalSpecies(CleverDict):
             Mass of new species
                 True keeps base_species mass
                 False/None results in a density-weighted average
+        update_zeff: bool, default False
+            Whether to recalculate ``zeff`` from the species remaining after the merge.
+
+            ``zeff`` is *not* derived on demand: it is set once by
+            :func:`from_kinetics` and then cached. By default a merge leaves that
+            cached value untouched, so ``zeff`` continues to describe the original
+            multi-species plasma even though the species carrying the impurity charge
+            have gone. Pass ``True`` to make ``zeff`` consistent with the species
+            actually present.
+
+            The default is ``False`` for backwards compatibility, and because the
+            stale value is often the one you want. Consumers such as
+            :class:`~pyrokinetics.diagnostics.neoclassical.Redl2021` and
+            :class:`~pyrokinetics.diagnostics.neoclassical.Sauter1999` treat
+            :math:`Z_{\rm eff}` as an *independent* key parameter describing
+            electron-ion pitch-angle scattering in the real plasma, alongside the
+            trapped fraction and collisionality -- not as a property of whichever
+            species list is being carried. Merging impurities into a hydrogenic
+            species for a gyrokinetic run does not change how strongly electrons
+            scatter in the experiment, so for those models the cached value remains
+            the physical one. Set ``update_zeff=True`` when you want a
+            self-consistent single-ion plasma instead.
 
         Raises
         ------
@@ -441,6 +464,10 @@ class LocalSpecies(CleverDict):
         merge_species.remove(base_species)
 
         self.remove_species(*merge_species)
+
+        if update_zeff:
+            self.set_zeff()
+
         self.update_pressure()
         self.check_quasineutrality()
 

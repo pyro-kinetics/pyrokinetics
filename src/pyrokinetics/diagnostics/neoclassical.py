@@ -1,10 +1,10 @@
 import numpy as np
 from pint.errors import DimensionalityError
-from scipy.integrate import simpson
+from scipy.integrate import cumulative_trapezoid, simpson
 
 from ..decorators import not_implemented
 from ..pyro import Pyro
-from ..units import PyroContextError
+from ..units import PyroContextError, ureg
 
 
 class BootstrapModel:
@@ -42,7 +42,26 @@ class BootstrapModel:
         # Get total current
         self.get_total_current()
 
-    def get_total_current(self):
+        # Get toroidal current
+        self.get_toroidal_current()
+
+    def _get_grad_shafranov_terms(self):
+        r"""
+        Common Grad-Shafranov terms shared by the current calculations
+
+        Returns
+        -------
+        dpsidr : Float
+            :math:`\partial \psi / \partial r`, signed by ``ip_ccw``
+        F : Float
+            Current function :math:`F = R B_\zeta`, signed by ``bt_ccw``
+        Fprime : Float
+            :math:`\partial F / \partial \psi`
+        mu0_dpdpsi : Float
+            :math:`\mu_0 \partial p / \partial \psi`
+        mu0 : Float
+            :math:`\mu_0` in the normalised units of the current context
+        """
 
         metric = self.pyro.metric_terms
         dpsidr = metric.dpsidr * -self.ip_ccw
@@ -60,27 +79,142 @@ class BootstrapModel:
         B0 = 1 * self.B2_fsa.units**0.5
         mu0 = B0**2 * beta / (2 * self.pe)
 
+        return dpsidr, F, Fprime, mu0_dpdpsi, mu0
+
+    def get_total_current(self):
+        r"""
+        Total parallel current moment :math:`\langle J \cdot B \rangle` from the
+        Grad-Shafranov equation, and the external (non-bootstrap) remainder
+
+        .. math::
+            \langle J \cdot B \rangle =
+                \frac{F' \langle B^2 \rangle}{\mu_0} + F \frac{\partial p}{\partial \psi}
+        """
+
+        _, F, Fprime, mu0_dpdpsi, mu0 = self._get_grad_shafranov_terms()
+
         self.JdotB = (Fprime * self.B2_fsa + F * mu0_dpdpsi) / mu0
         self.JextdotB = self.JdotB - self.JbsdotB
 
     def get_Fprime_from_total_current(self, JdotB=None):
+        r"""
+        Invert :func:`get_total_current` to obtain :math:`F'` from a given
+        :math:`\langle J \cdot B \rangle`
+        """
 
-        metric = self.pyro.metric_terms
-        dpsidr = metric.dpsidr * -self.ip_ccw
-        mu0_dpdr = metric.mu0dPdr
-        mu0_dpdpsi = mu0_dpdr / dpsidr
-
-        F = metric.B_zeta * self.bt_ccw
-
-        try:
-            beta = self.pyro.numerics.beta.m
-        except AttributeError:
-            beta = self.pyro.norms.beta.m
-
-        B0 = 1 * self.B2_fsa.units**0.5
-        mu0 = B0**2 * beta / (2 * self.pe)
+        _, F, _, mu0_dpdpsi, mu0 = self._get_grad_shafranov_terms()
 
         return (JdotB * mu0 - F * mu0_dpdpsi) / self.B2_fsa
+
+    def get_toroidal_current(self):
+        r"""
+        Toroidal current density, decomposed into bootstrap, external and combined
+        Pfirsch-Schlüter + diamagnetic contributions.
+
+        The local toroidal current density follows from the Grad-Shafranov equation:
+
+        .. math::
+            J_\phi(\theta) = R \frac{\partial p}{\partial \psi}
+                           + \frac{F F'}{\mu_0 R}
+
+        Two flux-surface reductions of :math:`J_\phi` are provided, since they are
+        **not** the same quantity (they differ by roughly the elongation):
+
+        - ``Jphi_fsa``: the plain flux-surface average :math:`\langle J_\phi \rangle`.
+          This is the quantity transport codes such as SCENE, JETTO and TRANSP
+          report as their toroidal current density.
+        - ``Jphi_eff``: the effective toroidal current density
+          :math:`J_\phi^{\rm eff} = \frac{1}{2 \pi \rho} \frac{\partial I_p}{\partial \rho}
+          = \frac{V'}{4 \pi^2 \rho} \langle J_\phi / R \rangle`, i.e. the current density
+          of an equivalent circular cross-section of radius :math:`\rho`.
+
+        Each is split into three parts. Parallel driven currents (bootstrap and
+        external) contribute
+
+        .. math::
+            J_\phi^{d} = \frac{F \langle J^d_\parallel \cdot B \rangle}{\langle B^2 \rangle}
+                         \langle 1/R \rangle
+
+        for ``Jphi_fsa``, and the analogous form with
+        :math:`\frac{V'}{4 \pi^2 \rho} \langle R^{-2} \rangle` for ``Jphi_eff``. The
+        remaining Pfirsch-Schlüter and diamagnetic currents are grouped together.
+
+        Notes
+        -----
+        The external contribution is **auxiliary plus ohmic combined**. A local
+        calculation cannot separate them, since ``JextdotB`` is obtained by
+        subtracting the bootstrap current from the total.
+
+        ``get_bs_current`` takes the absolute value of ``JbsdotB``, so ``JextdotB``
+        and the external toroidal contributions derived from it are only correct
+        when :math:`\langle J \cdot B \rangle` is positive in the sign convention
+        of the equilibrium.
+
+        Sets ``Jphi``, ``Jphi_fsa``, ``Jphi_bs_fsa``, ``Jphi_ext_fsa``,
+        ``Jphi_psdia_fsa``, ``Jphi_eff``, ``Jphi_bs_eff``, ``Jphi_ext_eff``,
+        ``Jphi_psdia_eff`` and ``Ip``.
+        """
+
+        metric = self.pyro.metric_terms
+
+        dpsidr, F, Fprime, mu0_dpdpsi, mu0 = self._get_grad_shafranov_terms()
+
+        # dp/dpsi
+        dpdpsi = mu0_dpdpsi / mu0
+
+        # Flux surface averages of the geometry
+        R_fsa = metric.flux_surface_average(metric.R)
+        R_inv_fsa = metric.flux_surface_average(1.0 / metric.R)
+        R_inv2_fsa = metric.flux_surface_average(1.0 / metric.R**2)
+
+        Vprime = metric.dVdr
+        rho = metric.rho
+
+        # Local toroidal current density from the Grad-Shafranov equation
+        self.Jphi = metric.R * dpdpsi + F * Fprime / (mu0 * metric.R)
+
+        # --- Flux-surface averaged toroidal current density, <J_phi> ---
+        self.Jphi_fsa = R_fsa * dpdpsi + F * Fprime * R_inv_fsa / mu0
+
+        # Parallel driven currents, <J_d . B> F <1/R> / <B^2>
+        parallel_factor = F * R_inv_fsa / self.B2_fsa
+        self.Jphi_bs_fsa = parallel_factor * self.JbsdotB
+        self.Jphi_ext_fsa = parallel_factor * self.JextdotB
+
+        # Combined Pfirsch-Schlüter and diamagnetic contribution
+        self.Jphi_psdia_fsa = dpdpsi * (R_fsa - F**2 * R_inv_fsa / self.B2_fsa)
+
+        # --- Effective toroidal current density, (1 / 2 pi rho) dIp/drho ---
+        eff_factor = Vprime / (4 * np.pi**2 * rho)
+        self.Jphi_eff = eff_factor * (dpdpsi + F * Fprime * R_inv2_fsa / mu0)
+
+        parallel_factor_eff = eff_factor * F * R_inv2_fsa / self.B2_fsa
+        self.Jphi_bs_eff = parallel_factor_eff * self.JbsdotB
+        self.Jphi_ext_eff = parallel_factor_eff * self.JextdotB
+
+        self.Jphi_psdia_eff = (
+            eff_factor * dpdpsi * (1.0 - F**2 * R_inv2_fsa / self.B2_fsa)
+        )
+
+        # --- Radial derivative of the enclosed current, dIp/drho = 2 pi rho J_eff ---
+        # Integrating these over rho gives the total current carried by each
+        # component, see ``integrate_toroidal_current``
+        self.dIp_drho = 2 * np.pi * rho * self.Jphi_eff
+        self.dIp_bs_drho = 2 * np.pi * rho * self.Jphi_bs_eff
+        self.dIp_ext_drho = 2 * np.pi * rho * self.Jphi_ext_eff
+        self.dIp_psdia_drho = 2 * np.pi * rho * self.Jphi_psdia_eff
+
+        # --- Total toroidal current enclosed by this flux surface ---
+        # mu0 Ip = V' psi' <|grad rho|^2 / R^2> / (4 pi^2), using V' = 2 pi int(J dtheta)
+        # and psi' = 2 pi dpsidr. The leading minus sign puts Ip in the same sign
+        # convention as Jphi above, so that Ip = int(Jphi_eff 2 pi rho drho).
+        grad_r2 = metric.toroidal_contravariant_metric("r", "r")
+        self.Ip = (
+            -dpsidr
+            * Vprime
+            * metric.flux_surface_average(grad_r2 / metric.R**2)
+            / (2 * np.pi * mu0)
+        )
 
     def get_trapped_fraction(self):
 
@@ -91,10 +225,8 @@ class BootstrapModel:
         B_mod = abs(metric.B_magnitude)
         B_max = np.max(B_mod)
 
-        B2_fsa = simpson(B_mod.m**2 * Jacobian.m, x=theta) / simpson(
-            Jacobian.m, x=theta
-        )
-        B2_fsa_units = B2_fsa * B_mod.units**2
+        B2_fsa_units = metric.flux_surface_average(B_mod**2)
+        B2_fsa = B2_fsa_units.m
 
         lambd_grid = np.linspace(0, 1 / B_max, 100)
         lambd = np.tile(lambd_grid, (ntheta, 1))
@@ -653,3 +785,122 @@ class Sauter1999(BootstrapModel):
         # )
 
         self.Jbs = self.JbsdotB / np.sqrt(self.B2_fsa)
+
+
+def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwargs):
+    r"""
+    Total toroidal current carried by each component, integrated over the poloidal
+    cross-section of a set of flux surfaces.
+
+    A ``BootstrapModel`` describes a single flux surface, so the current enclosed by
+    each component cannot be obtained locally -- it requires a radial scan. This
+    function loops over ``psi_n``, builds ``model`` on each surface, and cumulatively
+    integrates
+
+    .. math::
+        I^d_p(\rho) = \int_0^{\rho} 2 \pi \rho' J^{d,\rm eff}_\phi \, d\rho'
+
+    for each of the bootstrap, external and Pfirsch-Schlueter + diamagnetic parts.
+
+    Notes
+    -----
+    There is only one set of total currents, and it follows from the ``Jphi_*_eff``
+    densities. ``Jphi_eff`` is *defined* as
+    :math:`\frac{1}{2 \pi \rho} \partial I_p / \partial \rho`, so its
+    :math:`2 \pi \rho` weighted integral is the enclosed current by construction.
+    ``Jphi_fsa`` is a reporting convention (it is what SCENE, JETTO and TRANSP call
+    their toroidal current density) but it is volume weighted, so integrating it over
+    the poloidal area does **not** give the plasma current -- for a strongly shaped
+    equilibrium that route is wrong by tens of percent.
+
+    The innermost surface contributes :math:`\pi \rho_0^2 J^{\rm eff}_\phi(\rho_0)`,
+    i.e. the current density is taken as constant between the magnetic axis and the
+    first surface. Start the scan close to the axis to keep this small.
+
+    Parameters
+    ----------
+    pyro : Pyro
+        Pyro object with a global equilibrium and kinetics loaded
+    psi_n : ArrayLike
+        Normalised poloidal flux values to scan over, in increasing order
+    model : type, default ``Redl2021``
+        ``BootstrapModel`` subclass to use
+    ntheta : int, optional
+        Number of theta points passed to the model
+    **kwargs
+        Additional keyword arguments passed to ``pyro.load_local``, for example
+        ``local_geometry="MXH"``
+
+    Returns
+    -------
+    dict
+        Dictionary of arrays over the surfaces that loaded successfully, with keys
+        ``psi_n``, ``rho`` [metre], ``Ip_bs``, ``Ip_ext``, ``Ip_psdia``, ``Ip`` (the
+        sum of the three components) and ``Ip_ampere`` (the enclosed current obtained
+        locally from Ampere's law on each surface, as an independent check), all in
+        amperes.
+
+        Results are returned in physical units rather than normalised ones, because
+        the normalisation references (``nref``, ``tref``, ``bref``) differ from one
+        flux surface to the next and so cannot label a radial profile.
+    """
+
+    psi_n = np.asarray(psi_n)
+
+    psi_n_ok = []
+    rho = []
+    dIp_drho = {"bs": [], "ext": [], "psdia": []}
+    Ip_ampere = []
+
+    for psi in psi_n:
+        try:
+            pyro.load_local(psi_n=psi, **kwargs)
+        except Exception:
+            continue
+
+        bootstrap = model(pyro, ntheta=ntheta)
+
+        # Convert to physical units here, inside the loop. The reference values
+        # behind the normalised units (nref, tref, bref) are those of the flux
+        # surface currently loaded, and are overwritten by the next load_local
+        # call -- so a normalised quantity kept across surfaces would later be
+        # converted using the wrong references.
+        psi_n_ok.append(psi)
+        rho.append(pyro.metric_terms.rho.to("meter").m)
+        dIp_drho["bs"].append(bootstrap.dIp_bs_drho.to("ampere / meter").m)
+        dIp_drho["ext"].append(bootstrap.dIp_ext_drho.to("ampere / meter").m)
+        dIp_drho["psdia"].append(bootstrap.dIp_psdia_drho.to("ampere / meter").m)
+        Ip_ampere.append(bootstrap.Ip.to("ampere").m)
+
+    if len(rho) < 2:
+        raise RuntimeError(
+            "Need at least two flux surfaces to integrate the toroidal current, "
+            f"but only {len(rho)} of {len(psi_n)} loaded successfully"
+        )
+
+    rho = np.array(rho) * ureg.meter
+
+    result = {
+        "psi_n": np.array(psi_n_ok),
+        "rho": rho,
+        "Ip_ampere": np.array(Ip_ampere) * ureg.ampere,
+    }
+
+    total = None
+    for name, values in dIp_drho.items():
+        derivative = np.array(values) * ureg.ampere / ureg.meter
+
+        # Contribution from the axis up to the first surface, assuming a constant
+        # current density there: int_0^rho0 2 pi rho J drho = rho0 / 2 * dIp/drho
+        axis = 0.5 * rho[0] * derivative[0]
+
+        integral = (
+            cumulative_trapezoid(derivative.m, rho.m, initial=0.0) * ureg.ampere + axis
+        )
+
+        result[f"Ip_{name}"] = integral
+        total = integral if total is None else total + integral
+
+    result["Ip"] = total
+
+    return result

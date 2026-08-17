@@ -37,6 +37,49 @@ from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
+def read_gene_geometry_data(filename: PathLike) -> np.ndarray:
+    """
+    Read the columns of data that follow the ``&parameters`` header of a GENE
+    geometry output file.
+
+    The length of that header depends on which parameters GENE wrote, so it is
+    found by looking for the line closing the namelist rather than assumed. The
+    number of rows read is checked against the ``gridpoints`` entry of the
+    header, which should equal ``nz0``.
+
+    Parameters
+    ----------
+    filename
+        Path to a GENE geometry file, e.g. ``miller_0001``.
+
+    Returns
+    -------
+    np.ndarray
+        2D array of geometry data, with one row per point along the field line.
+    """
+    with open(filename) as f:
+        for line_number, line in enumerate(f):
+            if line.strip() == "/":
+                skiprows = line_number + 1
+                break
+        else:
+            raise ValueError(
+                f"Could not find the end of the '&parameters' namelist in the GENE "
+                f"geometry file {filename}"
+            )
+
+    geometry_data = np.loadtxt(filename, skiprows=skiprows)
+
+    gridpoints = f90nml.read(filename)["parameters"].get("gridpoints", None)
+    if gridpoints is not None and len(geometry_data) != gridpoints:
+        raise ValueError(
+            f"Read {len(geometry_data)} rows of geometry data from {filename}, but "
+            f"its header declares gridpoints = {gridpoints}"
+        )
+
+    return geometry_data
+
+
 class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     """
     Class that can read GENE input files, and produce
@@ -360,11 +403,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             zeta = self.data["geometry"].get("zeta", -local_geometry_data["sn"][2])
 
             s_delta = (
-                self.data["geometry"].get("s_delta", local_geometry_data["dsndr"][1])
+                self.data["geometry"].get(
+                    "s_delta",
+                    local_geometry_data["dsndr"][1] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
             s_zeta = (
-                self.data["geometry"].get("s_zeta", -local_geometry_data["dsndr"][2])
+                self.data["geometry"].get(
+                    "s_zeta",
+                    -local_geometry_data["dsndr"][2] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
 
@@ -581,11 +630,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 if geo_dict["Lref"] == 0.0:
                     geo_dict["Lref"] = 1.0
 
-                skiprows = 19
-                if "edge_opt" in geometry_nml["parameters"].keys():
-                    skiprows += 1
-
-                geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+                geometry_data = read_gene_geometry_data(geometry_filename)
 
                 Z0 = self.data["geometry"].get("major_z", False)
                 if Z0:
@@ -1135,10 +1180,35 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
+
+        trpeps = self.data["geometry"].get("trpeps", 0.0)
+
+        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
+
+        if (
+            geometry_type not in ["tracer_efit", "gene"]
+            and minor_radius != 0.0
+            and trpeps != 0.0
+            and np.isclose(minor_radius, trpeps * major_radius)
+        ):
+            if np.isclose(major_radius, 1.0):
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, but major_r is 1.0, "
+                    "suggesting major-radius normalisation. Not changing minor_r.",
+                    UserWarning,
+                )
+            else:
+                minor_radius = 1.0
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, suggesting it was set "
+                    "to the local radius rather than the reference minor radius. "
+                    "Assuming minor-radius normalisation and setting minor_r to 1.0.",
+                    UserWarning,
+                )
+
         rgeo_rmaj = 1.0
         raxis_rmaj = None
 
-        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
         if geometry_type in ["tracer_efit", "gene"]:
             major_radius = 0.0
             minor_radius = 0.0
@@ -1508,8 +1578,14 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
-        downsample: Dict[str, Any] = {},
+        kxky_flux_spectra=False,
+        downsample: Dict[str, Any] | None = None,
+        **kwargs,
     ) -> GKOutput:
+
+        if downsample is None:
+            downsample = {}
+
         raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
         fmt_downsample = {}
         for key, value in downsample.items():
@@ -1525,11 +1601,19 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             if load_fields
             else None
         )
-        fluxes = (
-            self._get_fluxes(raw_data, gk_input, coords, downsample)
-            if load_fluxes
-            else None
-        )
+        if kxky_flux_spectra:
+            fluxes = self._get_kxky_flux_spectra(
+                raw_data, gk_input, coords, downsample, fields, load_fluxes
+            )
+            flux_dims = ("field", "species", "kx", "ky", "time")
+        else:
+            fluxes = (
+                self._get_fluxes(raw_data, gk_input, coords, downsample)
+                if load_fluxes
+                else None
+            )
+            flux_dims = ("field", "species", "time")
+
         moments = (
             self._get_moments(raw_data, gk_input, coords, downsample)
             if load_moments
@@ -1544,7 +1628,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # Assign units and return GKOutput
         field_dims = ("theta", "kx", "ky", "time")
-        flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
 
         # Assign units and return GKOutput
@@ -1670,8 +1753,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
+            # Honour either the binary or the h5 variant when detecting the
+            # naming convention, so a run that only wrote h5 moments (but
+            # still has text parameters/nrg) is recognised as ``.dat``.
             dat_matches = np.any(
-                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
+                [
+                    Path(filename / f"{p}.dat").is_file()
+                    or Path(filename / f"{p}.dat.h5").is_file()
+                    for p in prefixes
+                ]
             )
             if dat_matches:
                 suffix = "dat"
@@ -1685,10 +1775,17 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             suffix = filename.name.split("_")[-1]
             delimiter = "_"
 
-        # Get all files in the same dir
+        # Get all files in the same dir; fall back to ``<name>.h5`` if the
+        # binary sibling is absent (flux-spectra and geom readers both
+        # understand the h5 layouts).
         for prefix in prefixes:
-            if (dirname / f"{prefix}{delimiter}{suffix}").exists():
-                files[prefix] = dirname / f"{prefix}{delimiter}{suffix}"
+            binary_path = dirname / f"{prefix}{delimiter}{suffix}"
+            if binary_path.exists():
+                files[prefix] = binary_path
+                continue
+            h5_path = dirname / f"{prefix}{delimiter}{suffix}.h5"
+            if h5_path.exists():
+                files[prefix] = h5_path
 
         return files
 
@@ -2021,21 +2118,29 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
-                # Read in time data
-                time.extend(list(file.get("field/time")))
+                # Read in time data. Take the same time steps as the binary
+                # reader above, so that the time coordinate lines up with the
+                # data read here, downsampling included.
+                time_indices = list(range(*time_idx.indices(full_ntime)))
+                h5_time = np.asarray(file.get("field/time"))
+                time.extend(float(h5_time[it]) for it in time_indices)
                 for i_field in range(nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
-                    h5_dataset_names = list(file[h5_subgroup].keys())
-                    for i_time in range(ntime):
-                        h5_dataset = h5_subgroup + h5_dataset_names[i_time]
+                    h5_dataset_names = sorted(file[h5_subgroup].keys())
+                    for it_out, it in enumerate(time_indices):
+                        h5_dataset = h5_subgroup + h5_dataset_names[it]
                         raw_field = np.array(file.get(h5_dataset))
                         raw_field = np.array(
                             raw_field["real"] + raw_field["imaginary"] * 1j,
                             dtype="complex128",
                         )
-                        sliced_field[i_field, :, :, :, i_time] = np.swapaxes(
-                            raw_field, 0, 2
-                        )
+                        # Apply the same kx fft-shift + ky/theta slicing
+                        # the binary branch above uses, so the h5 path
+                        # produces an identically-ordered kx axis.
+                        shifted = np.swapaxes(raw_field, 0, 2)
+                        sliced_field[i_field, :, :, :, it_out] = shifted[
+                            kx_unshifted, ky_idx, theta_idx
+                        ]
 
         # Match pyro convention for ion/electron direction
         sliced_field = np.conjugate(sliced_field)
@@ -2077,6 +2182,173 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         return result
 
     @staticmethod
+    def _read_moments_array(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+        downsample: Dict[str, Any],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Read every moment GENE writes for each species, from either the binary
+        ``mom_<species>`` files or their HDF5 equivalents.
+
+        Returns
+        -------
+        moments
+            Array of shape ``(nspecies, nmoment, nkx, nky, ntheta, ntime)``
+            holding GENE's raw values, i.e. before the conjugation that matches
+            the pyrokinetics ion/electron direction convention. Moments are
+            ordered ``[n, Tpar, Tperp, qpar, qperp, upar]``, with three extra
+            entries when GENE evolves ``bpar``. For linear runs the ``kx`` and
+            ``theta`` axes hold the raw ``(nx, nz)`` data, which the caller is
+            expected to convert to ballooning space.
+        time
+            1D array with the time of each moment output.
+        """
+        species = [spec["name"] for spec in gk_input.data["species"]]
+        nspecies = len(species)
+
+        if f"mom_{species[0]}" not in raw_data:
+            raise FileNotFoundError(
+                "mom_<species> files were not found alongside the GENE output"
+            )
+
+        # Time data stored as binary (int, double, int)
+        # Check precision used in GENE
+        precision = gk_input.data["info"]["PRECISION"]
+        if precision == "SINGLE":
+            time_data_fmt = "=ifi"
+            complex_size = 8
+            dtype = np.complex64
+        elif precision == "DOUBLE":
+            time_data_fmt = "=idi"
+            complex_size = 16
+            dtype = np.complex128
+        else:
+            raise ValueError(
+                f"Pyrokinetics can't handle cases when GENE precision is {precision}"
+            )
+
+        time = []
+        time_data_size = struct.calcsize(time_data_fmt)
+
+        int_size = 4
+
+        kx_idx = downsample.get("kx_idx", slice(None)) if downsample else slice(None)
+        ky_idx = downsample.get("ky_idx", slice(None)) if downsample else slice(None)
+        theta_idx = (
+            downsample.get("theta_idx", slice(None)) if downsample else slice(None)
+        )
+        time_idx = (
+            downsample.get("time_idx", slice(None)) if downsample else slice(None)
+        )
+
+        nx = gk_input.data["box"]["nx0"]
+        nz = gk_input.data["box"]["nz0"]
+
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
+
+        # Take the time indices from the iteration count rather than from
+        # ``coords["time"]``, which _get_fields may already have overwritten
+        # with the raw field times.
+        time_indices = list(range(*time_idx.indices(full_ntime)))
+        ntime = len(time_indices)
+
+        # Account for kx data being ifft shifted
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
+        nmoment_output = 6
+        if len(coords["field"]) > 2:
+            nmoment_output += 3
+
+        moment_size = nx * nz * full_nky * complex_size
+
+        time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
+
+        if gk_input.is_linear():
+            moments = np.empty(
+                (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
+            )
+        else:
+            moments = np.empty(
+                (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
+            )
+
+        # GENE writes moments in a fixed order in the binary files; the HDF5
+        # layout stores them by name. This mapping matches the binary ordering.
+        h5_moment_names = ("dens", "T_par", "T_perp", "q_par", "q_perp", "u_par")
+
+        for i_sp, spec in enumerate(species):
+            mom_file = raw_data[f"mom_{spec}"]
+
+            # Read binary file if present
+            if ".h5" not in str(mom_file):
+                with open(mom_file, "rb") as f:
+                    for it_out, it in enumerate(time_indices):
+                        # Seek to requested time block
+                        f.seek(it * time_block_size)
+
+                        # Read time header
+                        time_value = struct.unpack(
+                            time_data_fmt, f.read(time_data_size)
+                        )[1]
+                        if i_sp == 0:
+                            time.append(time_value)
+                        for i_moment in range(nmoment_output):
+                            f.seek(int_size, 1)
+                            moment_offset = f.tell()
+                            mm = np.memmap(
+                                mom_file,
+                                dtype=dtype,
+                                mode="r",
+                                offset=moment_offset,
+                                shape=(nx, full_nky, nz),
+                                order="F",
+                            )
+                            moments[i_sp, i_moment, :, :, :, it_out] = mm[
+                                kx_unshifted, ky_idx, theta_idx
+                            ]
+
+                            # Skip over moment block + trailing marker
+                            f.seek(moment_size + int_size, 1)
+
+            # Read .h5 file if binary file absent
+            else:
+                if nmoment_output > len(h5_moment_names):
+                    raise NotImplementedError(
+                        "Reading the electromagnetic moments of a bpar GENE run "
+                        "from HDF5 is not yet supported"
+                    )
+                with h5py.File(mom_file, "r") as file:
+                    group = file[f"mom_{spec}"]
+                    step_names = sorted(group[h5_moment_names[0]].keys())
+                    h5_time = np.asarray(group["time"])
+                    for it_out, it in enumerate(time_indices):
+                        if i_sp == 0:
+                            time.append(float(h5_time[it]))
+                        for i_moment, name in enumerate(h5_moment_names):
+                            raw_moment = np.asarray(group[name][step_names[it]])
+                            # HDF5 datasets are stored as (nz, nky, nkx) with a
+                            # compound {real, imaginary} dtype: convert to
+                            # complex and transpose to the (nkx, nky, nz)
+                            # layout used by the binary reader above.
+                            raw_moment = np.asarray(
+                                raw_moment["real"] + 1j * raw_moment["imaginary"],
+                                dtype=dtype,
+                            )
+                            moments[i_sp, i_moment, :, :, :, it_out] = np.swapaxes(
+                                raw_moment, 0, 2
+                            )[kx_unshifted, ky_idx, theta_idx]
+
+        return moments, np.asarray(time)
+
+    @staticmethod
     def _get_moments(
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
@@ -2091,139 +2363,48 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if f"mom_{gk_input.data['species'][0]['name']}" not in raw_data:
             return {}
 
-        # Time data stored as binary (int, double, int)
-        # Check precision used in GENE
-        if gk_input.data["info"]["PRECISION"] == "SINGLE":
-            time_data_fmt = "=ifi"
-            complex_size = 8
-            dtype = np.complex64
-        elif gk_input.data["info"]["PRECISION"] == "DOUBLE":
-            time_data_fmt = "=idi"
-            complex_size = 16
-            dtype = np.complex128
-        else:
-            raise ValueError(
-                f"Pyrokinetics can't handle cases when GENE precision is {gk_input.data['info']['PRECISION']}"
-            )
-
-        time = []
-        time_data_size = struct.calcsize(time_data_fmt)
-
-        int_size = 4
-
-        if downsample:
-            kx_idx = downsample.get("kx_idx", None)
-            ky_idx = downsample.get("ky_idx", None)
-            theta_idx = downsample.get("theta_idx", None)
-            time_idx = downsample.get("time_idx", None)
-        else:
-            kx_idx = None
-            ky_idx = None
-            theta_idx = None
-            time_idx = None
-
-        kx_idx = slice(None) if kx_idx is None else kx_idx
-        ky_idx = slice(None) if ky_idx is None else ky_idx
-        theta_idx = slice(None) if theta_idx is None else theta_idx
-        time_idx = slice(None) if time_idx is None else time_idx
-
-        nx = gk_input.data["box"]["nx0"]
-        nz = gk_input.data["box"]["nz0"]
-
-        nkx = len(coords["kx"])
-        nky = len(coords["ky"])
-        ntheta = len(coords["theta"])
-        ntime = len(coords["time"])
-
-        full_nky = len(coords["full_ky"])
-        full_ntime = len(coords["full_time"])
-
-        # Account for kx data being ifft shifted
-        kx_shifted = list(range(*kx_idx.indices((nx))))
-        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
-
-        species = [species["name"] for species in gk_input.data["species"]]
-        nspecies = len(species)
-
-        nmoment_output = 6
-        if len(coords["field"]) > 2:
-            nmoment_output += 3
-
-        moment_size = nx * nz * full_nky * complex_size
-
-        time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
-
-        if gk_input.is_linear():
-            sliced_moment = np.empty(
-                (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
-            )
-        else:
-            sliced_moment = np.empty(
-                (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
-            )
-
-        moments = np.empty(
-            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
+        sliced_moment, time = GKOutputReaderGENE._read_moments_array(
+            raw_data, gk_input, coords, downsample
         )
-        for i_sp, spec in enumerate(species):
-            # Read binary file if present
-            if ".h5" not in str(raw_data[f"mom_{spec}"]):
-                with open(raw_data[f"mom_{spec}"], "rb") as f:
-                    for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
-                        # Seek to requested time block
-                        f.seek(it * time_block_size)
 
-                        # Read time header
-                        time_value = struct.unpack(
-                            time_data_fmt, f.read(time_data_size)
-                        )[1]
-                        if i_sp == 0:
-                            time.append(time_value)
-                        for i_moment in range(nmoment_output):
-                            f.seek(int_size, 1)
-                            moment_offset = f.tell()
-                            mm = np.memmap(
-                                raw_data[f"mom_{spec}"],
-                                dtype=dtype,
-                                mode="r",
-                                offset=moment_offset,
-                                shape=(nx, full_nky, nz),
-                                order="F",
-                            )
-                            sliced_moment[i_sp, i_moment, :, :, :, it_out] = mm[
-                                kx_unshifted, ky_idx, theta_idx
-                            ]
+        # Match pyro convention for ion/electron direction
+        sliced_moment = np.conjugate(sliced_moment)
 
-                            # Skip over field block + trailing marker
-                            f.seek(moment_size + int_size, 1)
+        if not gk_input.is_linear():
+            moments = sliced_moment
 
-            # Read .h5 file if binary file absent
-            else:
-                raise NotImplementedError("Moments from HDf5 not yet supported")
+        # Convert from kx to ballooning space
+        else:
+            nz = gk_input.data["box"]["nz0"]
+            nx = gk_input.data["box"]["nx0"]
+            nspecies, nmoment_output = sliced_moment.shape[:2]
+            ntime = sliced_moment.shape[-1]
+            moments = np.empty(
+                (
+                    nspecies,
+                    nmoment_output,
+                    len(coords["kx"]),
+                    len(coords["ky"]),
+                    len(coords["theta"]),
+                    ntime,
+                ),
+                dtype=sliced_moment.dtype,
+            )
 
-            # Match pyro convention for ion/electron direction
-            sliced_moment = np.conjugate(sliced_moment)
+            try:
+                n0_global = gk_input.data["box"]["n0_global"]
+                q0 = gk_input.data["geometry"]["q0"]
+                phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
+            except KeyError:
+                phase_fac = -1
 
-            if not gk_input.is_linear():
-                nl_shape = (nspecies, nmoment_output, nkx, nky, ntheta, ntime)
-                moments = sliced_moment.reshape(nl_shape, order="F")
-
-            # Convert from kx to ballooning space
-            else:
-                try:
-                    n0_global = gk_input.data["box"]["n0_global"]
-                    q0 = gk_input.data["geometry"]["q0"]
-                    phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
-                except KeyError:
-                    phase_fac = -1
-
-                i_ball = 0
-                nx_actual = nx - 1 + nx % 2
-                for i_conn in range(0, nx_actual):
-                    moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
-                        sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
-                    )
-                    i_ball += nz
+            i_ball = 0
+            nx_actual = nx - 1 + nx % 2
+            for i_conn in range(0, nx_actual):
+                moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
+                    sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
+                )
+                i_ball += nz
 
         # =================================================
 
@@ -2439,14 +2620,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if gk_input.data["geometry"].get("norm_flux_projection", False):
             geometry_type = gk_input.data["geometry"]["magn_geometry"]
 
-            geometry_filename = raw_data[geometry_type]
-            geometry_nml = f90nml.read(geometry_filename)
-
-            skiprows = 19
-            if "edge_opt" in geometry_nml["parameters"].keys():
-                skiprows += 1
-
-            geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+            geometry_data = read_gene_geometry_data(raw_data[geometry_type])
 
             grho = np.sqrt(geometry_data[:, 0])
             jacob = geometry_data[:, -6]
@@ -2461,6 +2635,204 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
+
+    @staticmethod
+    def _read_geom_jacobian(
+        raw_data: Dict[str, Any], gk_input: GKInputGENE
+    ) -> Optional[np.ndarray]:
+        """Return GENE's per-theta Jacobian column from the geometry file.
+
+        The output is normalised so that ``jac_norm.mean() == 1``, i.e. a
+        flux-surface average is ``(jac_norm * X).mean(axis=theta)``. Returns
+        ``None`` if the geometry file isn't available.
+        """
+        geometry_type = gk_input.data["geometry"].get("magn_geometry", None)
+        if geometry_type is None or geometry_type not in raw_data:
+            return None
+        geom_fn = raw_data[geometry_type]
+        if ".h5" in str(geom_fn):
+            with h5py.File(geom_fn, "r") as fh:
+                jac = np.asarray(fh["Bfield_terms/Jacobian"])
+        else:
+            geom_nml = f90nml.read(geom_fn)
+            # Header is 18 lines (namelist body + closing '/'), plus 1 if
+            # ``edge_opt`` is written. This path is aligned shape-for-shape
+            # with the theta axis of the moments, so it needs exactly the
+            # ``nz0`` rows of geometry data.
+            skiprows = 18 + ("edge_opt" in geom_nml["parameters"])
+            geom_data = np.loadtxt(geom_fn, skiprows=skiprows)
+            jac = geom_data[:, -6]
+        return jac / jac.mean()
+
+    @staticmethod
+    def _get_kxky_flux_spectra(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+        downsample: Dict[str, Any],
+        fields: Optional[Dict[str, np.ndarray]],
+        load_fluxes: bool,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Fluxes resolved in ``(kx, ky)``, computed from the moment and field
+        files rather than read from the volume-integrated ``nrg`` file.
+
+        Checks that everything the calculation needs is available, then hands
+        over to :py:meth:`_get_flux_spectra`. The result replaces the fluxes
+        that would otherwise come from ``nrg``, and shares the standard
+        ``time`` coordinate.
+        """
+        if coords["linear"]:
+            raise NotImplementedError(
+                "kxky_flux_spectra is nonlinear-only: a linear GENE run holds a "
+                "single mode, so its fluxes need no (kx, ky) spectrum"
+            )
+
+        if not load_fluxes:
+            raise ValueError(
+                "kxky_flux_spectra replaces the fluxes read from the nrg file, "
+                "so it can't be combined with load_fluxes=False"
+            )
+
+        if not fields:
+            raise ValueError(
+                "kxky_flux_spectra requires load_fields=True: phi and apar are "
+                "needed to build the ExB and flutter velocities"
+            )
+
+        raw_moments, moment_time = GKOutputReaderGENE._read_moments_array(
+            raw_data, gk_input, coords, downsample
+        )
+
+        # The spectra multiply moments and fields at equal times and are stored
+        # on the standard time coordinate, so the two must share a cadence.
+        time = np.asarray(coords["time"])
+        if len(moment_time) != len(time) or not np.allclose(moment_time, time):
+            raise ValueError(
+                "GENE moments and fields must be written at the same times to "
+                "build flux spectra, but their time axes differ. Check that "
+                "istep_mom and istep_field match in the GENE input file."
+            )
+
+        jac_norm = GKOutputReaderGENE._read_geom_jacobian(raw_data, gk_input)
+        if jac_norm is None:
+            raise FileNotFoundError(
+                "GENE geometry file not found; it is required for flux spectra, "
+                "as it provides the per-theta Jacobian"
+            )
+
+        return GKOutputReaderGENE._get_flux_spectra(
+            raw_moments, fields, jac_norm, gk_input, coords
+        )
+
+    @staticmethod
+    def _get_flux_spectra(
+        raw_moments: np.ndarray,
+        fields: Dict[str, np.ndarray],
+        jac_norm: np.ndarray,
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
+        """Compute (field, species, kx, ky, time) flux spectra following
+        ``fluxspectra2D.pro`` from GENE's diagpy diagnostics.
+
+        The result has the same layout as the fluxes read from the ``nrg``
+        file by :py:meth:`_get_fluxes`, resolved in ``(kx, ky)``: the ``phi``
+        entry of the field axis holds the electrostatic (ExB) contribution and
+        the ``apar`` entry the electromagnetic (flutter) one.
+
+        Formulas (per species s, per (kx, ky), flux-surface averaged in theta):
+
+        * ``particle[phi]  = <conj(n) * v_Ex>_theta * n_s``
+        * ``heat[phi]      = <conj(Tpar/2 + Tperp + 3n/2) * v_Ex>_theta * n_s T_s``
+        * ``particle[apar] = <conj(upar) * B_x>_theta * n_s``
+        * ``heat[apar]     = <conj(qpar + qperp) * B_x>_theta * n_s T_s``
+
+        where ``v_Ex = -i k_y phi / B_ref`` and ``B_x = +i k_y A_par / B_ref``.
+        GENE lumps the ``bpar`` contribution in with ``apar``, as it does in
+        the ``nrg`` file, so the ``bpar`` entry is left at zero.
+
+        ``raw_moments`` must be the un-conjugated GENE values (shape
+        ``(nspecies, nmoment, nkx, nky, ntheta, ntime)``) as returned by
+        :py:meth:`_read_moments_array`. ``fields`` is the dict returned by
+        :py:meth:`_get_fields`, which *is* conjugated — we undo it here to
+        recover GENE's raw fields before applying the formulas.
+
+        A factor of 2 is applied to ``ky > 0`` modes (hermitian symmetry:
+        GENE stores only ``ky >= 0``). Summed over ``(kx, ky)`` the result
+        reproduces the volume-integrated ``nrg`` fluxes; the shipped
+        ``GENE_nonlinear_cbc`` fixture and
+        ``tests/gk_code/test_gk_output_reader_gene.py::test_kxky_flux_spectra_matches_nrg``
+        check this for both the binary and the HDF5 readers.
+        """
+        nspecies = raw_moments.shape[0]
+        nfield = len(coords["field"])
+        ky = np.asarray(coords["ky"])
+
+        # Un-conjugate pyro-stored fields back to raw GENE values so we
+        # match the IDL formulas directly.
+        phi = np.conj(fields["phi"])  # (theta, kx, ky, time)
+        has_apar = "apar" in fields
+        apar = np.conj(fields["apar"]) if has_apar else None
+
+        # Broadcast ky (theta, kx, ky, time) from a 1-D ky array.
+        ky_b = ky[None, None, :, None]
+        # TODO: use actual B_ref(theta) from geometry — for now take 1
+        # (GENE's raw fields already divide by B_ref in normalised units).
+        ve_x = -1j * ky_b * phi
+        B_x = 1j * ky_b * apar if has_apar else None
+
+        # Flux-surface average with jac_norm.
+        jac = jac_norm[:, None, None, None]  # broadcast over (theta, kx, ky, time)
+
+        def fs_avg(arr):
+            return (jac * arr).mean(axis=0).real  # theta axis
+
+        species_list = gk_input.data["species"]
+        nkx = raw_moments.shape[2]
+        nky = raw_moments.shape[3]
+        ntime = raw_moments.shape[5]
+        real_dtype = np.float32 if ve_x.dtype == np.complex64 else np.float64
+
+        if nfield == 3:
+            logging.warning(
+                "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar "
+                "flux spectra to zero"
+            )
+
+        particle = np.zeros((nfield, nspecies, nkx, nky, ntime), dtype=real_dtype)
+        heat = np.zeros_like(particle)
+
+        # Process one species at a time to cut peak memory (each moment array
+        # is theta*kx*ky*time complex, and we'd otherwise form several
+        # species-resident copies).
+        for i_sp, spec in enumerate(species_list):
+            dens_s = spec["dens"]
+            temp_s = spec["temp"]
+            # raw_moments[i_sp, i_moment, kx, ky, theta, time]; move theta to axis 0.
+            m = np.moveaxis(raw_moments[i_sp], 3, 1)  # (nmoment, theta, kx, ky, time)
+            n_s = m[0]
+            pressure = 0.5 * m[1] + m[2] + 1.5 * n_s
+            particle[0, i_sp] = fs_avg(np.conj(n_s) * ve_x) * dens_s
+            heat[0, i_sp] = fs_avg(np.conj(pressure) * ve_x) * (dens_s * temp_s)
+            if has_apar:
+                upar = m[5]
+                qsum = m[3] + m[4]
+                particle[1, i_sp] = fs_avg(np.conj(upar) * B_x) * dens_s
+                heat[1, i_sp] = fs_avg(np.conj(qsum) * B_x) * (dens_s * temp_s)
+
+        # Hermitian-symmetry weight: GENE stores only ky >= 0. For any
+        # quadratic flux F(ky) = Re(A* B) we have F(-ky) = F(ky), so a
+        # physical-space total requires weight 2 on ky > 0 modes and 1 on
+        # ky = 0. Without this the (kx, ky) sums come out at half the
+        # volume-integrated nrg fluxes.
+        ky_weight = np.where(ky > 0, 2.0, 1.0)  # (nky,)
+        ky_weight = ky_weight[None, None, None, :, None]
+        particle *= ky_weight
+        heat *= ky_weight
+
+        # GENE writes no momentum moments, so no momentum spectrum is returned.
+        return {"particle": particle, "heat": heat}
 
     @staticmethod
     def _get_eigenvalues(

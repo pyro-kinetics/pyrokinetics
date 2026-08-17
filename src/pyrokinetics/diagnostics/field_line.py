@@ -168,7 +168,7 @@ class FieldLine:
             Sets upper limit of field line integral (default pi). Can't be set if nturns>1
         max_fraction : float, optional
            Maximum allowed x‐step size as a fraction of the full radial domain Lx.
-           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Steps with ``|Δx|`` > ``max_fraction * Lx`` issue a warning but are retained.
            Default is 0.25.
         pad_factor : int, optional
            Factor by which to pad the kx spectrum before transforming.
@@ -262,7 +262,7 @@ class FieldLine:
             cumulative displacements are available.
         max_fraction: float, optional
            Maximum allowed x‐step size as a fraction of the full radial domain Lx.
-           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Steps with ``|Δx|`` > ``max_fraction * Lx`` issue a warning but are retained.
            Default is 0.25.
         pad_factor: int, optional
            Factor by which to pad the kx spectrum before transforming.
@@ -386,17 +386,26 @@ class FieldLine:
         """
         Compute the radial correlation length λ_x at each y using the Wiener–Khinchin theorem.
 
-        1. Reconstructs b(x) = ∂y A_par via direct Fourier‐mode summation using `self._invfft`.
-        2. Computes the power spectrum P(k) = |FFT[b(x)]|².
-        3. Obtains the autocorrelation C(Δ) = IFFT[P(k)], normalized so C(0)=1.
-        4. Identifies λ_x(θ,y) as the smallest Δ where C(Δ) = 1/e.
+        #. Reconstructs ``b(x) = ∂y A_par`` via direct Fourier-mode summation
+           using ``self._invfft``.
+
+        #. Computes the power spectrum ``P(k) = |FFT[b(x)]|²``.
+
+        #. Obtains the autocorrelation ``C(Δ) = IFFT[P(k)]``,
+           normalized so ``C(0)=1``.
+
+        #. Identifies ``λ_x(θ,y)`` as the smallest ``Δ`` where
+           ``C(Δ) = 1/e``.
+
         Finally, λ_x(y) is taken as the mean over θ.
 
         You need to load the simulation output files before calling this function.
 
         Parameters
         ----------
-        time: float, time reference
+        time: float
+            Time reference
+
         Returns
         -------
         points: ArrayLike, units [rhoref]
@@ -511,7 +520,7 @@ class FieldLine:
             Sets upper limit of field line integral (default pi). Can't be set if nturns>1
         max_fraction : float, optional
            Maximum allowed x‐step size as a fraction of the full radial domain Lx.
-           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Steps with ``|Δx|`` > ``max_fraction * Lx`` issue a warning but are retained.
            Default is 0.25.
         pad_factor : int, optional
            Factor by which to pad the kx spectrum before transforming.

@@ -16,4 +16,4 @@ cases:
    *
 
 .. _reStructuredText Primer:
-.. _here: https://github.com/pyro-kinetics/pyrokinetics/tree/unstable/docs/examples
+.. _here: https://github.com/pyro-kinetics/pyrokinetics/tree/main/docs/examples
