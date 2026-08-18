@@ -369,6 +369,7 @@ class LocalSpecies(CleverDict):
         keep_base_species_z: bool = False,
         keep_base_species_mass: bool = False,
         update_zeff: bool = False,
+        update_nu: bool = False,
     ) -> None:
         r"""
         Merge multiple species into one. Performs a weighted average depending on the
@@ -410,6 +411,30 @@ class LocalSpecies(CleverDict):
             scatter in the experiment, so for those models the cached value remains
             the physical one. Set ``update_zeff=True`` when you want a
             self-consistent single-ion plasma instead.
+        update_nu: bool, default False
+            Whether to rescale the base species' collision frequency ``nu`` to match
+            its post-merge charge, density and mass.
+
+            ``nu`` is a *like-species* frequency,
+            :math:`\nu_s \propto z_s^4 n_s / (T_s^{3/2} \sqrt{m_s})`, set once by
+            :func:`from_kinetics` (or read from a gyrokinetic input file) and not
+            otherwise derived. By default the merge leaves it untouched, so the base
+            species keeps a ``nu`` belonging to its pre-merge density -- which is
+            inconsistent with the ``dens`` written alongside it. Pass ``True`` to
+            rescale it by the factor the merge implies.
+
+            The value is rescaled, not recomputed from scratch, so the Coulomb
+            logarithm and unit convention already carried by ``nu`` survive. That
+            matters because ``nu`` need not have come from ``from_kinetics`` at all:
+            for a ``LocalSpecies`` read from a gyrokinetic input file it is whatever
+            that file specified, and rebuilding it would silently substitute
+            pyrokinetics' own Coulomb logarithm -- which cannot even be evaluated
+            without physical densities and temperatures.
+
+            The default is ``False`` for backwards compatibility. Note that neither
+            setting reproduces the real main-ion collisionality: collisions against
+            the full ion mix go as :math:`Z^2 n_e Z_{\rm eff}`, which a single merged
+            species cannot represent. See also ``update_zeff``.
 
         Raises
         ------
@@ -456,10 +481,25 @@ class LocalSpecies(CleverDict):
                 / new_dens
             )
 
+        # collision frequency, rescaled rather than rebuilt so that whatever Coulomb
+        # logarithm and unit convention are already baked into ``nu`` are preserved.
+        # nu ~ z^4 dens / (temp^1.5 sqrt(mass)), and temp is unchanged by the merge.
+        if update_nu:
+            base = self[base_species]
+            new_nu = (
+                base.nu
+                * (new_z / base.z) ** 4
+                * (new_dens / base.dens)
+                * np.sqrt(base.mass / new_mass)
+            )
+
         self[base_species].dens = new_dens
         self[base_species].z = new_z
         self[base_species].inverse_ln = new_inverse_ln
         self[base_species].mass = new_mass
+
+        if update_nu:
+            self[base_species].nu = new_nu
 
         merge_species.remove(base_species)
 
