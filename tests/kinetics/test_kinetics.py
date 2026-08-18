@@ -872,3 +872,82 @@ def test_merge_species_global_round_trip(scene_file):
         deuterium_dens_after, deuterium_dens_before + tritium_dens_before, rtol=1e-6
     )
     np.testing.assert_allclose(info["Z_eff_profile"], 1.0)
+
+
+def _zeff_by_hand(kinetics, psi_q):
+    """Zeff = sum_ions n_i Z_i^2 / n_e, evaluated directly from the species."""
+    ne = kinetics.species_data["electron"].get_dens(psi_q).to("meter**-3").m
+    zeff = np.zeros_like(ne)
+    for name in kinetics.species_names:
+        if name == "electron":
+            continue
+        species = kinetics.species_data[name]
+        zeff += (
+            species.get_dens(psi_q).to("meter**-3").m
+            * kinetics.Z_profile(species, False, psi_q) ** 2
+        )
+    return zeff / ne
+
+
+def test_merge_species_global_preserve_zeff(jetto_file):
+    """``preserve_zeff`` stashes the pre-merge Zeff for LocalSpecies to pick up."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+
+    psi = np.linspace(0.05, 0.95, 11)
+    psi_q = psi * units.dimensionless
+    expected = _zeff_by_hand(kinetics, psi_q)
+    # the JETTO template carries carbon, so this is a genuine multi-species case
+    assert np.all(expected > 1.1)
+
+    ions = [name for name in kinetics.species_names if name != "electron"]
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=[name for name in ions if name != "deuterium"],
+        psi=psi,
+        keep_base_species_z=True,
+        preserve_zeff=True,
+    )
+
+    # every ion is now hydrogenic, so a fresh calculation would give 1.0 ...
+    np.testing.assert_allclose(_zeff_by_hand(kinetics, psi_q), 1.0, rtol=1e-6)
+    # ... but the stashed profile still describes the original plasma
+    np.testing.assert_allclose(
+        kinetics.zeff_profile(psi_q).magnitude, expected, rtol=1e-6
+    )
+
+
+def test_merge_species_global_no_zeff_profile_by_default(jetto_file):
+    """Without ``preserve_zeff`` nothing is stashed, so downstream behaviour is
+    unchanged and LocalSpecies keeps deriving Zeff itself."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+    assert not hasattr(kinetics, "zeff_profile")
+
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["impurity1"],
+        keep_base_species_z=True,
+    )
+
+    assert not hasattr(kinetics, "zeff_profile")
+
+
+def test_merge_species_global_preserve_zeff_sums_over_unmerged_ions(jetto_file):
+    """Zeff must cover every ion, including those left out of the merge."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+
+    psi = np.linspace(0.05, 0.95, 11)
+    psi_q = psi * units.dimensionless
+    expected = _zeff_by_hand(kinetics, psi_q)
+
+    # merge only the fast deuterium, leaving carbon (which dominates Zeff) alone
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["deuterium_fast"],
+        psi=psi,
+        keep_base_species_z=True,
+        preserve_zeff=True,
+    )
+
+    np.testing.assert_allclose(
+        kinetics.zeff_profile(psi_q).magnitude, expected, rtol=1e-6
+    )

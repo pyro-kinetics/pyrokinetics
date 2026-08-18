@@ -283,6 +283,7 @@ class Kinetics(ReadableFromFile):
         keep_base_species_z: bool = True,
         keep_base_species_mass: bool = True,
         round_charge: bool = False,
+        preserve_zeff: bool = False,
     ):
         """
         Global merge analogue of LocalSpecies.merge_species(), implemented for global Species.
@@ -304,6 +305,23 @@ class Kinetics(ReadableFromFile):
             m_eff(psi) = sum_i [ m_i n_i(psi) ] / n_new(psi)
             but Species.mass is scalar in this API (get_mass has no psi argument), so we
             store a density-weighted scalar effective mass, and return m_eff(psi) for inspection.
+
+        If preserve_zeff=True:
+            Zeff(psi) = sum_ions [ n_i(psi) Z_i(psi)^2 ] / n_e(psi) is evaluated over
+            *all* ions before the merge and stored as ``self.zeff_profile``, which
+            LocalSpecies.from_kinetics then uses in place of its own calculation.
+
+            This exists because neither Kinetics nor Species carries a Zeff. It is
+            derived downstream in LocalSpecies.from_kinetics from whichever species
+            survive, so by default a global merge silently resets Zeff towards the
+            base species' charge -- merging every ion into deuterium gives Zeff = 1.
+            That differs from LocalSpecies.merge_species, which by default leaves its
+            cached Zeff untouched. Pass preserve_zeff=True to keep the real plasma's
+            electron-ion scattering, matching the local default.
+
+            Note there is no equivalent for the collision frequency: ``nu`` is also
+            built in from_kinetics, always self-consistently with the surviving
+            species, so a global merge has no stale value to correct.
 
         Notes
         -----
@@ -337,6 +355,29 @@ class Kinetics(ReadableFromFile):
             raise ValueError("psi grid must be strictly increasing")
 
         psi_q = psi * units.dimensionless
+
+        # Capture Zeff before anything is merged away. Neither Kinetics nor Species
+        # carries a Zeff: it is derived in LocalSpecies.from_kinetics from whichever
+        # species survive, so a global merge otherwise silently collapses it towards
+        # the base species' charge. Summing over every ion, not just merge_set, since
+        # species left out of the merge still scatter electrons.
+        if preserve_zeff:
+            if "electron" not in sp:
+                raise ValueError(
+                    "preserve_zeff requires an electron species to normalise against"
+                )
+            ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
+            zeff = np.zeros_like(psi, dtype=float)
+            for name in list(self.species_names):
+                if name == "electron":
+                    continue
+                s = sp[name]
+                zeff += (
+                    s.get_dens(psi_q).to("meter**-3").m
+                    * self.Z_profile(s, round_charge, psi_q) ** 2
+                )
+            zeff /= np.maximum(ne, 1e-300)
+            self.zeff_profile = UnitSpline(psi_q, zeff * units.elementary_charge)
 
         # Collect n_i(psi), Z_i(psi), and scalar masses
         dens_arr = []
