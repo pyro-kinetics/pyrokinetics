@@ -330,10 +330,83 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
+        if not self.runfile_dict:
+            self.ensure_unique_run_names()
+
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
         self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
+
+    def _format_single_run_name_with_fmt(self, parameters, fmt):
+        return self.parameter_separator.join(
+            f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{fmt}}"
+            for param, value in parameters.items()
+        )
+
+    def _hashable_value(self, value):
+        """
+        Convert scan parameter values into hashable objects for duplicate detection.
+        Handles pint Quantities, numpy scalars, numpy arrays, and plain Python values.
+        """
+        if isinstance(value, Quantity):
+            value = value.magnitude
+
+        value = np.asarray(value)
+
+        if value.shape == ():
+            return value.item()
+
+        return tuple(value.ravel().tolist())
+
+    def _scan_point_key(self, parameters):
+        """
+        Canonical key for detecting genuinely duplicated scan points.
+        """
+        return tuple(
+            (param, self._hashable_value(value)) for param, value in parameters.items()
+        )
+
+    def ensure_unique_run_names(self):
+        """
+        Ensure automatically generated run directory names are unique across
+        the whole scan. If close values collide due to rounding, increase
+        value_fmt precision. If scan points are genuinely duplicated, raise.
+        """
+        runs = list(self.outer_product())
+
+        # First detect genuinely duplicated scan points.
+        scan_keys = [self._scan_point_key(run) for run in runs]
+
+        if len(scan_keys) != len(set(scan_keys)):
+            raise ValueError(
+                "duplicate scan points detected; cannot generate unique directories"
+            )
+
+        fmt = self.value_fmt
+
+        def run_names(fmt):
+            return [self._format_single_run_name_with_fmt(run, fmt) for run in runs]
+
+        names = run_names(fmt)
+
+        while len(names) != len(set(names)):
+            warnings.warn(
+                f"Rounding collision detected in generated run directories; "
+                f"increasing precision to ensure unique directory names: {fmt}",
+                UserWarning,
+            )
+
+            if "." in fmt:
+                p = int(fmt.split(".")[1][:-1]) + 1
+                fmt = f".{p}f"
+            else:
+                fmt = ".3f"
+
+            names = run_names(fmt)
+
+        self.value_fmt = fmt
+        self.pyroscan_json["value_fmt"] = fmt
 
     def format_single_run_name(self, parameters):
         """
@@ -375,11 +448,10 @@ class PyroScan:
             return self.runfile_dict[key_str]
 
         else:
+
             return self.parameter_separator.join(
-                (
-                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
-                    for param, value in parameters.items()
-                )
+                f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
+                for param, value in parameters.items()
             )
 
     def create_single_run(self, parameters: dict):
