@@ -17,6 +17,7 @@ species_mapping = {
     "NE": ["neon", 20.0],
     "AR": ["argon", 40.0],
     "W": ["tungsten", 184.0],
+    "NI": ["nickel", 59.0]
 }
 
 
