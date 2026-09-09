@@ -47,6 +47,9 @@ def ion_species_selector(nucleons, charge):
             return "tritium"
         if charge.m == 2:
             return "helium3"
+        # any other charge state on A=3 is not a species this knows how to name;
+        # without this the elif chain ends here and the function returns None
+        return "impurity"
     elif nucleons == 6 and charge.m == 3:
         return "lithium"
     elif (1.0 < nucleons < 3.0) and charge.m == 1:
@@ -67,6 +70,50 @@ def np_to_T(n, p):
             UserWarning,
         )
     return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
+
+
+def unique_species_name(species_name, result):
+    """
+    ``species_name``, or an indexed variant of it if that name is already taken.
+
+    ``ion_species_selector`` maps everything heavier than lithium to the single
+    name "impurity", and any two blocks sharing (A, Z) to the same name. Since
+    the reader collects species into a dict keyed by that name, a pFile holding
+    more than one such species would otherwise have each block overwrite the
+    last -- silently dropping a species along with the charge it contributed to
+    quasineutrality.
+
+    Numbering follows the convention the JETTO reader uses for multiple
+    impurities ("impurity1", "impurity2", ...). The first occurrence keeps the
+    bare name, so any pFile that reads correctly today is unaffected.
+
+    Parameters
+    ----------
+    species_name : str
+        Name proposed by ``ion_species_selector``.
+    result : dict
+        Species collected so far.
+
+    Returns
+    -------
+    str
+        A name not already present in ``result``.
+    """
+    if species_name not in result:
+        return species_name
+
+    index = 2
+    while f"{species_name}{index}" in result:
+        index += 1
+    new_name = f"{species_name}{index}"
+
+    warnings.warn(
+        f"pFile holds more than one species identified as '{species_name}'; "
+        f"reading this one as '{new_name}'. Species in a pFile are described "
+        "only by (N, Z, A), so they cannot be told apart any more precisely.",
+        UserWarning,
+    )
+    return new_name
 
 
 class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
@@ -161,6 +208,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                 ion_mass = ion_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(ion_nucleons, ion_charge)
+                species_name = unique_species_name(species_name, result)
 
                 result[species_name] = Species(
                     species_type=species_name,
@@ -191,6 +239,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(impurity_nucleons, impurity_charge)
+                species_name = unique_species_name(species_name, result)
                 result[species_name] = Species(
                     species_type=species_name,
                     charge=UnitSpline(ne_psi_n, impurity_charge * unit_charge_array),
@@ -224,6 +273,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
             fast_species = ion_species_selector(
                 fast_ion_nucleons, fast_ion_charge
             ) + str("_fast")
+            fast_species = unique_species_name(fast_species, result)
 
             result[fast_species] = Species(
                 species_type=fast_species,

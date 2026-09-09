@@ -14,6 +14,18 @@ if TYPE_CHECKING:
     import matplotlib.pyplot as plt
 
 
+def _mass_kg(species) -> float:
+    """
+    Magnitude of a species' mass in kg.
+
+    ``Species.mass`` is a ``pint`` quantity, but taking its bare ``.m`` would
+    trust whatever unit it happens to carry. Convert first so masses collected
+    from different species are always on the same scale.
+    """
+    mass = species.mass
+    return float(mass.to("kg").m) if hasattr(mass, "to") else float(mass)
+
+
 class Kinetics(ReadableFromFile):
     """
     Contains all the kinetic data in the form of Species objects.
@@ -388,7 +400,7 @@ class Kinetics(ReadableFromFile):
             s = sp[name]
             dens_arr.append(s.get_dens(psi_q).to("meter**-3").m)
             Z_arr.append(self.Z_profile(s, round_charge, psi_q))
-            m_list.append(float(getattr(s.mass, "m", s.mass)))  # scalar mass
+            m_list.append(_mass_kg(s))  # scalar mass, in kg
 
         dens_arr = np.stack(dens_arr, axis=0)  # (ns, npsi)
         Z_arr = np.stack(Z_arr, axis=0)  # (ns, npsi)
@@ -428,17 +440,18 @@ class Kinetics(ReadableFromFile):
 
         # --- Mass merge ---
         if keep_base_species_mass:
-            m_eff_profile = np.full_like(
-                n_new, float(getattr(base.mass, "m", base.mass)), dtype=float
-            )
+            m_eff_profile = np.full_like(n_new, _mass_kg(base), dtype=float)
             # base.mass unchanged
         else:
             # m_eff(psi) = sum(m_i n_i)/sum(n_i)
             m_eff_profile = np.sum(m_arr * dens_arr, axis=0) / np.maximum(n_new, 1e-300)
-            # Store a scalar effective mass (density-weighted over psi)
+            # Store a scalar effective mass (density-weighted over psi). Must be
+            # a pint quantity: every other Species.mass is one, and the plain
+            # float this used to assign silently propagated into any expression
+            # that combined it with a dimensional quantity.
             w = np.maximum(n_new, 0.0)
             m_store = float(np.sum(m_eff_profile * w) / np.sum(w))
-            base.mass = m_store
+            base.mass = m_store * units.kg
 
         # --- Remove or zero merged-away species ---
         merged_away = [n for n in merge_set if n != base_species]
