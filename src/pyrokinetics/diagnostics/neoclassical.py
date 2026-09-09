@@ -9,11 +9,12 @@ from ..units import PyroContextError, ureg
 
 class BootstrapModel:
 
-    def __init__(self, pyro: Pyro, ntheta=None):
+    def __init__(self, pyro: Pyro, ntheta=None, radial_coordinate="r_minor"):
 
         pyro.load_metric_terms(ntheta)
 
         self.pyro = pyro
+        self.radial_coordinate = radial_coordinate
         self.Zeff = self.pyro.local_species.zeff.m
 
         # Catch floating point errors
@@ -41,6 +42,9 @@ class BootstrapModel:
 
         # Get total current
         self.get_total_current()
+
+        # Resolve the radial coordinate Jphi_eff is defined on
+        self._get_radial_label()
 
         # Get toroidal current
         self.get_toroidal_current()
@@ -80,6 +84,91 @@ class BootstrapModel:
         mu0 = B0**2 * beta / (2 * self.pe)
 
         return dpsidr, F, Fprime, mu0_dpdpsi, mu0
+
+    def _get_radial_label(self):
+        r"""
+        Radial coordinate that the effective toroidal current density is built on
+
+        ``Jphi_eff`` is :math:`(1 / 2 \pi x) \partial I_p / \partial x`, which depends
+        on the radial label :math:`x`. Two labels are supported, selected by the
+        ``radial_coordinate`` argument:
+
+        - ``"r_minor"`` (default): :math:`x = r`, the minor radius
+          (``metric_terms.rho``). This is the historical behaviour.
+        - ``"rho_tor"``: :math:`x = \rho = \sqrt{\Psi_{\rm tor} / (\pi B_{\rm geo})}`,
+          the toroidal flux label used by JETTO (Tholerus eq 1) and by transport
+          codes generally.
+
+        Since both are :math:`(1 / 2 \pi x) \partial I_p / \partial x`, the chain rule
+        relates them by a single dimensionless factor
+
+        .. math::
+            J_\phi^{\rm eff}\big|_\rho = J_\phi^{\rm eff}\big|_r
+                \frac{\partial (r^2)}{\partial (\rho^2)}, \qquad
+            \frac{\partial (r^2)}{\partial (\rho^2)}
+                = \frac{2 \pi r B_{\rm geo}}{q} \frac{\partial r}{\partial \psi}
+
+        :math:`\Psi_{\rm tor}` cancels, so the factor needs only :math:`r`,
+        :math:`\partial r / \partial \psi`, :math:`q` and :math:`B_{\rm geo}`. All are
+        available at a single flux surface from the ``Equilibrium`` splines, so no
+        radial scan is required.
+
+        Notes
+        -----
+        :math:`J_\phi^{\rm eff}` scales as :math:`1/c^2` under
+        :math:`\rho \rightarrow c\rho`, so this is a change of *convention* and not a
+        relabelling, and it is pinned by :math:`B_{\rm geo}`. That value is taken from
+        ``Equilibrium.B_0``. It cannot be recovered from a local GK input, which is why
+        ``"rho_tor"`` requires a global equilibrium: pyrokinetics' own
+        :math:`B_{\rm ref} = F / R_{\rm maj}` is defined per flux surface and is not
+        :math:`B_{\rm geo}`.
+
+        Sets ``rho_label``, the radial coordinate itself, and ``label_factor``, which
+        is exactly 1 for ``"r_minor"``.
+        """
+
+        metric = self.pyro.metric_terms
+
+        if self.radial_coordinate == "r_minor":
+            self.rho_label = metric.rho
+            self.label_factor = 1.0 * ureg.dimensionless
+            return
+
+        if self.radial_coordinate != "rho_tor":
+            raise ValueError(
+                "radial_coordinate must be 'r_minor' or 'rho_tor', got "
+                f"{self.radial_coordinate!r}"
+            )
+
+        eq = self.pyro.eq
+        if eq is None:
+            raise ValueError(
+                "radial_coordinate='rho_tor' requires a global Equilibrium, but "
+                "pyro.eq is None. The conversion is set by B_geo, the vacuum field at "
+                "the geometric axis, which a local GK input does not carry. Load an "
+                "equilibrium, or use radial_coordinate='r_minor'. Note that "
+                "pyrokinetics' own Bref = F / Rmaj is a per-flux-surface quantity and "
+                "is not B_geo, so it cannot be substituted for it."
+            )
+
+        psi_n = self.pyro.local_geometry.psi_n
+        B_geo = np.abs(eq.B_0)
+
+        # rho = sqrt(Psi_tor / (pi B_geo)) = a_tor rho_tor, using pyrokinetics'
+        # rho_tor, which is normalised to 1 at the LCFS
+        a_tor = np.sqrt(eq.psi_tor(1.0) / (np.pi * B_geo))
+        self.rho_label = (a_tor * eq.rho_tor(psi_n)).to(self.pyro.norms.lref)
+
+        # d(r^2)/d(rho^2). Positive by construction, so the signs of B_0, q and
+        # dr/dpsi (which depend on the COCOS convention) are discarded.
+        self.label_factor = np.abs(
+            2
+            * np.pi
+            * eq.r_minor(psi_n)
+            * B_geo
+            * eq.r_minor_prime(psi_n)
+            / eq.q(psi_n)
+        ).to(ureg.dimensionless)
 
     def get_total_current(self):
         r"""
@@ -126,7 +215,9 @@ class BootstrapModel:
         - ``Jphi_eff``: the effective toroidal current density
           :math:`J_\phi^{\rm eff} = \frac{1}{2 \pi \rho} \frac{\partial I_p}{\partial \rho}
           = \frac{V'}{4 \pi^2 \rho} \langle J_\phi / R \rangle`, i.e. the current density
-          of an equivalent circular cross-section of radius :math:`\rho`.
+          of an equivalent circular cross-section of radius :math:`\rho`. Which
+          :math:`\rho` this is depends on the ``radial_coordinate`` argument, see
+          :func:`_get_radial_label`; the ``Jphi_fsa`` family does not depend on it.
 
         Each is split into three parts. Parallel driven currents (bootstrap and
         external) contribute
@@ -185,7 +276,9 @@ class BootstrapModel:
         self.Jphi_psdia_fsa = dpdpsi * (R_fsa - F**2 * R_inv_fsa / self.B2_fsa)
 
         # --- Effective toroidal current density, (1 / 2 pi rho) dIp/drho ---
-        eff_factor = Vprime / (4 * np.pi**2 * rho)
+        # label_factor = d(r^2)/d(rho_label^2) moves V'/(4 pi^2 r) onto the
+        # requested radial label, and is 1 for "r_minor". See _get_radial_label.
+        eff_factor = self.label_factor * Vprime / (4 * np.pi**2 * rho)
         self.Jphi_eff = eff_factor * (dpdpsi + F * Fprime * R_inv2_fsa / mu0)
 
         parallel_factor_eff = eff_factor * F * R_inv2_fsa / self.B2_fsa
@@ -199,10 +292,10 @@ class BootstrapModel:
         # --- Radial derivative of the enclosed current, dIp/drho = 2 pi rho J_eff ---
         # Integrating these over rho gives the total current carried by each
         # component, see ``integrate_toroidal_current``
-        self.dIp_drho = 2 * np.pi * rho * self.Jphi_eff
-        self.dIp_bs_drho = 2 * np.pi * rho * self.Jphi_bs_eff
-        self.dIp_ext_drho = 2 * np.pi * rho * self.Jphi_ext_eff
-        self.dIp_psdia_drho = 2 * np.pi * rho * self.Jphi_psdia_eff
+        self.dIp_drho = 2 * np.pi * self.rho_label * self.Jphi_eff
+        self.dIp_bs_drho = 2 * np.pi * self.rho_label * self.Jphi_bs_eff
+        self.dIp_ext_drho = 2 * np.pi * self.rho_label * self.Jphi_ext_eff
+        self.dIp_psdia_drho = 2 * np.pi * self.rho_label * self.Jphi_psdia_eff
 
         # --- Total toroidal current enclosed by this flux surface ---
         # mu0 Ip = V' psi' <|grad rho|^2 / R^2> / (4 pi^2), using V' = 2 pi int(J dtheta)
@@ -787,7 +880,9 @@ class Sauter1999(BootstrapModel):
         self.Jbs = self.JbsdotB / np.sqrt(self.B2_fsa)
 
 
-def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwargs):
+def integrate_toroidal_current(
+    pyro, psi_n, model=Redl2021, ntheta=None, radial_coordinate="r_minor", **kwargs
+):
     r"""
     Total toroidal current carried by each component, integrated over the poloidal
     cross-section of a set of flux surfaces.
@@ -827,6 +922,10 @@ def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwarg
         ``BootstrapModel`` subclass to use
     ntheta : int, optional
         Number of theta points passed to the model
+    radial_coordinate : str, default ``"r_minor"``
+        Radial label the effective current densities are built on, passed to
+        ``model``. See ``BootstrapModel._get_radial_label``. The integration is
+        performed over whichever label is chosen, so ``Ip`` is unchanged by it.
     **kwargs
         Additional keyword arguments passed to ``pyro.load_local``, for example
         ``local_geometry="MXH"``
@@ -835,7 +934,8 @@ def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwarg
     -------
     dict
         Dictionary of arrays over the surfaces that loaded successfully, with keys
-        ``psi_n``, ``rho`` [metre], ``Ip_bs``, ``Ip_ext``, ``Ip_psdia``, ``Ip`` (the
+        ``psi_n``, ``rho`` [metre] (the ``radial_coordinate`` label), ``Ip_bs``,
+        ``Ip_ext``, ``Ip_psdia``, ``Ip`` (the
         sum of the three components) and ``Ip_ampere`` (the enclosed current obtained
         locally from Ampere's law on each surface, as an independent check), all in
         amperes.
@@ -858,7 +958,7 @@ def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwarg
         except Exception:
             continue
 
-        bootstrap = model(pyro, ntheta=ntheta)
+        bootstrap = model(pyro, ntheta=ntheta, radial_coordinate=radial_coordinate)
 
         # Convert to physical units here, inside the loop. The reference values
         # behind the normalised units (nref, tref, bref) are those of the flux
@@ -866,7 +966,7 @@ def integrate_toroidal_current(pyro, psi_n, model=Redl2021, ntheta=None, **kwarg
         # call -- so a normalised quantity kept across surfaces would later be
         # converted using the wrong references.
         psi_n_ok.append(psi)
-        rho.append(pyro.metric_terms.rho.to("meter").m)
+        rho.append(bootstrap.rho_label.to("meter").m)
         dIp_drho["bs"].append(bootstrap.dIp_bs_drho.to("ampere / meter").m)
         dIp_drho["ext"].append(bootstrap.dIp_ext_drho.to("ampere / meter").m)
         dIp_drho["psdia"].append(bootstrap.dIp_psdia_drho.to("ampere / meter").m)
