@@ -118,6 +118,26 @@ class Species:
 
         return self._norm_gradient(self.temp, psi_n)
 
+    def get_pressure(self, psi_n=None):
+        """
+        Species pressure p(psi) computed as n(psi) * T(psi), returned in pascals.
+
+        """
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
+        n = self.get_dens(psi_n)
+        T = self.get_temp(psi_n)
+        p = n * T
+        return p.to("pascal")
+
+    def get_norm_pressure_gradient(self, psi_n=None):
+        """
+        - 1/p dp/drho
+        """
+
+        return self.get_norm_dens_gradient(psi_n) + self.get_norm_temp_gradient(psi_n)
+
     def get_angular_velocity(self, psi_n=None):
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless

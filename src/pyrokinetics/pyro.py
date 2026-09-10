@@ -150,7 +150,8 @@ class Pyro:
         # We'll set this to None for now, as setting it to the provided gk_code without
         # first reading gk_file would cause us to read a default template file.
         self.gk_code = None
-
+        self.eq = None
+        self.kinetics = None
         # Prepare to read gk_file
         # Deprecation of gk_type: gk_code always takes precedent.
         if gk_type is not None:
@@ -1679,9 +1680,16 @@ class Pyro:
         Exception
             Various errors can be raised while reading ``eq_file`` and creating an
             Equilibrium.
+
+        Notes
+        -----
+        If a global ``Kinetics`` has already been loaded, its ``eq`` attribute is
+        updated to point at the newly-loaded Equilibrium.
         """
         self.eq_file = eq_file  # property setter, converts to Path
         self.eq = read_equilibrium(self.eq_file, eq_type, **kwargs)
+        if self.kinetics is not None:
+            self.kinetics.eq = self.eq
 
     @property
     def eq_type(self) -> Union[str, None]:
@@ -1730,6 +1738,11 @@ class Pyro:
         Exception
             Various errors can be raised while reading ``kinetics_file`` and creating a
             Kinetics.
+
+        Notes
+        -----
+        If a global ``Equilibrium`` has already been loaded, it is attached to the
+        resulting ``Kinetics`` object as ``kinetics.eq``.
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
         try:
@@ -1745,6 +1758,8 @@ class Pyro:
                 )
             else:
                 raise exc
+        if self.eq is not None:
+            self.kinetics.eq = self.eq
 
     @property
     def kinetics_type(self) -> Union[str, None]:
