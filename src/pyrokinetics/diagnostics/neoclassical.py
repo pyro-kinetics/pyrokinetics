@@ -9,12 +9,25 @@ from ..units import PyroContextError, ureg
 
 class BootstrapModel:
 
-    def __init__(self, pyro: Pyro, ntheta=None, radial_coordinate="r_minor"):
+    def __init__(
+        self,
+        pyro: Pyro,
+        ntheta=None,
+        radial_coordinate="r_minor",
+        ion_collisionality="neo",
+    ):
 
         pyro.load_metric_terms(ntheta)
 
+        if ion_collisionality not in ("neo", "legacy"):
+            raise ValueError(
+                "ion_collisionality must be 'neo' or 'legacy', got "
+                f"{ion_collisionality!r}"
+            )
+
         self.pyro = pyro
         self.radial_coordinate = radial_coordinate
+        self.ion_collisionality = ion_collisionality
         self.Zeff = self.pyro.local_species.zeff.m
 
         # Catch floating point errors
@@ -336,6 +349,67 @@ class BootstrapModel:
         self.B2_fsa = B2_fsa_units
         self.trapped_fraction = ftrap
 
+    @staticmethod
+    def _is_fast(name, species):
+        """
+        Whether a species is fast/non-thermal, and so takes no part in thermal
+        ion-ion collisions. Same heuristic as ``get_kinetic_species_data``.
+        """
+        return "fast" in name or species.temp.m > 10
+
+    def _get_collisionality_ion(self):
+        r"""
+        Ion species and density rescaling used by :math:`\nu^*_i`
+
+        Sauter eq (18c) is written for a plasma with a single ion species, so both
+        :math:`n_i` and :math:`Z` there refer to that one species. Neither Sauter
+        (1999) nor Redl (2021) states how to generalise it to several ion species --
+        Sauter's conclusion explicitly leaves "the correct form of the value of Z"
+        undetermined. NEO, whose results the Redl coefficients were fitted to,
+        resolves it in ``neo_theory.f90`` by taking the majority ion by density and
+        rescaling its collisionality by the summed ion density,
+
+        .. code-block:: fortran
+
+            nui_star_S = nui_star_HH / dens(is_ion,ir) * dens_sum
+
+        so the charge and the Coulomb logarithm stay those of the majority ion and
+        only the density becomes a sum. OMFIT's ``sauter_bootstrap`` does the same.
+        That is the ``"neo"`` behaviour here, and it is the default.
+
+        Fast species are left out of both the majority pick and the sum. NEO does not
+        exclude them explicitly, but a NEO species list holds thermal species by
+        construction, whereas a ``LocalSpecies`` built from a transport code carries
+        fast ions too.
+
+        ``"legacy"`` restores the previous behaviour -- the first non-electron species
+        in ``LocalSpecies`` order, using its own density alone -- for reproducing
+        results from before this was changed.
+
+        Returns
+        -------
+        ion : Species
+            Species supplying :math:`Z`, :math:`T_i` and the Coulomb logarithm
+        dens_ratio : float
+            Factor rescaling :math:`\nu^*_i` from that species' density to the
+            summed thermal ion density. 1.0 in ``"legacy"`` mode.
+        """
+        ls = self.pyro.local_species
+        ion_names = [name for name in ls.names if name != "electron"]
+
+        if self.ion_collisionality == "legacy":
+            return ls[ion_names[0]], 1.0
+
+        thermal = [name for name in ion_names if not self._is_fast(name, ls[name])]
+        if not thermal:
+            thermal = ion_names
+
+        # Densities all share units within a LocalSpecies, so compare magnitudes
+        ion = ls[max(thermal, key=lambda name: ls[name].dens.m)]
+        dens_sum = sum(ls[name].dens.m for name in thermal)
+
+        return ion, dens_sum / ion.dens.m
+
     def get_collisionalities(self):
 
         lg = self.pyro.local_geometry
@@ -343,8 +417,7 @@ class BootstrapModel:
 
         eps = lg.rho / lg.Rmaj
         electron = ls.electron
-        ion_name = [name for name in ls.names if name != "electron"][0]
-        ion = ls[ion_name]
+        ion, ion_dens_ratio = self._get_collisionality_ion()
 
         lref = lg.Rmaj.units
         vref = ls.electron.nu.units * lref
@@ -413,6 +486,11 @@ class BootstrapModel:
                 * np.sqrt(tref / ion.temp)
                 * coulomb_factor
             )
+
+        # Rescale from the majority ion density to the summed thermal ion density,
+        # keeping that ion's charge and Coulomb logarithm. See
+        # ``_get_collisionality_ion``. No-op when ion_collisionality="legacy".
+        self.nu_star_i = self.nu_star_i * ion_dens_ratio
 
     def get_bs_coeffs(self):
 
@@ -881,7 +959,13 @@ class Sauter1999(BootstrapModel):
 
 
 def integrate_toroidal_current(
-    pyro, psi_n, model=Redl2021, ntheta=None, radial_coordinate="r_minor", **kwargs
+    pyro,
+    psi_n,
+    model=Redl2021,
+    ntheta=None,
+    radial_coordinate="r_minor",
+    ion_collisionality="neo",
+    **kwargs,
 ):
     r"""
     Total toroidal current carried by each component, integrated over the poloidal
@@ -958,7 +1042,12 @@ def integrate_toroidal_current(
         except Exception:
             continue
 
-        bootstrap = model(pyro, ntheta=ntheta, radial_coordinate=radial_coordinate)
+        bootstrap = model(
+            pyro,
+            ntheta=ntheta,
+            radial_coordinate=radial_coordinate,
+            ion_collisionality=ion_collisionality,
+        )
 
         # Convert to physical units here, inside the loop. The reference values
         # behind the normalised units (nref, tref, bref) are those of the flux
