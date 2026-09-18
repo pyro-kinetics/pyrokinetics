@@ -88,7 +88,14 @@ class MetricTerms:  # CleverDict
 
     """
 
-    def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None):
+    def __init__(
+        self,
+        local_geometry: LocalGeometry,
+        ntheta=None,
+        theta=None,
+        sonic=False,
+        mu0F_rho=None,
+    ):
         if theta is not None and ntheta is not None:
             raise ValueError("Can't set both theta and ntheta, please select one")
 
@@ -161,7 +168,14 @@ class MetricTerms:  # CleverDict
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
 
-        self.mu0dPdr = local_geometry.beta_prime / 2.0
+        if not sonic:
+            self.mu0dPdr = local_geometry.beta_prime / 2.0
+        else:
+            if mu0F_rho is None:
+                raise ValueError(
+                    "Please provide LocalSpecies object when using Sonic metric terms"
+                )
+            self.mu0dPdr = mu0F_rho
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
@@ -373,16 +387,24 @@ class MetricTerms:  # CleverDict
         )
 
         term3_units = (
-            (self.Jacobian.units**3) * gcont_zeta_zeta.units / g_theta_theta.units
+            self.mu0dPdr.units
+            / (self.dpsidr.units**2)
+            * (self.Jacobian.units**3)
+            * gcont_zeta_zeta.units
+            / g_theta_theta.units
         )
 
         @ureg.wraps(term3_units, (term3_units, None))
         def trapezoid_term3(y, x):
             return integrate.trapezoid(y, x)
 
-        term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
-            trapezoid_term3(
-                (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
+        term3 = (
+            -trapezoid_term3(
+                self.mu0dPdr
+                / (self.dpsidr**2)
+                * (self.Jacobian**3)
+                * gcont_zeta_zeta
+                / g_theta_theta,
                 self.regulartheta,
             )
             / self.theta_range
