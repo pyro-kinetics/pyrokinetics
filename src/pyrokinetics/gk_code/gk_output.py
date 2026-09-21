@@ -161,12 +161,16 @@ class Coords(GKOutputArgs):
     #: Units of [rhoref ** -1]
     ky: ArrayLike
 
-    #: 1D grid of time of the simulation output
-    #: Units of [lref / vref]
-    time: ArrayLike
-
     #: List of species names in the simulation
     species: Iterable[str]
+
+    #: 1D grid of time of the simulation output
+    #: Units of [lref / vref]
+    # optional / defaulted fields must come after required ones
+    time: Optional[ArrayLike] = None
+    field_time: Optional[ArrayLike] = None
+    flux_time: Optional[ArrayLike] = None
+    moment_time: Optional[ArrayLike] = None
 
     #: 1D grid of theta used in the simulation
     #: Units of [radians]
@@ -195,14 +199,21 @@ class Coords(GKOutputArgs):
         "pitch",
     )
 
-    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("kx", "ky", "time")
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = (
+        "kx",
+        "ky",
+        "time",
+        "field_time",
+        "flux_time",
+        "moment_time",
+    )
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         if name not in self.names:
             raise ValueError(f"The coord '{name}' is not recognised")
         if name in ("kx", "ky"):
             return c.rhoref**-1
-        if name == "time":
+        if name in ("time", "field_time", "flux_time", "moment_time"):
             return c.lref / c.vref
         if name == "theta":
             return units.radians
@@ -233,7 +244,7 @@ class Fields(GKOutputArgs):
 
     #: The dimensionality of the fields.
     #: Each field should have the same number of dimensions.
-    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "ky", "field_time")
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each field for a given convention"""
@@ -252,20 +263,7 @@ class Fields(GKOutputArgs):
 
 @dataclasses.dataclass
 class Fluxes(GKOutputArgs):
-    """Utility dataclass type used to pass fluxes to ``GKOutput``.
-
-    The dimensionality depends on what the code writes to disk, and is set by
-    each reader: most codes only provide fluxes summed over the perpendicular
-    wavenumbers, while others resolve them in ``ky`` and/or ``kx``.
-
-    The ``field`` dimension separates the contributions driven by each field,
-    i.e. ``phi`` is the electrostatic (ExB) contribution, ``apar`` the
-    electromagnetic (flutter) one. GENE fluxes are read from the ``nrg`` file
-    with dims ``(field, species, time)``, unless
-    ``kxky_flux_spectra=True`` is passed to the reader, in which case they are
-    computed from the moment and field files with dims
-    ``(field, species, kx, ky, time)``.
-    """
+    """Utility dataclass type used to pass fluxes to ``GKOutput``."""
 
     #: Units of ``[nref * vref * (rhoref / lref)**2]``.
     particle: Optional[ArrayLike] = None
@@ -280,7 +278,7 @@ class Fluxes(GKOutputArgs):
 
     #: The dimensionality of the fluxes.
     #: Each array should have the same dimensionality.
-    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "species", "kx", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "species", "kx", "ky", "flux_time")
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each flux for a given convention"""
@@ -318,7 +316,7 @@ class Moments(GKOutputArgs):
 
     #: The dimensionality of the moments.
     #: Each array should have the same dimensionality.
-    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "species", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "species", "ky", "moment_time")
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each moment for a given convention"""
@@ -488,7 +486,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             return (dim, val, {"units": None, "long_name": desc})
 
         dataset_coords = {
-            "time": make_var("time", coords.time, "Time"),
             "kx": make_var("kx", coords.kx, "Radial wavenumber"),
             "ky": make_var("ky", coords.ky, "Bi-normal wavenumber"),
             "theta": make_var("theta", coords.theta, "Angle"),
@@ -497,6 +494,21 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             "mode": make_var("mode", coords.mode, "Mode"),
             "species": make_var("species", coords.species, "Species"),
         }
+
+        if coords.time is not None:
+            dataset_coords["time"] = make_var("time", coords.time, "Time")
+        if coords.field_time is not None:
+            dataset_coords["field_time"] = make_var(
+                "field_time", coords.field_time, "Field time"
+            )
+        if coords.flux_time is not None:
+            dataset_coords["flux_time"] = make_var(
+                "flux_time", coords.flux_time, "Flux time"
+            )
+        if coords.moment_time is not None:
+            dataset_coords["moment_time"] = make_var(
+                "moment_time", coords.moment_time, "Moment time"
+            )
 
         # Add field, flux and moment coords
         if coords.field is not None:
@@ -565,9 +577,23 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 data_vars[key] = make_var(fluxes.dims, fluxes[key], flux_desc[key])
 
         # Add eigenvalues. If not provided, try to generate from fields
+        # if eigenvalues is None and fields is not None and linear:
+        #     field_time = coords.field_time if coords.field_time is not None else coords.time
+        #     eigenvalues = self._eigenvalues_from_fields(
+        #         fields, coords.theta.magnitude, coords.time.magnitude
+        #     )
+
         if eigenvalues is None and fields is not None and linear:
+            if coords.field_time is None:
+                raise ValueError(
+                    "field_time is required to calculate linear eigenvalues "
+                    "from field data"
+                )
+
             eigenvalues = self._eigenvalues_from_fields(
-                fields, coords.theta.magnitude, coords.time.magnitude
+                fields,
+                coords.theta.magnitude,
+                coords.field_time.magnitude,
             )
 
         if eigenvalues is not None:
@@ -763,6 +789,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         return Eigenvalues(
             growth_rate=growth_rate,
             mode_frequency=mode_frequency,
+            dims=("kx", "ky", "time"),
         )
 
     @staticmethod
@@ -794,7 +821,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         phi = fields[phase_field]
 
-        if "time" in fields.dims:
+        time_dim = next((d for d in fields.dims if d.endswith("time")), None)
+        if time_dim is not None:
             # Check for final time slice with finite data
             final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
             if final_index != amplitude.shape[-1] - 1:
@@ -819,7 +847,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         phase = np.exp(1j * np.angle(phi_theta_star))
 
-        if "time" in fields.dims:
+        time_dim = next((d for d in fields.dims if d.endswith("time")), None)
+        if time_dim is not None:
             phase = phase[..., np.newaxis]
 
         normalising_factor = phase * amplitude
