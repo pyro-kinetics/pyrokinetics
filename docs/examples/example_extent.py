@@ -4,9 +4,8 @@ from pathlib import Path
 import numpy as np
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.pyroscan import PyroScan
-
 from pyrokinetics.diagnostics.extent import Extent
+from pyrokinetics.pyroscan import PyroScan
 
 json_path = template_dir / "outputs" / "CGYRO_linear_scan"
 pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)

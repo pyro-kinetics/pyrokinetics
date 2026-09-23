@@ -5,8 +5,8 @@ from numbers import Real
 import numpy as np
 import xarray as xr
 
-from ..gk_code.gk_output import GKOutput
 from ..dataset_wrapper import DatasetWrapper
+from ..gk_code.gk_output import GKOutput
 
 
 class Extent:
@@ -19,10 +19,7 @@ class Extent:
         if not isinstance(output, DatasetWrapper):
             raise TypeError("output must be a DatasetWrapper")
 
-        fields = [
-            name for name in ("phi", "apar", "bpar")
-            if name in output
-        ]
+        fields = [name for name in ("phi", "apar", "bpar") if name in output]
         if not fields:
             raise ValueError("GKOutput contains none of 'phi', 'apar', or 'bpar'")
 
@@ -116,4 +113,4 @@ class Extent:
         width = hi - lo
         result = xr.DataArray(width, attrs={"name": "extent"})
         bounds = xr.DataArray(bounds, attrs={"name": "extent"})
-        return result,bounds
+        return result, bounds
