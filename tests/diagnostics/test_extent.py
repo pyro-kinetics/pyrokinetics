@@ -39,7 +39,6 @@ def test_pyro_output(gk_code, gk_file):
         assert bounds.data.units == theta_units
 
 
-
 def test_pyroscan_output(tmp_path):
     json_path = template_dir / "outputs" / "CGYRO_linear_scan"
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
