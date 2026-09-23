@@ -96,8 +96,8 @@ class Extent:
             raise ValueError("fraction must be a finite real scalar")
         if not 0 < fraction < 1:
             raise ValueError("fraction must lie strictly between 0 and 1")
-            
-        field_amplitude = np.real(field)
+
+        field_amplitude = np.abs(np.real(field))
         power = (field_amplitude / field_amplitude.max()) ** 2
         total_power = power.integrate("theta")
         cdf = power.cumulative_integrate("theta") / total_power
