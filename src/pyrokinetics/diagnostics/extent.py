@@ -98,16 +98,25 @@ class Extent:
         power = (field_amplitude / field_amplitude.max()) ** 2
         total_power = power.integrate("theta")
         cdf = power.cumulative_integrate("theta") / total_power
+        cdf = cdf.copy(data=getattr(cdf.data, "magnitude", cdf.data))
+        theta_units = getattr(cdf.theta.data, "units", None)
+        theta = xr.DataArray(
+            getattr(cdf.theta.data, "magnitude", cdf.theta.data),
+            dims=cdf.theta.dims,
+            coords=cdf.theta.coords,
+        )
         tail = (1 - fraction) / 2
         bounds = xr.apply_ufunc(
             np.interp,
             xr.DataArray([tail, 1 - tail], dims="bound"),
             cdf,
-            cdf.theta,
+            theta,
             input_core_dims=[["bound"], ["theta"], ["theta"]],
             output_core_dims=[["bound"]],
             vectorize=True,
         )
+        if theta_units is not None:
+            bounds = bounds.copy(data=bounds.data * theta_units)
         lo = bounds.isel(bound=0, drop=True)
         hi = bounds.isel(bound=1, drop=True)
         width = hi - lo
