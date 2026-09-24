@@ -1,4 +1,4 @@
-"""Calculates the extent of a field using the 95% rule"""
+"""Calculates the extent of eigenfunctions using the 95% rule."""
 
 from numbers import Real
 
@@ -19,29 +19,18 @@ class Extent:
         if not isinstance(output, DatasetWrapper):
             raise TypeError("output must be a DatasetWrapper")
 
-        fields = [name for name in ("phi", "apar", "bpar") if name in output]
-        if not fields:
-            raise ValueError("GKOutput contains none of 'phi', 'apar', or 'bpar'")
+        if "eigenfunctions" not in output:
+            raise ValueError("output contains no eigenfunctions")
 
-        extents = []
-        field_bounds = []
-
-        for name in fields:
-            extent, bounds = self._compute(
-                output[name],
-                dl_dtheta=dl_dtheta,
-                fraction=fraction,
-            )
-            extents.append(extent)
-            field_bounds.append(bounds)
-
-        field_coordinate = xr.IndexVariable("field", fields)
+        extent, bounds = self._compute(
+            output["eigenfunctions"],
+            dl_dtheta=dl_dtheta,
+            fraction=fraction,
+        )
 
         output.data = output.data.assign(
-            extent=xr.concat(extents, dim=field_coordinate),
-            bounds=xr.concat(field_bounds, dim=field_coordinate).assign_coords(
-                bound=["lo", "hi"],
-            ),
+            extent=extent,
+            bounds=bounds.assign_coords(bound=["lo", "hi"]),
         )
 
     @staticmethod
