@@ -257,9 +257,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         capitalisation overwrites that key; new keys are stored in lowercase, as
         :meth:`parse_tglf` does.
         """
-        existing_keys = {key.lower(): key for key in self.data}
-        for key, value in flags.items():
-            self.data[existing_keys.get(key.lower(), key.lower())] = value
+        self._add_flags_case_insensitive(flags, str.lower)
 
     def get_local_geometry(self) -> LocalGeometry:
         """

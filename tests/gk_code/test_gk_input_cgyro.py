@@ -67,7 +67,21 @@ def test_is_nonlinear(cgyro):
 
 def test_add_flags(cgyro):
     cgyro.add_flags({"foo": "bar"})
-    assert cgyro.data["foo"] == "bar"
+    assert cgyro.data["FOO"] == "bar"
+
+
+@pytest.mark.parametrize("key", ["N_RADIAL", "n_radial", "N_Radial"])
+def test_add_flags_case_insensitive(tmp_path, cgyro, key):
+    cgyro.add_flags({key: 6, "new_flag": 1})
+    assert cgyro.data["N_RADIAL"] == 6
+    assert cgyro.data["NEW_FLAG"] == 1
+    assert [k for k in cgyro.data if k.upper() == "N_RADIAL"] == ["N_RADIAL"]
+
+    filename = tmp_path / "input.cgyro"
+    cgyro.write(filename)
+    with open(filename) as f:
+        lines = [line for line in f if line.upper().startswith("N_RADIAL")]
+    assert lines == ["N_RADIAL = 6\n"]
 
 
 def test_get_local_geometry(cgyro):
