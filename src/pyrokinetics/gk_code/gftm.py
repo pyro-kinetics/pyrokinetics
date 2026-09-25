@@ -34,16 +34,15 @@ from .gk_output import (
 )
 
 
-class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
-    """Reader for TGLF input files"""
+class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
+    """Reader for GFTM input files"""
 
-    code_name = "TGLF"
-    default_file_name = "input.TGLF"
+    code_name = "GFTM"
+    default_file_name = "input.GFTM"
     norm_convention = "cgyro"
-    tglf_max_ntheta = 32
     _convention_dict = {}
 
-    pyro_tglf_miller = {
+    pyro_gftm_miller = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "q": "q_loc",
@@ -53,7 +52,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": "drmajdx_loc",
     }
 
-    pyro_tglf_miller_defaults = {
+    pyro_gftm_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "q": 2.0,
@@ -63,7 +62,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": 0.0,
     }
 
-    pyro_tglf_mxh = {
+    pyro_gftm_mxh = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "Z0": "zmaj_loc",
@@ -100,7 +99,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "dsndr6": "shape_s_sin6",
     }
 
-    pyro_tglf_mxh_defaults = {
+    pyro_gftm_mxh_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
@@ -139,7 +138,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     }
 
     @staticmethod
-    def pyro_TGLF_species(iSp=1):
+    def pyro_GFTM_species(iSp=1):
         return {
             "mass": f"mass_{iSp}",
             "z": f"zs_{iSp}",
@@ -153,31 +152,31 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         self, filename: PathLike, detect_norm: bool = True
     ) -> Dict[str, Any]:
         """
-        Reads TGLF input file into a dictionary
+        Reads GFTM input file into a dictionary
         """
         with open(filename) as f:
-            data_dict = self.parse_tglf(f)
+            data_dict = self.parse_gftm(f)
         return super().read_dict(data_dict, detect_norm=detect_norm)
 
     def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
-        Reads TGLF input file given as string
+        Reads GFTM input file given as string
         """
-        data_dict = self.parse_tglf(input_string.split("\n"))
+        data_dict = self.parse_gftm(input_string.split("\n"))
         return super().read_dict(data_dict, detect_norm=detect_norm)
 
     def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
-        Reads TGLF input file given as dict
+        Reads GFTM input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
         return super().read_dict(input_dict, detect_norm=detect_norm)
 
     @staticmethod
-    def parse_tglf(lines):
+    def parse_gftm(lines):
         """
-        Given lines of a tglf file or a string split by '/n', return a dict of
-        TGLF input data
+        Given lines of a gftm file or a string split by '/n', return a dict of
+        GFTM input data
         """
         results = {}
         for line in lines:
@@ -206,17 +205,18 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def verify_file_type(self, filename: PathLike):
         """
-        Ensure this file is a valid TGLF input file, and that it contains sufficient
+        Ensure this file is a valid GFTM input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
 
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
         self.verify_expected_keys(filename, expected_keys)
 
-        # NU and NE identify GFTM even when the shared TGLF keys are present.
+        # Shared inputs default to TGLF unless a GFTM velocity-basis key
+        # is supplied. Explicit file_type="GFTM" bypasses autodetection.
         data = type(self)().read_from_file(filename, detect_norm=False)
-        if {"nu", "ne"}.intersection(data):
-            raise ValueError("NU or NE identifies a GFTM input")
+        if not {"nu", "ne"}.intersection(data):
+            raise ValueError("GFTM autodetection requires NU or NE in the input")
 
     def write(
         self,
@@ -226,7 +226,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         code_normalisation: str = None,
     ):
         """
-        Write input file for TGLF
+        Write input file for GFTM
         """
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
@@ -240,7 +240,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         self.data = convert_dict(self.data, convention)
 
-        with open(filename, "w+") as new_TGLF_input:
+        with open(filename, "w+") as new_GFTM_input:
             for key, value in self.data.items():
                 if isinstance(value, float):
                     value_str = f"{value:{float_format}}"
@@ -249,17 +249,22 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 else:
                     value_str = str(value)
 
-                new_TGLF_input.write(f"{key.upper()} = {value_str}\n")
+                new_GFTM_input.write(f"{key.upper()} = {value_str}\n")
 
     def is_nonlinear(self) -> bool:
         return self.data.get("use_transport_model", 1) == 1
 
     def add_flags(self, flags) -> None:
         """
-        Add extra flags to TGLF input file
+        Add extra flags to GFTM input file
+
+        GFTM keys are case-insensitive. A flag matching an existing key in any
+        capitalisation overwrites that key; new keys are stored in lowercase, as
+        :meth:`parse_gftm` does.
         """
+        existing_keys = {key.lower(): key for key in self.data}
         for key, value in flags.items():
-            self.data[key] = value
+            self.data[existing_keys.get(key.lower(), key.lower())] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """
@@ -272,19 +277,19 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             norms = Normalisation("get_local_species")
             convention = getattr(norms, self.norm_convention)
 
-        tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "Miller-family", "Fourier", "ELITE"]
-        tglf_eq = tglf_eq_mapping[tglf_eq_flag]
+        gftm_eq_flag = self.data["geometry_flag"]
+        gftm_eq_mapping = ["SAlpha", "Miller-family", "Fourier", "ELITE"]
+        gftm_eq = gftm_eq_mapping[gftm_eq_flag]
 
-        if tglf_eq == "Miller-family":
-            tglf_eq = "MXH" if self._has_mxh_terms() else "Miller"
+        if gftm_eq == "Miller-family":
+            gftm_eq = "MXH" if self._has_mxh_terms() else "Miller"
 
-        if tglf_eq not in ["Miller", "MXH"]:
+        if gftm_eq not in ["Miller", "MXH"]:
             raise NotImplementedError(
-                f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
+                f"GFTM equilibrium option '{gftm_eq_flag}' ('{gftm_eq}') not implemented"
             )
 
-        if tglf_eq == "MXH":
+        if gftm_eq == "MXH":
             local_geometry = self.get_local_geometry_mxh()
         else:
             local_geometry = self.get_local_geometry_miller()
@@ -300,7 +305,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         return local_geometry
 
     def _has_mxh_terms(self) -> bool:
-        """TGLF uses geometry_flag=1 for both Miller and MXH-extended Miller."""
+        """GFTM uses geometry_flag=1 for both Miller and MXH-extended Miller."""
 
         mxh_term_keys = [
             "zmaj_loc",
@@ -334,15 +339,15 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Miller object from TGLF file
+        Load Miller object from GFTM file
         """
 
         miller_data = default_miller_inputs()
 
-        for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_miller.items(), self.pyro_tglf_miller_defaults.values()
+        for (pyro_key, gftm_key), gftm_default in zip(
+            self.pyro_gftm_miller.items(), self.pyro_gftm_miller_defaults.values()
         ):
-            miller_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            miller_data[pyro_key] = self.data.get(gftm_key, gftm_default)
 
         miller_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
             1 - miller_data["delta"] ** 2
@@ -368,26 +373,26 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def get_local_geometry_mxh(self) -> LocalGeometryMXH:
         """
-        Load mxh object from TGLF file
+        Load mxh object from GFTM file
         """
 
         mxh_data = default_mxh_inputs(n_moments=7)
 
-        for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_mxh.items(),
-            self.pyro_tglf_mxh_defaults.values(),
+        for (pyro_key, gftm_key), gftm_default in zip(
+            self.pyro_gftm_mxh.items(),
+            self.pyro_gftm_mxh_defaults.values(),
         ):
-            if "shape" not in tglf_key:
-                mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            if "shape" not in gftm_key:
+                mxh_data[pyro_key] = self.data.get(gftm_key, gftm_default)
             else:
                 index = int(pyro_key[-1])
                 new_key = pyro_key[:-1]
-                if "shape_s" in tglf_key:
+                if "shape_s" in gftm_key:
                     mxh_data[new_key][index] = (
-                        self.data.get(tglf_key, tglf_default) / mxh_data["rho"]
+                        self.data.get(gftm_key, gftm_default) / mxh_data["rho"]
                     )
                 else:
-                    mxh_data[new_key][index] = self.data.get(tglf_key, tglf_default)
+                    mxh_data[new_key][index] = self.data.get(gftm_key, gftm_default)
 
         mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
         for i_moment in range(6, 2, -1):
@@ -426,7 +431,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def get_local_species(self):
         """
-        Load LocalSpecies object from TGLF file
+        Load LocalSpecies object from GFTM file
         """
         # Dictionary of local species parameters
         local_species = LocalSpecies()
@@ -443,9 +448,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
-            pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
+            pyro_GFTM_species = self.pyro_GFTM_species(i_sp + 1)
             species_data = CleverDict()
-            for p_key, c_key in pyro_TGLF_species.items():
+            for p_key, c_key in pyro_GFTM_species.items():
                 species_data[p_key] = self.data[c_key]
 
             species_data.omega0 = (
@@ -664,7 +669,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         # default.
         if self.data is None:
             if template_file is None:
-                template_file = gk_templates["TGLF"]
+                template_file = gk_templates["GFTM"]
             self.read_from_file(template_file)
 
         if local_norm is None:
@@ -683,16 +688,16 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
-                "for TGLF not yet supported"
+                "for GFTM not yet supported"
             )
 
-        # Geometry (Miller/MXH). Native TGLF uses geometry_flag=1 for the
+        # Geometry (Miller/MXH). Native GFTM uses geometry_flag=1 for the
         # Miller-family path, including MXH-extended shaping terms.
         self.data["geometry_flag"] = 1
 
         if eq_type == "Miller":
             # Assign Miller values to input file
-            for key, value in self.pyro_tglf_miller.items():
+            for key, value in self.pyro_gftm_miller.items():
                 self.data[value] = local_geometry[key]
 
             self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
@@ -702,7 +707,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         elif eq_type == "MXH":
             # Assign MXH values to input file
             # Assign MXH values to input file
-            for key, val in self.pyro_tglf_mxh.items():
+            for key, val in self.pyro_gftm_mxh.items():
                 if "shape" not in val:
                     self.data[val] = getattr(local_geometry, key)
                 else:
@@ -734,29 +739,29 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         if extra_species > 0:
             for iSp in range(extra_species):
-                tglf_species = self.pyro_TGLF_species(iSp + 1 + n_species)
-                for tglf_key in tglf_species.values():
-                    if tglf_key in self.data:
-                        self.data.pop(tglf_key)
+                gftm_species = self.pyro_GFTM_species(iSp + 1 + n_species)
+                for gftm_key in gftm_species.values():
+                    if gftm_key in self.data:
+                        self.data.pop(gftm_key)
 
-                if f"vpar_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_{iSp+1+n_species}")
-                if f"vpar_shear_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_shear_{iSp+1+n_species}")
+                if f"vpar_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_{iSp + 1 + n_species}")
+                if f"vpar_shear_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_shear_{iSp + 1 + n_species}")
 
         names = local_species.names
         names.remove("electron")
         names.insert(0, "electron")
         for iSp, name in enumerate(local_species.names):
-            tglf_species = self.pyro_TGLF_species(iSp + 1)
+            gftm_species = self.pyro_GFTM_species(iSp + 1)
 
-            for pyro_key, TGLF_key in tglf_species.items():
-                self.data[TGLF_key] = local_species[name][pyro_key]
+            for pyro_key, GFTM_key in gftm_species.items():
+                self.data[GFTM_key] = local_species[name][pyro_key]
 
-            self.data[f"vpar_{iSp+1}"] = (
+            self.data[f"vpar_{iSp + 1}"] = (
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
-            self.data[f"vpar_shear_{iSp+1}"] = (
+            self.data[f"vpar_shear_{iSp + 1}"] = (
                 -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
@@ -784,7 +789,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
-        self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
+        self.data["nxgrid"] = numerics.ntheta
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
@@ -800,28 +805,28 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     def get_ne_te_normalisation(self):
         found_electron = False
         for i_sp in range(self.data["ns"]):
-            if self.data[f"zs_{i_sp+1}"] == -1:
-                ne = self.data[f"as_{i_sp+1}"]
-                Te = self.data[f"taus_{i_sp+1}"]
+            if self.data[f"zs_{i_sp + 1}"] == -1:
+                ne = self.data[f"as_{i_sp + 1}"]
+                Te = self.data[f"taus_{i_sp + 1}"]
                 found_electron = True
                 break
 
         if not found_electron:
             raise TypeError(
-                "Pyro currently requires an electron species in TGLF input files"
+                "Pyro currently requires an electron species in GFTM input files"
             )
 
         return ne, Te
 
 
-class TGLFFile:
+class GFTMFile:
     def __init__(self, path: PathLike, required: bool):
         self.path = Path(path)
         self.required = required
         self.fmt = self.path.name.split(".")[0]
 
 
-class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
+class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
@@ -890,7 +895,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 ).with_units(convention)
             ),
             linear=coords["linear"],
-            gk_code="TGLF",
+            gk_code="GFTM",
             input_file=input_str,
             output_convention=output_convention,
             jacobian=coords["jacobian"],
@@ -900,87 +905,87 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def _required_files(dirname: PathLike):
         dirname = Path(dirname)
         return {
-            "input": TGLFFile(dirname / "input.tglf", required=True),
-            "run": TGLFFile(dirname / "out.tglf.run", required=True),
+            "input": GFTMFile(dirname / "input.gftm", required=True),
+            "run": GFTMFile(dirname / "out.gftm.run", required=True),
         }
 
     def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Couldn't find TGLF file '{f.path}'")
+                raise RuntimeError(f"Couldn't find GFTM file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
         """
         Given path to input file, guess at the path for associated output files.
-        For TGLF, simply returns dir of the path.
+        For GFTM, simply returns dir of the path.
         """
         return Path(filename).parent
 
     @classmethod
     def _get_raw_data(
         cls, dirname: PathLike
-    ) -> Tuple[Dict[str, Any], GKInputTGLF, str]:
+    ) -> Tuple[Dict[str, Any], GKInputGFTM, str]:
         dirname = Path(dirname)
         if not dirname.exists():
             raise RuntimeError(
-                f"GKOutputReaderTGLF: Provided path {dirname} does not exist. "
-                "Please supply the name of a directory containing TGLF output files."
+                f"GKOutputReaderGFTM: Provided path {dirname} does not exist. "
+                "Please supply the name of a directory containing GFTM output files."
             )
         if not dirname.is_dir():
             raise RuntimeError(
-                f"GKOutputReaderTGLF: Provided path {dirname} is not a directory. "
-                "Please supply the name of a directory containing TGLF output files."
+                f"GKOutputReaderGFTM: Provided path {dirname} is not a directory. "
+                "Please supply the name of a directory containing GFTM output files."
             )
 
-        # The following list of TGLF files may exist
+        # The following list of GFTM files may exist
         expected_files = {
             **cls._required_files(dirname),
-            "wavefunction": TGLFFile(dirname / "out.tglf.wavefunction", required=False),
-            "run": TGLFFile(dirname / "out.tglf.run", required=False),
-            "field": TGLFFile(dirname / "out.tglf.field_spectrum", required=False),
-            "ky": TGLFFile(dirname / "out.tglf.ky_spectrum", required=False),
-            "ql_flux": TGLFFile(dirname / "out.tglf.QL_flux_spectrum", required=False),
-            "sum_flux": TGLFFile(
-                dirname / "out.tglf.sum_flux_spectrum", required=False
+            "wavefunction": GFTMFile(dirname / "out.gftm.wavefunction", required=False),
+            "run": GFTMFile(dirname / "out.gftm.run", required=False),
+            "field": GFTMFile(dirname / "out.gftm.field_spectrum", required=False),
+            "ky": GFTMFile(dirname / "out.gftm.ky_spectrum", required=False),
+            "ql_flux": GFTMFile(dirname / "out.gftm.QL_flux_spectrum", required=False),
+            "sum_flux": GFTMFile(
+                dirname / "out.gftm.sum_flux_spectrum", required=False
             ),
-            "eigenvalues": TGLFFile(
-                dirname / "out.tglf.eigenvalue_spectrum", required=False
+            "eigenvalues": GFTMFile(
+                dirname / "out.gftm.eigenvalue_spectrum", required=False
             ),
         }
         # Read in files
         raw_data = {}
-        for key, tglf_file in expected_files.items():
-            if not tglf_file.path.exists():
-                if tglf_file.required:
+        for key, gftm_file in expected_files.items():
+            if not gftm_file.path.exists():
+                if gftm_file.required:
                     raise RuntimeError(
-                        f"GKOutputReaderTGLF: The file {tglf_file.path.name} is needed"
+                        f"GKOutputReaderGFTM: The file {gftm_file.path.name} is needed"
                     )
                 continue
             # Read in file according to format
             if key == "ky":
-                raw_data[key] = np.loadtxt(tglf_file.path, skiprows=2)
+                raw_data[key] = np.loadtxt(gftm_file.path, skiprows=2)
 
             else:
-                with open(tglf_file.path, "r") as f:
+                with open(gftm_file.path, "r") as f:
                     raw_data[key] = f.read()
 
         input_str = raw_data["input"]
-        gk_input = GKInputTGLF()
+        gk_input = GKInputGFTM()
         gk_input.read_str(input_str)
 
         return raw_data, gk_input, input_str
 
     @staticmethod
-    def _get_coords(raw_data: Dict[str, Any], gk_input: GKInputTGLF) -> Dict[str, Any]:
+    def _get_coords(raw_data: Dict[str, Any], gk_input: GKInputGFTM) -> Dict[str, Any]:
         """
-        Sets coords and attrs of a Pyrokinetics dataset from a collection of TGLF
+        Sets coords and attrs of a Pyrokinetics dataset from a collection of GFTM
         files.
 
         Args:
-            raw_data (Dict[str,Any]): Dict containing TGLF output.
-            gk_input (GKInputTGLF): Processed TGLF input file.
+            raw_data (Dict[str,Any]): Dict containing GFTM output.
+            gk_input (GKInputGFTM): Processed GFTM input file.
 
         Returns:
             Dict: Dict with coords
@@ -1009,10 +1014,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             species = gk_input.get_local_species().names
 
             run = raw_data["run"].splitlines()
-            ky = (
-                float([line for line in run if "ky" in line][0].split(":")[-1].strip())
-                / bunit_over_b0
-            )
+            ky = _last_floats([line for line in run if "ky" in line][0], 1)[0]
+            ky /= bunit_over_b0
 
             local_geometry = gk_input.get_local_geometry()
             metric_ntheta = gk_input.data["nxgrid"]
@@ -1052,7 +1055,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             species = gk_input.get_local_species().names
             if nspecies != len(species):
                 raise RuntimeError(
-                    "GKOutputReaderTGLF: Different number of species in input and output."
+                    "GKOutputReaderGFTM: Different number of species in input and output."
                 )
             field = ["phi", "apar", "bpar"][:nfield]
             ky = raw_data["ky"] / bunit_over_b0
@@ -1107,7 +1110,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     @staticmethod
     def _get_moments(
         raw_data: Dict[str, Any],
-        gk_input: GKInputTGLF,
+        gk_input: GKInputGFTM,
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -1167,12 +1170,12 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         data['growth_rate'] = growth_rate(ky, mode)
 
         This is only valid for transport runs.
-        Unlike the version in the super() class, TGLF needs to get extra info from
+        Unlike the version in the super() class, GFTM needs to get extra info from
         an eigenvalue file.
 
         Args:
             data: The Xarray dataset to be modified.
-            dirname (PathLike): Directory containing TGLF output files.
+            dirname (PathLike): Directory containing GFTM output files.
         Returns:
             Xarray.Dataset: The modified dataset which was passed to 'data'.
         """
@@ -1198,13 +1201,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             f = raw_data["run"].splitlines()
             lines = f[-nmode:]
 
-            eigenvalues = np.array(
-                [
-                    list(filter(None, eig.strip().split(":")[-1].split("  ")))
-                    for eig in lines
-                ],
-                dtype="float",
-            )
+            eigenvalues = np.array([_last_floats(eig, 2) for eig in lines])
 
             eigenvalues = eigenvalues.reshape((1, nmode, 2))
             mode_frequency = -eigenvalues[:, :, 0]
@@ -1257,11 +1254,11 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         for i_mode in range(nmode):
             theta_star = np.argmax(abs(eigenfunctions[:, i_mode, 0]), axis=0)
             phi_theta_star = eigenfunctions[:, i_mode, 0][theta_star]
-            phase = np.abs(phi_theta_star) / phi_theta_star
             field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
             amplitude = np.sqrt(
                 trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
             )
+            phase = np.abs(phi_theta_star) / phi_theta_star
             phase_amplitude[:, i_mode, :] = phase / amplitude
 
         eigenfunctions *= phase_amplitude
@@ -1277,3 +1274,12 @@ def is_float(element):
         return True
     except ValueError:
         return False
+
+
+def _last_floats(line: str, count: int) -> list[float]:
+    values = [
+        float(token) for token in line.replace("=", " ").split() if is_float(token)
+    ]
+    if len(values) < count:
+        raise ValueError(f"Could not parse {count} float value(s) from line: {line!r}")
+    return values[-count:]

@@ -48,6 +48,7 @@ def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     json_path = nonlinear_tmp_path / json_dir
     shutil.unpack_archive(zip_path, json_path)
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+    assert pyro_scan.base_pyro.gk_code == "TGLF"
 
     pyro_scan.load_gk_output(load_fields=False)
     data = pyro_scan.gk_output.data
