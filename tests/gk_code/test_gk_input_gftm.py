@@ -47,21 +47,24 @@ def test_verify_file_type(gftm):
 
 
 @pytest.mark.parametrize(
-    "filename, expected_type",
+    "filename", ["input.GfTm", "input.tglf", "pyroscan_base.input"]
+)
+@pytest.mark.parametrize(
+    "extra_input, expected_type",
     [
-        ("input.gftm", GKInputGFTM),
-        ("input.GfTm", GKInputGFTM),
-        ("gftm_scan.input", GKInputGFTM),
-        ("input.tglf", GKInputTGLF),
-        ("pyroscan_base.input", GKInputTGLF),
+        ("NU=7\n", GKInputGFTM),
+        ("NE=3\n", GKInputGFTM),
+        ("nu=7\nne=3\n", GKInputGFTM),
+        ("", GKInputTGLF),
+        ("# NU=7\n# NE=3\n", GKInputTGLF),
     ],
 )
-def test_autodetect_shared_input(filename, expected_type, tmp_path):
-    # A parent directory naming GFTM must not override the input's basename.
+def test_autodetect_shared_input(filename, extra_input, expected_type, tmp_path):
+    # Neither the filename nor its parent directory determines the code type.
     directory = tmp_path / "gftm_runs"
     directory.mkdir()
     path = directory / filename
-    path.write_text(template_file.read_text())
+    path.write_text((template_dir / "input.tglf").read_text() + "\n" + extra_input)
 
     assert isinstance(read_gk_input(path), expected_type)
     other_type = GKInputTGLF if expected_type is GKInputGFTM else GKInputGFTM
@@ -71,9 +74,14 @@ def test_autodetect_shared_input(filename, expected_type, tmp_path):
 
 def test_explicit_gftm_with_generic_filename(tmp_path):
     path = tmp_path / "input.in"
-    path.write_text(template_file.read_text())
+    path.write_text((template_dir / "input.tglf").read_text())
 
+    assert isinstance(read_gk_input(path), GKInputTGLF)
     assert isinstance(read_gk_input(path, file_type="GFTM"), GKInputGFTM)
+
+    from pyrokinetics import Pyro
+
+    assert Pyro(gk_file=path, gk_code="GFTM").gk_code == "GFTM"
 
 
 @pytest.mark.parametrize(
@@ -125,7 +133,7 @@ def test_write(tmp_path, gftm):
     local_species = gftm.get_local_species()
     numerics = gftm.get_numerics()
     # Set output path
-    filename = tmp_path / "input.gftm"
+    filename = tmp_path / "input.in"
     # Write out a new input file
     gftm_writer = GKInputGFTM()
     gftm_writer.set(local_geometry, local_species, numerics)

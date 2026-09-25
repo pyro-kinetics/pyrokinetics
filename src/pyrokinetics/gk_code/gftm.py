@@ -209,14 +209,14 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
         info for Pyrokinetics to work with
         """
 
-        # GFTM and TGLF share input keys. Until their contents can be
-        # distinguished, reserve GFTM autodetection for filenames naming it.
-        # Explicit file_type="GFTM" bypasses autodetection.
-        if "gftm" not in Path(filename).name.lower():
-            raise ValueError("GFTM autodetection requires 'gftm' in the filename")
-
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
         self.verify_expected_keys(filename, expected_keys)
+
+        # Shared inputs default to TGLF unless a GFTM velocity-basis key
+        # is supplied. Explicit file_type="GFTM" bypasses autodetection.
+        data = type(self)().read_from_file(filename, detect_norm=False)
+        if not {"nu", "ne"}.intersection(data):
+            raise ValueError("GFTM autodetection requires NU or NE in the input")
 
     def write(
         self,
