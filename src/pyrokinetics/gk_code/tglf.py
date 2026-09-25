@@ -210,6 +210,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         info for Pyrokinetics to work with
         """
 
+        # Ambiguous inputs default to TGLF unless the filename names GFTM.
+        if "gftm" in Path(filename).name.lower():
+            raise ValueError("Filename identifies a GFTM input")
+
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
         self.verify_expected_keys(filename, expected_keys)
 

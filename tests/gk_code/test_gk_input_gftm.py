@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from pyrokinetics import template_dir
-from pyrokinetics.gk_code import GKInputGFTM
+from pyrokinetics.gk_code import GKInputGFTM, GKInputTGLF, read_gk_input
 from pyrokinetics.local_geometry import LocalGeometryMiller, LocalGeometryMXH
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
@@ -44,6 +44,36 @@ def test_read_str():
 def test_verify_file_type(gftm):
     """Ensure that 'verify_file_type' does not raise exception on GFTM file"""
     gftm.verify_file_type(template_file)
+
+
+@pytest.mark.parametrize(
+    "filename, expected_type",
+    [
+        ("input.gftm", GKInputGFTM),
+        ("input.GfTm", GKInputGFTM),
+        ("gftm_scan.input", GKInputGFTM),
+        ("input.tglf", GKInputTGLF),
+        ("pyroscan_base.input", GKInputTGLF),
+    ],
+)
+def test_autodetect_shared_input(filename, expected_type, tmp_path):
+    # A parent directory naming GFTM must not override the input's basename.
+    directory = tmp_path / "gftm_runs"
+    directory.mkdir()
+    path = directory / filename
+    path.write_text(template_file.read_text())
+
+    assert isinstance(read_gk_input(path), expected_type)
+    other_type = GKInputTGLF if expected_type is GKInputGFTM else GKInputGFTM
+    with pytest.raises(ValueError):
+        other_type().verify_file_type(path)
+
+
+def test_explicit_gftm_with_generic_filename(tmp_path):
+    path = tmp_path / "input.in"
+    path.write_text(template_file.read_text())
+
+    assert isinstance(read_gk_input(path, file_type="GFTM"), GKInputGFTM)
 
 
 @pytest.mark.parametrize(
@@ -95,7 +125,7 @@ def test_write(tmp_path, gftm):
     local_species = gftm.get_local_species()
     numerics = gftm.get_numerics()
     # Set output path
-    filename = tmp_path / "input.in"
+    filename = tmp_path / "input.gftm"
     # Write out a new input file
     gftm_writer = GKInputGFTM()
     gftm_writer.set(local_geometry, local_species, numerics)
