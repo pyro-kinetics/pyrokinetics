@@ -16,6 +16,13 @@ def test_add_flags(neo):
     assert neo.data["FOO"] == "bar"
 
 
+def test_add_flags_rejects_groups(neo):
+    data = dict(neo.data)
+    with pytest.raises(TypeError):
+        neo.add_flags({"new_flag": 1, "group": {"N_ENERGY": 6}})
+    assert neo.data == data
+
+
 @pytest.mark.parametrize("key", ["N_ENERGY", "n_energy", "N_Energy"])
 def test_add_flags_case_insensitive(tmp_path, neo, key):
     neo.add_flags({key: 6, "new_flag": 1})

@@ -22,11 +22,11 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from ..units import PyroContextError, PyroNormalisationError
-from .gk_input import GKInput
+from .gk_input import GKInput, GKInputFlat
 from .gk_output import GKOutput
 
 
-class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
+class GKInputNEO(GKInputFlat, FileReader, file_type="NEO", reads=GKInput):
     """
     Class that can read NEO input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects

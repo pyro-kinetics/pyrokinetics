@@ -70,6 +70,13 @@ def test_add_flags(cgyro):
     assert cgyro.data["FOO"] == "bar"
 
 
+def test_add_flags_rejects_groups(cgyro):
+    data = dict(cgyro.data)
+    with pytest.raises(TypeError):
+        cgyro.add_flags({"new_flag": 1, "group": {"N_RADIAL": 6}})
+    assert cgyro.data == data
+
+
 @pytest.mark.parametrize("key", ["N_RADIAL", "n_radial", "N_Radial"])
 def test_add_flags_case_insensitive(tmp_path, cgyro, key):
     cgyro.add_flags({key: 6, "new_flag": 1})

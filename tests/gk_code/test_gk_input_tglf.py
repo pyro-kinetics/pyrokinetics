@@ -70,6 +70,13 @@ def test_add_flags(tglf):
     assert tglf.data["foo"] == "bar"
 
 
+def test_add_flags_rejects_groups(tglf):
+    data = dict(tglf.data)
+    with pytest.raises(TypeError):
+        tglf.add_flags({"new_flag": 1, "group": {"nbasis_max": 6}})
+    assert tglf.data == data
+
+
 @pytest.mark.parametrize("key", ["NBASIS_MAX", "nbasis_max", "Nbasis_Max"])
 def test_add_flags_case_insensitive(tmp_path, tglf, key):
     tglf.add_flags({key: 6, "NEW_FLAG": 1})

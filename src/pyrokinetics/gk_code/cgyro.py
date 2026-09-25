@@ -25,7 +25,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
-from .gk_input import GKInput
+from .gk_input import GKInput, GKInputFlat
 from .gk_output import (
     Coords,
     Eigenfunctions,
@@ -37,7 +37,7 @@ from .gk_output import (
 )
 
 
-class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
+class GKInputCGYRO(GKInputFlat, FileReader, file_type="CGYRO", reads=GKInput):
     """
     Class that can read CGYRO input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
