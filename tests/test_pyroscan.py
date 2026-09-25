@@ -564,3 +564,23 @@ def test_parameter_func_not_applied_twice(tmp_path):
         val = pyro_obj.local_species.electron.inverse_lt
 
         assert np.isclose(val.magnitude, 2.0)
+
+
+def test_pyroscan_convert_gk_code(tmp_path):
+    """Converting a scan writes the new code's files into each run directory."""
+    pyro = Pyro(gk_file=template_dir / "input.gs2")
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"kappa": [1.5, 2.0]},
+        base_directory=tmp_path / "gs2",
+    )
+
+    scan.convert_gk_code("TGLF")
+    assert scan.file_name == "input.TGLF"
+    for name, run in scan.pyro_dict.items():
+        assert run.gk_file == tmp_path / "gs2" / name / "input.TGLF"
+
+    scan.write(base_directory=tmp_path / "tglf")
+    for name in scan.pyro_dict:
+        run = Pyro(gk_file=tmp_path / "tglf" / name / "input.TGLF", gk_code="TGLF")
+        assert run.gk_code == "TGLF"
