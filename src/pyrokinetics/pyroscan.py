@@ -38,6 +38,9 @@ def _resolve_path(path: str | pathlib.Path, base: pathlib.Path) -> pathlib.Path:
 
 
 # ---- time handling ----
+VALID_TIME_MODES = ("last", "average", "trace")
+
+
 def reduce_time(
     da,
     *,
@@ -50,6 +53,7 @@ def reduce_time(
     time_mode:
         "last"      → take final time
         "average"   → average over tolerance_time_range
+        "trace"     → preserve the full time series unchanged
     """
     if "time" not in da.dims:
         return da
@@ -71,20 +75,29 @@ def reduce_time(
             .drop_vars("time", errors="ignore")
         )
 
-    raise ValueError(f"Unknown time_mode={time_mode}")
+    if time_mode == "trace":
+        return da
+
+    raise ValueError(
+        f"Unknown time_mode={time_mode!r}; expected one of {VALID_TIME_MODES}"
+    )
 
 
 # ---- xarray selection ----
 def select_kx_ky_time(
     da,
     *,
-    kx_min,
+    kx_min=None,
     sum_ky=False,
+    sum_kx=False,
     time_mode,
     tolerance_time_range=None,
 ):
     if "kx" in da.dims:
-        da = da.sel(kx=kx_min)
+        if sum_kx:
+            da = da.sum(dim="kx")
+        elif kx_min is not None:
+            da = da.sel(kx=kx_min)
 
     da = reduce_time(
         da,
@@ -618,12 +631,16 @@ class PyroScan:
     def load_gk_output(
         self,
         output_convention="pyrokinetics",
-        tolerance_time_range=0.8,
+        tolerance_time_range=0.9,
+        linear_time_mode="average",
+        linear_time_range=None,
         netcdf_file=None,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
         sum_ky=True,
+        sum_kx=False,
+        nonlinear_fields="trace",
         drop_nan=False,
         **kwargs,
     ):
@@ -634,19 +651,53 @@ class PyroScan:
         ----------
         output_convention: str default 'pyrokinetics'
             ConventionNormalisation to convert output to
-        tolerance_time_range: float default 0.8
-            Time window over which to calculate growth rate tolerance
+        tolerance_time_range: float default 0.9
+            Start fraction of the time axis used when computing the growth rate
+            tolerance (i.e. ``tolerance_time_range=0.9`` averages convergence
+            statistics over the last 10% of the simulation).
+        linear_time_mode: str default 'average'
+            How to reduce ``growth_rate`` and ``mode_frequency`` along the time
+            axis for linear runs. One of:
+
+            * ``"average"`` – mean over the window
+              ``[linear_time_range * t_max, t_max]`` (default).
+            * ``"last"``    – take the final time point (legacy behaviour).
+            * ``"trace"``   – preserve the full time trace, no reduction.
+        linear_time_range: float default None
+            Start fraction of the time axis used when averaging ``growth_rate``
+            and ``mode_frequency``. Defaults to ``tolerance_time_range`` when
+            not supplied, so that a single argument controls both windows.
         netcdf_file: PathLike default None
             If supplied then load PyroScanGKOutput from existing netCDF
         load_fields (bool, default True) – Flag to load fields or not
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
+        sum_ky (bool, default True) – If True, sum fluxes, fields and eigenfunctions
+            over ky. If False, preserve the ky dimension.
+        sum_kx (bool, default False) – Applies to fields and eigenfunctions (fluxes
+            are already kx-integrated). If True, sum over kx; if False, preserve the
+            kx dimension.
+        nonlinear_fields (str, default "trace") – How nonlinear fields
+            are reduced in time. "trace" keeps the complex field and its
+            time dimension. "amplitude_squared" loads |field|**2 averaged over
+            ``tolerance_time_range`` (taken before any kx/ky sum, so sums are of
+            squared amplitudes). Averaging the complex field itself is not offered: the
+            phase of each Fourier coefficient keeps moving, so the mean cancels.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
         None
         """
+        if linear_time_mode not in VALID_TIME_MODES:
+            raise ValueError(
+                f"linear_time_mode={linear_time_mode!r} is not valid; "
+                f"expected one of {VALID_TIME_MODES}"
+            )
+
+        if linear_time_range is None:
+            linear_time_range = tolerance_time_range
+
         # Load from netCDF is supplied
         if netcdf_file is not None:
             # Auto-detect a pyroscan_norms.json sitting alongside the scan
@@ -698,10 +749,11 @@ class PyroScan:
 
         load_specs = {
             "linear": {
-                "scalars": ["growth_rate", "mode_frequency", "eigenfunctions"],
+                "scalars": ["growth_rate", "mode_frequency"],
                 "extras": ["growth_rate_tolerance"],
                 "fluxes": [],
-                "fields": [],
+                # Eigenfunctions are selected exactly as the fields are
+                "fields": ["eigenfunctions"],
             },
             "nonlinear": {
                 "scalars": [],
@@ -720,8 +772,20 @@ class PyroScan:
             "nonlinear": {
                 "scalars": "last",
                 "fluxes": "average",
-                "fields": "average",
+                # Set from nonlinear_fields below
+                "fields": "trace",
             },
+        }
+
+        # Per-variable overrides for growth_rate / mode_frequency in linear runs.
+        # eigenfunctions intentionally stay on the scalars-default policy because
+        # they are spatial profiles, not time series we want to average.
+        scalar_time_mode_overrides = {
+            "linear": {
+                "growth_rate": linear_time_mode,
+                "mode_frequency": linear_time_mode,
+            },
+            "nonlinear": {},
         }
 
         if self.base_pyro.gk_code == "TGLF":
@@ -738,7 +802,19 @@ class PyroScan:
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
+        scalar_overrides = scalar_time_mode_overrides[regime]
         time_policy = time_policy[regime]
+
+        if nonlinear_fields not in ("amplitude_squared", "trace"):
+            raise ValueError(
+                "nonlinear_fields must be 'amplitude_squared' or 'trace', "
+                f"not {nonlinear_fields!r}"
+            )
+        amplitude_squared = (
+            regime == "nonlinear" and nonlinear_fields == "amplitude_squared"
+        )
+        if amplitude_squared:
+            time_policy["fields"] = "average"
 
         buffers = {
             name: []
@@ -780,10 +856,12 @@ class PyroScan:
 
                 for name in spec["scalars"]:
                     if name in pyro.gk_output:
+                        scalar_mode = scalar_overrides.get(name, time_policy["scalars"])
                         run_buffers[name] = select_kx_ky_time(
                             pyro.gk_output[name],
                             kx_min=kx_min,
-                            time_mode=time_policy["scalars"],
+                            time_mode=scalar_mode,
+                            tolerance_time_range=linear_time_range,
                         )
 
                 for name in spec["fluxes"]:
@@ -796,14 +874,17 @@ class PyroScan:
                             tolerance_time_range=tolerance_time_range,
                         )
 
-                data = data.isel(ky=[0]).squeeze()
-                pyro.gk_output.data = data
-
+                # Fields and eigenfunctions are reduced identically: kx and ky
+                # are kept unless summed with sum_kx / sum_ky
                 for name in spec["fields"]:
                     if name in pyro.gk_output:
+                        field = pyro.gk_output[name]
+                        if amplitude_squared:
+                            field = abs(field) ** 2
                         run_buffers[name] = select_kx_ky_time(
-                            pyro.gk_output[name],
-                            kx_min=kx_min,
+                            field,
+                            sum_ky=sum_ky,
+                            sum_kx=sum_kx,
                             time_mode=time_policy["fields"],
                             tolerance_time_range=tolerance_time_range,
                         )

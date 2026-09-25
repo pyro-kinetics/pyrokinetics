@@ -107,6 +107,19 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
 
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
+    # By default nonlinear fields are kept complex and in time; ky is summed
+    phi = pyro_scan.gk_output.data["phi"]
+    assert {"time", "kx"} <= set(phi.dims)
+    assert "ky" not in phi.dims
+    assert np.iscomplexobj(phi.data.magnitude)
+
+    # ...or reduced to |phi|**2 averaged in time
+    pyro_scan.load_gk_output(nonlinear_fields="amplitude_squared")
+    phi = pyro_scan.gk_output.data["phi"]
+    assert "kx" in phi.dims
+    assert "ky" not in phi.dims and "time" not in phi.dims
+    assert not np.iscomplexobj(phi.data.magnitude)
+    assert np.all(phi.data.magnitude >= 0)
 
     pyro_scan.load_gk_output(load_fluxes=True)
     assert "particle" in pyro_scan.gk_output.data.data_vars
@@ -564,3 +577,126 @@ def test_parameter_func_not_applied_twice(tmp_path):
         val = pyro_obj.local_species.electron.inverse_lt
 
         assert np.isclose(val.magnitude, 2.0)
+
+
+# Linear outputs with phi, apar and bpar; GX's has more than one ky
+ELECTROMAGNETIC_RUNS = [
+    ("STELLA_linear", "stella.in"),
+    ("GX_linear", "gx.in"),
+]
+
+
+def _electromagnetic_scan(tmp_path, template, file_name):
+    """A two-point kappa scan whose runs are copies of an electromagnetic run."""
+    pyro = Pyro(gk_file=template_dir / "outputs" / template / file_name)
+    kappa = float(pyro.local_geometry.kappa)
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"kappa": [kappa, kappa + 0.1]},
+        base_directory=tmp_path,
+        file_name=file_name,
+    )
+    for name in scan.pyro_dict:
+        shutil.copytree(
+            template_dir / "outputs" / template, tmp_path / name, dirs_exist_ok=True
+        )
+    return scan, pyro
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_fields_keep_kx_and_ky(tmp_path, template, file_name):
+    scan, pyro = _electromagnetic_scan(tmp_path, template, file_name)
+    scan.load_gk_output(sum_ky=False, sum_kx=False)
+    data = scan.gk_output.data
+
+    pyro.load_gk_output()
+    for field in ("phi", "apar", "bpar"):
+        assert data[field].dims == ("kappa", "theta", "kx", "ky")
+    assert data.sizes["kx"] == pyro.gk_output.data.sizes["kx"]
+    assert data.sizes["ky"] == pyro.gk_output.data.sizes["ky"]
+
+    # Eigenfunctions mirror the fields
+    assert data["eigenfunctions"].dims == ("kappa", "field", "theta", "kx", "ky")
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_fields_summed_like_eigenfunctions(tmp_path, template, file_name):
+    scan, _ = _electromagnetic_scan(tmp_path, template, file_name)
+
+    # Default: ky summed, kx kept
+    scan.load_gk_output()
+    data = scan.gk_output.data
+    for field in ("phi", "apar", "bpar"):
+        assert data[field].dims == ("kappa", "theta", "kx")
+    assert data["eigenfunctions"].dims == ("kappa", "field", "theta", "kx")
+
+    scan.load_gk_output(sum_ky=True, sum_kx=True)
+    data = scan.gk_output.data
+    for field in ("phi", "apar", "bpar"):
+        assert data[field].dims == ("kappa", "theta")
+    assert data["eigenfunctions"].dims == ("kappa", "field", "theta")
+
+
+@pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "CGYRO_nonlinear_scan",
+            template_dir
+            / "outputs"
+            / "CGYRO_nonlinear_scan"
+            / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_nonlinear_field_spectrum(json_dir, zip_path, nonlinear_tmp_path):
+    """
+    sum_ky / sum_kx should gate the reduction of the ky and kx dimensions
+    when loading fields for a nonlinear scan. With both flags False the full
+    (kx, ky) spectrum must be preserved; with both True the field collapses
+    to a single value per (scan_coord, theta, time).
+    """
+    json_path = nonlinear_tmp_path / json_dir / "spectrum"
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=False, sum_kx=False)
+    phi_full = pyro_scan.gk_output.data["phi"]
+    assert "kx" in phi_full.dims
+    assert "ky" in phi_full.dims
+    assert phi_full.sizes["kx"] > 1
+    assert phi_full.sizes["ky"] > 1
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=True, sum_kx=False)
+    phi_sum_ky = pyro_scan.gk_output.data["phi"]
+    assert "kx" in phi_sum_ky.dims
+    assert "ky" not in phi_sum_ky.dims
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=True, sum_kx=True)
+    phi_sum_both = pyro_scan.gk_output.data["phi"]
+    assert "kx" not in phi_sum_both.dims
+    assert "ky" not in phi_sum_both.dims
+
+
+def test_pyroscan_linear_time_mode():
+    json_path = template_dir / "outputs" / "CGYRO_linear_scan"
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    for mode in ("average", "last"):
+        pyro_scan.load_gk_output(linear_time_mode=mode)
+        assert "time" not in pyro_scan.gk_output.data["growth_rate"].dims
+
+    with pytest.raises(ValueError, match="linear_time_mode"):
+        pyro_scan.load_gk_output(linear_time_mode="mean")
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_linear_time_trace(tmp_path, template, file_name):
+    """
+    "trace" keeps the time series. The runs here share a time grid; runs whose
+    time grids differ need ragged-grid stacking to be combined.
+    """
+    scan, _ = _electromagnetic_scan(tmp_path, template, file_name)
+    scan.load_gk_output(linear_time_mode="trace")
+    assert "time" in scan.gk_output.data["growth_rate"].dims
+    assert "time" in scan.gk_output.data["mode_frequency"].dims

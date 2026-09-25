@@ -72,6 +72,10 @@ class SaturationRules:
 
         theta = data["theta"].data
         eigenfunctions = data["eigenfunctions"]
+        # The scan keeps kx and ky on eigenfunctions; the rule uses one kx
+        if "kx" in eigenfunctions.dims:
+            kx_min = abs(eigenfunctions["kx"]).argmin().item()
+            eigenfunctions = eigenfunctions.isel(kx=kx_min, drop=True)
         growth_rate_tolerance = data["growth_rate_tolerance"]
 
         growth_rate = data["growth_rate"].where(
