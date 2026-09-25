@@ -22,7 +22,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
-from .gk_input import GKInput
+from .gk_input import GKInput, GKInputFlat
 from .gk_output import (
     Coords,
     Eigenfunctions,
@@ -34,10 +34,11 @@ from .gk_output import (
 )
 
 
-class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
+class GKInputTGLF(GKInputFlat, FileReader, file_type="TGLF", reads=GKInput):
     """Reader for TGLF input files"""
 
     code_name = "TGLF"
+    flag_key_case = staticmethod(str.lower)
     default_file_name = "input.TGLF"
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
@@ -248,13 +249,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def is_nonlinear(self) -> bool:
         return self.data.get("use_transport_model", 1) == 1
-
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to TGLF input file
-        """
-        for key, value in flags.items():
-            self.data[key] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """

@@ -22,17 +22,18 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from ..units import PyroContextError, PyroNormalisationError
-from .gk_input import GKInput
+from .gk_input import GKInput, GKInputFlat
 from .gk_output import GKOutput
 
 
-class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
+class GKInputNEO(GKInputFlat, FileReader, file_type="NEO", reads=GKInput):
     """
     Class that can read NEO input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
     """
 
     code_name = "NEO"
+    flag_key_case = staticmethod(str.upper)
     default_file_name = "input.neo"
     norm_convention = "neo"
     _convention_dict = {}
@@ -245,13 +246,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
 
     def is_nonlinear(self) -> bool:
         return bool(self.data.get("NONLINEAR_FLAG", 0))
-
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to NEO input file
-        """
-        for key, value in flags.items():
-            self.data[key] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """

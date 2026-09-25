@@ -684,7 +684,9 @@ class Pyro:
         flags: Dict[str,Any]
             Dict of key-value pairs matching the format of a given gyrokinetics input
             file. For example, GS2 uses Fortran namelists, so flags should be a
-            dict-of-dicts: one for each group in the namelist.
+            dict-of-dicts: one for each group in the namelist. TGLF, CGYRO and NEO
+            use flat ``KEY = value`` files, so flags should be a flat dict; keys
+            match existing keys regardless of capitalisation.
 
         Returns
         -------
@@ -695,6 +697,8 @@ class Pyro:
         RuntimeError
             If ``gk_input`` is ``None``, i.e. the user has not read a gyrokinetics file,
             or the user has set ``pyro.gk_code=None``.
+        TypeError
+            If ``flags`` does not match the structure of the input file.
         """
         # FIXME We currently call update_gk_code before writing, and this can overwrite
         #      some user-set flags. I'd considered storing the flags and adding them
