@@ -11,14 +11,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
   - Changed Pyro kwarg from `gk_type` to  `gk_code`
-  - `PyroScan.load_gk_output`: `phi`, `apar`, `bpar` and `eigenfunctions` keep
-    their `kx` and `ky` dimensions instead of being reduced to `ky[0]` and the
-    smallest `|kx|`; select one with the new `field_kx` / `field_ky`.
-    Nonlinear fields keep their `time` dimension instead of being averaged.
-  - `PyroScan.load_gk_output` raises if runs give a quantity different shapes,
-    and drops a coordinate that differs between runs instead of using the last
-    run's values.
- 
+  - `PyroScan.load_gk_output`: `phi`, `apar`, `bpar` and `eigenfunctions` are no
+    longer reduced to `ky[0]` and the smallest `|kx|`. They follow `sum_ky`
+    (default True, as for fluxes) and the new `sum_kx` (default False), and are
+    otherwise kept on their `kx`/`ky` grid.
+  - Nonlinear fields default to `|field|**2` averaged in time
+    (`nonlinear_fields="amplitude_squared"`) instead of the time average of the
+    complex field; `nonlinear_fields="time_resolved"` keeps the complex field in
+    time.
+
 ### Fixed
 
 ## [0.0.1] - 2021-01-26  
