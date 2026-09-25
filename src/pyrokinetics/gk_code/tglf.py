@@ -257,14 +257,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to TGLF input file
-
-        TGLF keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in lowercase, as
-        :meth:`parse_tglf` does.
         """
-        existing_keys = {key.lower(): key for key in self.data}
         for key, value in flags.items():
-            self.data[existing_keys.get(key.lower(), key.lower())] = value
+            self.data[key] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """
