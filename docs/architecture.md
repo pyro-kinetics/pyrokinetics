@@ -84,6 +84,22 @@ consistent). It writes one input file per point into a directory tree, records
 itself in a JSON file (`pyroscan.json`) and can collect outputs into a
 `PyroScanGKOutput` dataset with scan coordinates.
 
+#### Converting a scan to another code
+
+Convert the scan as a whole, then write it somewhere new:
+
+```python
+scan.convert_gk_code("TGLF", template_file=None)
+scan.write(base_directory="tglf")
+```
+
+`convert_gk_code` converts the base `Pyro` and every run, sets `file_name` to
+the new code's default and points each run's `gk_file` back into its own run
+directory. Passing `base_directory` to `write` leaves the original runs
+untouched. Do not add per-run "write decks for code X" methods: converting the
+whole scan is the one supported path. Code-specific settings for every run are
+applied with `add_flags` on each `pyro_dict` entry before writing.
+
 ## File reading infrastructure
 
 ### `Factory` (`factory.py`)
