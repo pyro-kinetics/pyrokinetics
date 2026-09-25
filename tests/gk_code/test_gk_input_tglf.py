@@ -70,6 +70,20 @@ def test_add_flags(tglf):
     assert tglf.data["foo"] == "bar"
 
 
+@pytest.mark.parametrize("key", ["NBASIS_MAX", "nbasis_max", "Nbasis_Max"])
+def test_add_flags_case_insensitive(tmp_path, tglf, key):
+    tglf.add_flags({key: 6, "NEW_FLAG": 1})
+    assert tglf.data["nbasis_max"] == 6
+    assert tglf.data["new_flag"] == 1
+    assert [k for k in tglf.data if k.lower() == "nbasis_max"] == ["nbasis_max"]
+
+    filename = tmp_path / "input.tglf"
+    tglf.write(filename)
+    with open(filename) as f:
+        lines = [line for line in f if line.startswith("NBASIS_MAX")]
+    assert lines == ["NBASIS_MAX = 6\n"]
+
+
 def test_get_local_geometry(tglf):
     # TODO test it has the correct values
     local_geometry = tglf.get_local_geometry()
