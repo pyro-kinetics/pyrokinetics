@@ -40,9 +40,7 @@ manifest.add_output(ids_file_path)
 
 # Add another code
 manifest.add_code(
-    name="newcode",
-    commit="abcdef123",
-    repo="https://gitlab.com/example/newcode"
+    name="newcode", commit="abcdef123", repo="https://gitlab.com/example/newcode"
 )
 
 # Overwrite workflow metadata if needed
