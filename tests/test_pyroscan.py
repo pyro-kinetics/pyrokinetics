@@ -47,6 +47,11 @@ def test_pyroscan_read_linear(json_dir):
 def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     json_path = nonlinear_tmp_path / json_dir
     shutil.unpack_archive(zip_path, json_path)
+    # TODO: Distinguish TGLF and GFTM inputs during autodetection. Both readers
+    # currently check rmin_loc, rmaj_loc, and nky, so this TGLF base input can
+    # be identified as GFTM, skipping PyroScan's TGLF eigenvalue handling.
+    # Their different parsing of ky in linear output does not distinguish
+    # input files: both input readers currently use the same ky conversion.
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
 
     pyro_scan.load_gk_output(load_fields=False)
