@@ -90,11 +90,15 @@ itself in a JSON file (`pyroscan.json`) and can collect outputs into a
 dimensions. Rules to keep when changing it:
 
 - **Time reduction only converges a quantity onto one value.** Linear growth
-  rate, frequency, fields and eigenfunctions take the last time; nonlinear
-  fluxes are averaged over `tolerance_time_range`.
+  rate and frequency follow `linear_time_mode` (`"average"` over the last part
+  of the run set by `linear_time_range`, default; `"last"`; or `"trace"`, the
+  full time series). Linear fields and eigenfunctions take the last time;
+  nonlinear fluxes are averaged over `tolerance_time_range`. `reduce_time`'s
+  modes are listed in `VALID_TIME_MODES`; reuse `"trace"` for "keep the time
+  dimension" rather than adding a new mode.
 - **Never time-average a complex field.** The phase of each Fourier coefficient
   keeps moving in a nonlinear run, so its mean cancels. Nonlinear fields are
-  kept complex with their `time` dimension (`nonlinear_fields="time_resolved"`,
+  kept complex with their `time` dimension (`nonlinear_fields="trace"`,
   the default), or reduced to `|field|**2` averaged in time
   (`"amplitude_squared"`). `|field|**2` is taken before any `kx`/`ky` sum.
 - **Fields and eigenfunctions are reduced identically.** `phi`, `apar`, `bpar`

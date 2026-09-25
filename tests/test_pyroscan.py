@@ -676,3 +676,27 @@ def test_pyroscan_nonlinear_field_spectrum(json_dir, zip_path, nonlinear_tmp_pat
     phi_sum_both = pyro_scan.gk_output.data["phi"]
     assert "kx" not in phi_sum_both.dims
     assert "ky" not in phi_sum_both.dims
+
+
+def test_pyroscan_linear_time_mode():
+    json_path = template_dir / "outputs" / "CGYRO_linear_scan"
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    for mode in ("average", "last"):
+        pyro_scan.load_gk_output(linear_time_mode=mode)
+        assert "time" not in pyro_scan.gk_output.data["growth_rate"].dims
+
+    with pytest.raises(ValueError, match="linear_time_mode"):
+        pyro_scan.load_gk_output(linear_time_mode="mean")
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_linear_time_trace(tmp_path, template, file_name):
+    """
+    "trace" keeps the time series. The runs here share a time grid; runs whose
+    time grids differ need ragged-grid stacking to be combined.
+    """
+    scan, _ = _electromagnetic_scan(tmp_path, template, file_name)
+    scan.load_gk_output(linear_time_mode="trace")
+    assert "time" in scan.gk_output.data["growth_rate"].dims
+    assert "time" in scan.gk_output.data["mode_frequency"].dims

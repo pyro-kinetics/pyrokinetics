@@ -55,7 +55,7 @@ def reduce_time(
         "average"   → average over tolerance_time_range
         "trace"     → preserve the full time series unchanged
     """
-    if "time" not in da.dims or time_mode == "none":
+    if "time" not in da.dims:
         return da
 
     if time_mode == "last":
@@ -640,7 +640,7 @@ class PyroScan:
         load_moments=False,
         sum_ky=True,
         sum_kx=False,
-        nonlinear_fields="time_resolved",
+        nonlinear_fields="trace",
         drop_nan=False,
         **kwargs,
     ):
@@ -677,8 +677,8 @@ class PyroScan:
         sum_kx (bool, default False) – Applies to fields and eigenfunctions (fluxes
             are already kx-integrated). If True, sum over kx; if False, preserve the
             kx dimension.
-        nonlinear_fields (str, default "time_resolved") – How nonlinear fields
-            are reduced in time. "time_resolved" keeps the complex field and its
+        nonlinear_fields (str, default "trace") – How nonlinear fields
+            are reduced in time. "trace" keeps the complex field and its
             time dimension. "amplitude_squared" loads |field|**2 averaged over
             ``tolerance_time_range`` (taken before any kx/ky sum, so sums are of
             squared amplitudes). Averaging the complex field itself is not offered: the
@@ -773,7 +773,7 @@ class PyroScan:
                 "scalars": "last",
                 "fluxes": "average",
                 # Set from nonlinear_fields below
-                "fields": "none",
+                "fields": "trace",
             },
         }
 
@@ -805,9 +805,9 @@ class PyroScan:
         scalar_overrides = scalar_time_mode_overrides[regime]
         time_policy = time_policy[regime]
 
-        if nonlinear_fields not in ("amplitude_squared", "time_resolved"):
+        if nonlinear_fields not in ("amplitude_squared", "trace"):
             raise ValueError(
-                "nonlinear_fields must be 'amplitude_squared' or 'time_resolved', "
+                "nonlinear_fields must be 'amplitude_squared' or 'trace', "
                 f"not {nonlinear_fields!r}"
             )
         amplitude_squared = (
