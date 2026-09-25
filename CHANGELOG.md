@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased] - 2021-01-26
  
 ### Added
+  - `PyroHypercube`: non-gridded parameter sets (one value per sample), with a
+    single `sample` output dimension, and `from_directory` to read existing run
+    trees. Shares output loading with `PyroScan` through
+    `PyroScan.output_layout`.
 
 ### Changed
   - Changed Pyro kwarg from `gk_type` to  `gk_code`

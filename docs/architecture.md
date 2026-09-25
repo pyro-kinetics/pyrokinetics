@@ -125,6 +125,42 @@ dimensions. Rules to keep when changing it:
   the `STELLA_linear` and `GX_linear` outputs in `templates/outputs/` (GX's has
   more than one `ky`).
 
+### `PyroHypercube` (`src/pyrokinetics/pyrohypercube.py`)
+
+The non-gridded sibling of `PyroScan`, for Latin hypercubes, sampled points
+or a directory of existing runs. It subclasses `PyroScan` and changes only how
+runs map onto the output:
+
+- `parameter_dict` holds **one value per sample** (all entries the same
+  length), not a list per parameter to take the outer product of.
+  `sample_points()` replaces `outer_product()` (which is overridden to return
+  the samples, so inherited `write`/`update_self_parameters` work unchanged).
+- Runs are named by `sample_names` (default `sample_0000`, ...), not by
+  parameter values, which would collide for nearby samples.
+- The output `Dataset` has one `sample` dimension; each varied parameter is a
+  non-dimension coordinate along it, with `sample_name` alongside.
+
+Shared machinery lives in `PyroScan`, with one override point:
+`output_layout() -> ScanLayout` gives the coordinates, units, shape, scan
+dimensions and squeezable dimensions. Everything else in `load_gk_output`
+(which quantities, time reduction, failed runs) is common, so a hypercube
+pointed at a gridded scan reproduces `PyroScan`'s values exactly (tested).
+`coord_quantity` reads a coordinate's units whether they are in `attrs` (a
+dimension coordinate; an xarray index cannot hold pint arrays) or quantified in
+place (a non-dimension coordinate); use it rather than `.units` on coordinates.
+
+`from_directory(root, pattern, params, gk_code, file_name)` reads existing run
+trees, and exists for legacy trees; new sets should be built from a base `Pyro`
+and `parameter_dict`. Assumptions it enforces or checks:
+
+- Runs differ only in `params`, and every run uses the same input file name
+  (a mismatch raises).
+- Output is stored with the first run's reference values, as for `PyroScan`;
+  runs whose physical reference values differ trigger a warning.
+
+To write the samples for another code, convert the whole set with
+`convert_gk_code` and `write(base_directory=...)`, as for `PyroScan`.
+
 ## File reading infrastructure
 
 ### `Factory` (`factory.py`)

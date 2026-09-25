@@ -37,6 +37,7 @@ CI (`.github/workflows/`) runs pytest on Python 3.10–3.12, black/isort and fla
 src/pyrokinetics/
   pyro.py            Pyro: top-level object, owns everything below
   pyroscan.py        PyroScan: N-D parameter scans over a Pyro
+  pyrohypercube.py   PyroHypercube: non-gridded parameter sets (sample dimension)
   gk_code/           GKInput/GKOutput base classes + one module per GK code
   equilibrium/       Equilibrium + readers (GEQDSK, TRANSP, IMAS, ...)
   kinetics/          Kinetics + readers (JETTO, SCENE, TRANSP, pFile, ...)
