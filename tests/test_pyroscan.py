@@ -107,6 +107,8 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
 
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
+    # Nonlinear fields are not averaged: they keep time, kx and ky
+    assert {"time", "kx", "ky"} <= set(pyro_scan.gk_output.data["phi"].dims)
 
     pyro_scan.load_gk_output(load_fluxes=True)
     assert "particle" in pyro_scan.gk_output.data.data_vars
@@ -584,3 +586,58 @@ def test_pyroscan_convert_gk_code(tmp_path):
     for name in scan.pyro_dict:
         run = Pyro(gk_file=tmp_path / "tglf" / name / "input.TGLF", gk_code="TGLF")
         assert run.gk_code == "TGLF"
+
+
+# Linear outputs with phi, apar and bpar; GX's has more than one ky
+ELECTROMAGNETIC_RUNS = [
+    ("STELLA_linear", "stella.in"),
+    ("GX_linear", "gx.in"),
+]
+
+
+def _electromagnetic_scan(tmp_path, template, file_name):
+    """A two-point kappa scan whose runs are copies of an electromagnetic run."""
+    pyro = Pyro(gk_file=template_dir / "outputs" / template / file_name)
+    kappa = float(pyro.local_geometry.kappa)
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"kappa": [kappa, kappa + 0.1]},
+        base_directory=tmp_path,
+        file_name=file_name,
+    )
+    for name in scan.pyro_dict:
+        shutil.copytree(
+            template_dir / "outputs" / template, tmp_path / name, dirs_exist_ok=True
+        )
+    return scan, pyro
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_fields_keep_kx_and_ky(tmp_path, template, file_name):
+    scan, pyro = _electromagnetic_scan(tmp_path, template, file_name)
+    scan.load_gk_output()
+    data = scan.gk_output.data
+
+    pyro.load_gk_output()
+    for field in ("phi", "apar", "bpar"):
+        assert data[field].dims == ("kappa", "theta", "kx", "ky")
+    assert data.sizes["kx"] == pyro.gk_output.data.sizes["kx"]
+    assert data.sizes["ky"] == pyro.gk_output.data.sizes["ky"]
+
+    # Eigenfunctions mirror the fields
+    assert data["eigenfunctions"].dims == ("kappa", "field", "theta", "kx", "ky")
+
+
+@pytest.mark.parametrize("template, file_name", ELECTROMAGNETIC_RUNS)
+def test_pyroscan_fields_selected_when_asked(tmp_path, template, file_name):
+    scan, _ = _electromagnetic_scan(tmp_path, template, file_name)
+    scan.load_gk_output()
+    kx = float(scan.gk_output.data["kx"][0])
+    ky = float(scan.gk_output.data["ky"][-1])
+
+    scan.load_gk_output(field_kx=kx, field_ky=ky)
+    data = scan.gk_output.data
+
+    for field in ("phi", "apar", "bpar"):
+        assert data[field].dims == ("kappa", "theta")
+    assert data["eigenfunctions"].dims == ("kappa", "field", "theta")

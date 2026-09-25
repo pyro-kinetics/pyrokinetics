@@ -50,8 +50,9 @@ def reduce_time(
     time_mode:
         "last"      → take final time
         "average"   → average over tolerance_time_range
+        "none"      → keep the time dimension
     """
-    if "time" not in da.dims:
+    if "time" not in da.dims or time_mode == "none":
         return da
 
     if time_mode == "last":
@@ -125,6 +126,13 @@ def normalize_failed_runs(buffers: dict[str, list]) -> None:
 
 
 # ---- dataset assembly ----
+def _same_values(a, b):
+    """Are two coordinate arrays equal (to floating-point tolerance)?"""
+    if np.issubdtype(a.dtype, np.number) and np.issubdtype(b.dtype, np.number):
+        return np.allclose(a, b, equal_nan=True)
+    return np.array_equal(a, b)
+
+
 def add_quantity(ds, name, arrays, base_shape, scan_coords):
     if not any(isinstance(a, xr.DataArray) for a in arrays):
         return ds
@@ -137,6 +145,33 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
                 a.squeeze(dim, drop=True) if isinstance(a, xr.DataArray) else a
                 for a in arrays
             ]
+
+    for a in arrays:
+        if isinstance(a, xr.DataArray) and a.shape != last.shape:
+            raise ValueError(
+                f"Cannot stack '{name}' across the scan: runs have different "
+                f"shapes {dict(a.sizes)} and {dict(last.sizes)}. For fields, "
+                "select a single kx/ky with field_kx/field_ky."
+            )
+
+    # Coordinates are taken from the last run; one that differs between runs
+    # would be wrong for the others, so it is dropped and its dimension kept.
+    coords = dict(last.coords)
+    for dim in last.dims:
+        if dim not in last.coords:
+            continue
+        values = np.asarray(last[dim].values)
+        if any(
+            isinstance(a, xr.DataArray)
+            and not _same_values(np.asarray(a[dim].values), values)
+            for a in arrays
+        ):
+            warnings.warn(
+                f"'{name}': the '{dim}' coordinate differs between runs, so it "
+                f"is dropped and only the '{dim}' dimension is kept.",
+                stacklevel=2,
+            )
+            coords.pop(dim)
 
     shape = base_shape + last.shape
 
@@ -163,7 +198,7 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         dims=dims,
         coords={
             **scan_coords,
-            **last.coords,
+            **coords,
         },
     )
 
@@ -625,6 +660,8 @@ class PyroScan:
         load_moments=False,
         sum_ky=True,
         drop_nan=False,
+        field_kx=None,
+        field_ky=None,
         **kwargs,
     ):
         """
@@ -642,6 +679,10 @@ class PyroScan:
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
+        field_kx (float, default None) – Select the fields and eigenfunctions
+            at the kx nearest this value, in ``output_convention`` units. If
+            None, they keep their kx dimension.
+        field_ky (float, default None) – As ``field_kx``, for ky.
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -698,10 +739,11 @@ class PyroScan:
 
         load_specs = {
             "linear": {
-                "scalars": ["growth_rate", "mode_frequency", "eigenfunctions"],
+                "scalars": ["growth_rate", "mode_frequency"],
                 "extras": ["growth_rate_tolerance"],
                 "fluxes": [],
-                "fields": [],
+                # Eigenfunctions are selected exactly as the fields are
+                "fields": ["eigenfunctions"],
             },
             "nonlinear": {
                 "scalars": [],
@@ -720,7 +762,9 @@ class PyroScan:
             "nonlinear": {
                 "scalars": "last",
                 "fluxes": "average",
-                "fields": "average",
+                # Nonlinear fields are kept in time; what to average is the
+                # user's choice
+                "fields": "none",
             },
         }
 
@@ -796,14 +840,17 @@ class PyroScan:
                             tolerance_time_range=tolerance_time_range,
                         )
 
-                data = data.isel(ky=[0]).squeeze()
-                pyro.gk_output.data = data
-
+                # Fields and eigenfunctions keep their kx and ky dimensions
+                # unless a value is asked for
                 for name in spec["fields"]:
                     if name in pyro.gk_output:
-                        run_buffers[name] = select_kx_ky_time(
-                            pyro.gk_output[name],
-                            kx_min=kx_min,
+                        field = pyro.gk_output[name]
+                        if field_kx is not None:
+                            field = field.sel(kx=field_kx, method="nearest")
+                        if field_ky is not None:
+                            field = field.sel(ky=field_ky, method="nearest")
+                        run_buffers[name] = reduce_time(
+                            field,
                             time_mode=time_policy["fields"],
                             tolerance_time_range=tolerance_time_range,
                         )
