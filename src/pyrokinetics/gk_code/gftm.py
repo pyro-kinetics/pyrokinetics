@@ -257,12 +257,9 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to GFTM input file
-
-        GFTM keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in lowercase, as
-        :meth:`parse_gftm` does.
         """
-        self._add_flags_case_insensitive(flags, str.lower)
+        for key, value in flags.items():
+            self.data[key] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """

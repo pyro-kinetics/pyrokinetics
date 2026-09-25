@@ -98,20 +98,6 @@ def test_add_flags(gftm):
     assert gftm.data["foo"] == "bar"
 
 
-@pytest.mark.parametrize("key", ["NBASIS_MAX", "nbasis_max", "Nbasis_Max"])
-def test_add_flags_case_insensitive(tmp_path, gftm, key):
-    gftm.add_flags({key: 6, "NEW_FLAG": 1})
-    assert gftm.data["nbasis_max"] == 6
-    assert gftm.data["new_flag"] == 1
-    assert [k for k in gftm.data if k.lower() == "nbasis_max"] == ["nbasis_max"]
-
-    filename = tmp_path / "input.gftm"
-    gftm.write(filename)
-    with open(filename) as f:
-        lines = [line for line in f if line.startswith("NBASIS_MAX")]
-    assert lines == ["NBASIS_MAX = 6\n"]
-
-
 def test_get_local_geometry(gftm):
     # TODO test it has the correct values
     local_geometry = gftm.get_local_geometry()
