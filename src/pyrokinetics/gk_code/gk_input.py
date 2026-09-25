@@ -2,7 +2,7 @@ import copy
 from abc import abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import f90nml
 import numpy as np
@@ -191,19 +191,6 @@ class GKInput(AbstractFileReader, ReadableFromFile):
                 self.data[key] = dict()
             for param, val in parameter.items():
                 self.data[key][param] = val
-
-    def _add_flags_case_insensitive(
-        self, flags: Dict[str, Any], new_key_case: Callable[[str], str]
-    ) -> None:
-        """
-        Add flags to a flat ``key = value`` input, matching keys case-insensitively
-
-        A flag matching an existing key in any capitalisation overwrites that key.
-        New keys are stored as ``new_key_case(key)``, e.g. ``str.lower``.
-        """
-        existing_keys = {key.lower(): key for key in self.data}
-        for key, value in flags.items():
-            self.data[existing_keys.get(key.lower(), new_key_case(key))] = value
 
     @abstractmethod
     def get_local_geometry(self) -> LocalGeometry:

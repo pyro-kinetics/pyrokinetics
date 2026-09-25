@@ -249,11 +249,9 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to NEO input file
-
-        NEO keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in uppercase.
         """
-        self._add_flags_case_insensitive(flags, str.upper)
+        for key, value in flags.items():
+            self.data[key] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """
