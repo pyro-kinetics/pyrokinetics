@@ -44,6 +44,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     """
 
     code_name = "CGYRO"
+    flag_key_case = staticmethod(str.upper)
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
     _convention_dict = {}
@@ -264,15 +265,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
     def is_nonlinear(self) -> bool:
         return bool(self.data.get("NONLINEAR_FLAG", 0))
-
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to CGYRO input file
-
-        CGYRO keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in uppercase.
-        """
-        self._add_flags_case_insensitive(flags, str.upper)
 
     def get_local_geometry(self) -> LocalGeometry:
         """

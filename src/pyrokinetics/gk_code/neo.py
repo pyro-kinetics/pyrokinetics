@@ -33,6 +33,7 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
     """
 
     code_name = "NEO"
+    flag_key_case = staticmethod(str.upper)
     default_file_name = "input.neo"
     norm_convention = "neo"
     _convention_dict = {}
@@ -245,15 +246,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
 
     def is_nonlinear(self) -> bool:
         return bool(self.data.get("NONLINEAR_FLAG", 0))
-
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to NEO input file
-
-        NEO keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in uppercase.
-        """
-        self._add_flags_case_insensitive(flags, str.upper)
 
     def get_local_geometry(self) -> LocalGeometry:
         """

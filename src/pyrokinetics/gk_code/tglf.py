@@ -38,6 +38,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     """Reader for TGLF input files"""
 
     code_name = "TGLF"
+    flag_key_case = staticmethod(str.lower)
     default_file_name = "input.TGLF"
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
@@ -248,16 +249,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
     def is_nonlinear(self) -> bool:
         return self.data.get("use_transport_model", 1) == 1
-
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to TGLF input file
-
-        TGLF keys are case-insensitive. A flag matching an existing key in any
-        capitalisation overwrites that key; new keys are stored in lowercase, as
-        :meth:`parse_tglf` does.
-        """
-        self._add_flags_case_insensitive(flags, str.lower)
 
     def get_local_geometry(self) -> LocalGeometry:
         """

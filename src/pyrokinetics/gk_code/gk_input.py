@@ -47,6 +47,9 @@ class GKInput(AbstractFileReader, ReadableFromFile):
     norm_convention: str = "pyrokinetics"
     """`Convention` used for normalising this code's quantities"""
 
+    flag_key_case: Optional[Callable[[str], str]] = None
+    """Case applied to new top-level keys by `add_flags`; ``None`` keeps them as given"""
+
     def __init__(self, filename: Optional[PathLike] = None):
         self.data: Optional[f90nml.Namelist] = None
         self._convention_dict = {}
@@ -179,31 +182,29 @@ class GKInput(AbstractFileReader, ReadableFromFile):
     def is_linear(self) -> bool:
         return not self.is_nonlinear()
 
-    @abstractmethod
-    def add_flags(self, flags) -> None:
+    def add_flags(self, flags: Dict[str, Any]) -> None:
         """
         Add extra flags to a GK code input file
 
-        Default version assumes a Fortran90 namelist
-        """
-        for key, parameter in flags.items():
-            if key not in self.data:
-                self.data[key] = dict()
-            for param, val in parameter.items():
-                self.data[key][param] = val
-
-    def _add_flags_case_insensitive(
-        self, flags: Dict[str, Any], new_key_case: Callable[[str], str]
-    ) -> None:
-        """
-        Add flags to a flat ``key = value`` input, matching keys case-insensitively
-
-        A flag matching an existing key in any capitalisation overwrites that key.
-        New keys are stored as ``new_key_case(key)``, e.g. ``str.lower``.
+        Top-level keys match existing keys in ``self.data`` case-insensitively, so
+        a flag overwrites an existing entry whatever its capitalisation. New keys
+        are converted with `flag_key_case`. A ``dict`` value is merged into the
+        Fortran namelist group of that name; any other value is set directly.
         """
         existing_keys = {key.lower(): key for key in self.data}
         for key, value in flags.items():
-            self.data[existing_keys.get(key.lower(), new_key_case(key))] = value
+            if key.lower() in existing_keys:
+                key = existing_keys[key.lower()]
+            elif self.flag_key_case is not None:
+                key = self.flag_key_case(key)
+
+            if isinstance(value, dict):
+                if key not in self.data:
+                    self.data[key] = dict()
+                for param, val in value.items():
+                    self.data[key][param] = val
+            else:
+                self.data[key] = value
 
     @abstractmethod
     def get_local_geometry(self) -> LocalGeometry:
