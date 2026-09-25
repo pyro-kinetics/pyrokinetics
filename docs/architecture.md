@@ -94,9 +94,9 @@ dimensions. Rules to keep when changing it:
   fluxes are averaged over `tolerance_time_range`.
 - **Never time-average a complex field.** The phase of each Fourier coefficient
   keeps moving in a nonlinear run, so its mean cancels. Nonlinear fields are
-  either `|field|**2` averaged in time (`nonlinear_fields="amplitude_squared"`,
-  the default) or kept complex with their `time` dimension
-  (`"time_resolved"`). `|field|**2` is taken before any `kx`/`ky` sum.
+  kept complex with their `time` dimension (`nonlinear_fields="time_resolved"`,
+  the default), or reduced to `|field|**2` averaged in time
+  (`"amplitude_squared"`). `|field|**2` is taken before any `kx`/`ky` sum.
 - **Fields and eigenfunctions are reduced identically.** `phi`, `apar`, `bpar`
   and `eigenfunctions` go through the same `select_kx_ky_time` call: `ky` is
   summed when `sum_ky` (default, shared with fluxes), `kx` when `sum_kx`

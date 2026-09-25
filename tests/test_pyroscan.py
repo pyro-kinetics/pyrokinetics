@@ -107,18 +107,19 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
 
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
-    # By default nonlinear fields are |phi|**2 averaged in time, summed over ky
+    # By default nonlinear fields are kept complex and in time; ky is summed
+    phi = pyro_scan.gk_output.data["phi"]
+    assert {"time", "kx"} <= set(phi.dims)
+    assert "ky" not in phi.dims
+    assert np.iscomplexobj(phi.data.magnitude)
+
+    # ...or reduced to |phi|**2 averaged in time
+    pyro_scan.load_gk_output(nonlinear_fields="amplitude_squared")
     phi = pyro_scan.gk_output.data["phi"]
     assert "kx" in phi.dims
     assert "ky" not in phi.dims and "time" not in phi.dims
     assert not np.iscomplexobj(phi.data.magnitude)
     assert np.all(phi.data.magnitude >= 0)
-
-    # ...or kept complex and time resolved
-    pyro_scan.load_gk_output(nonlinear_fields="time_resolved")
-    phi = pyro_scan.gk_output.data["phi"]
-    assert "time" in phi.dims
-    assert np.iscomplexobj(phi.data.magnitude)
 
     pyro_scan.load_gk_output(load_fluxes=True)
     assert "particle" in pyro_scan.gk_output.data.data_vars

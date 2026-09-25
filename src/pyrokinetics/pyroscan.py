@@ -630,7 +630,7 @@ class PyroScan:
         load_moments=False,
         sum_ky=True,
         sum_kx=False,
-        nonlinear_fields="amplitude_squared",
+        nonlinear_fields="time_resolved",
         drop_nan=False,
         **kwargs,
     ):
@@ -653,11 +653,11 @@ class PyroScan:
         sum_kx (bool, default False) – Applies to fields and eigenfunctions (fluxes
             are already kx-integrated). If True, sum over kx; if False, preserve the
             kx dimension.
-        nonlinear_fields (str, default "amplitude_squared") – How nonlinear fields
-            are reduced in time. "amplitude_squared" loads |field|**2 averaged over
+        nonlinear_fields (str, default "time_resolved") – How nonlinear fields
+            are reduced in time. "time_resolved" keeps the complex field and its
+            time dimension. "amplitude_squared" loads |field|**2 averaged over
             ``tolerance_time_range`` (taken before any kx/ky sum, so sums are of
-            squared amplitudes). "time_resolved" keeps the complex field and its
-            time dimension. Averaging the complex field itself is not offered: the
+            squared amplitudes). Averaging the complex field itself is not offered: the
             phase of each Fourier coefficient keeps moving, so the mean cancels.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
