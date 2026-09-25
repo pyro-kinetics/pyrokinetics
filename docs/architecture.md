@@ -84,6 +84,22 @@ consistent). It writes one input file per point into a directory tree, records
 itself in a JSON file (`pyroscan.json`) and can collect outputs into a
 `PyroScanGKOutput` dataset with scan coordinates.
 
+#### Stacking runs whose grids differ
+
+`add_quantity` stacks each quantity over the runs through `stack_runs`. Runs
+need not share a grid (TGLF `NMODES`, `theta` resolution, `kx` in a `theta0`
+scan, output times). Rules to keep:
+
+- Runs that agree are stacked as they are.
+- Otherwise each dimension with a coordinate becomes the **sorted** union of the
+  runs' values, matched to a relative tolerance (`1e-8` of the largest value),
+  and a run is NaN where it has no value. Never append one run's grid to
+  another's: integrals and interpolation over `theta` need it monotonic.
+- A dimension without a coordinate (e.g. `mode`) is padded by position.
+- Never label every run with the last run's coordinate values.
+- Eigenfunctions of runs at different `theta` resolution make the union large;
+  `load_gk_output(load_eigenfunctions=False)` skips them.
+
 ## File reading infrastructure
 
 ### `Factory` (`factory.py`)
