@@ -84,6 +84,31 @@ consistent). It writes one input file per point into a directory tree, records
 itself in a JSON file (`pyroscan.json`) and can collect outputs into a
 `PyroScanGKOutput` dataset with scan coordinates.
 
+#### Loading a scan's output
+
+`load_gk_output` loads every run and stacks each quantity along the scan
+dimensions. Rules to keep when changing it:
+
+- **Time reduction only converges a quantity onto one value.** Linear growth
+  rate, frequency, fields and eigenfunctions take the last time; nonlinear
+  fluxes are averaged over `tolerance_time_range`. Nonlinear fields keep their
+  `time` dimension: the phase of each Fourier coefficient keeps moving, so a
+  complex time average cancels, and what to average (e.g. `|phi|**2`) is the
+  user's choice.
+- **Fields and eigenfunctions keep `kx` and `ky`.** `phi`, `apar`, `bpar` and
+  `eigenfunctions` are treated identically and are only reduced to one `kx`/`ky`
+  when asked, via `field_kx` / `field_ky` (nearest value). A scanned parameter
+  that is also a dimension of each run (e.g. `ky`) is squeezed out, since its
+  value is already the scan coordinate. Consumers that need one `kx` select it
+  themselves, as `SaturationRules` does.
+- **Runs must agree to be stacked.** `add_quantity` raises if runs give a
+  quantity different shapes, and drops (with a warning) a coordinate whose
+  values differ between runs, rather than labelling every run with the last
+  run's values.
+- Not every linear output is electromagnetic. Test `apar`/`bpar` handling on
+  the `STELLA_linear` and `GX_linear` outputs in `templates/outputs/` (GX's has
+  more than one `ky`).
+
 ## File reading infrastructure
 
 ### `Factory` (`factory.py`)
