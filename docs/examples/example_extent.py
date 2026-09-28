@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+
 from pyrokinetics import template_dir
 from pyrokinetics.diagnostics.extent import Extent
 from pyrokinetics.pyroscan import PyroScan
