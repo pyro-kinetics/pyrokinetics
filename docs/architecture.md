@@ -84,6 +84,29 @@ consistent). It writes one input file per point into a directory tree, records
 itself in a JSON file (`pyroscan.json`) and can collect outputs into a
 `PyroScanGKOutput` dataset with scan coordinates.
 
+#### Stacking runs whose grids differ
+
+`add_quantity` stacks each quantity over the runs through `stack_runs`. Runs
+need not share a grid (TGLF `NMODES`, `theta` resolution, `kx` in a `theta0`
+scan, output times). Rules to keep:
+
+- Runs that agree are stacked as they are.
+- Otherwise each dimension with a coordinate becomes the **sorted** union of the
+  runs' values, matched to a relative tolerance (`1e-8` of the largest value),
+  and a run is NaN where it has no value. Never append one run's grid to
+  another's: integrals and interpolation over `theta` need it monotonic.
+- A dimension without a coordinate (e.g. `mode`) is padded by position.
+- Never label every run with the last run's coordinate values.
+- **Integrating over a merged axis.** A run with gaps on the merged axis makes
+  `.integrate` NaN. Call `.pint.interpolate_na(dim, method="linear")` first:
+  the trapezoid rule is exact for the linear interpolant, so the result equals
+  each run's integral on its own grid. Use the `.pint` accessor: plain
+  `interpolate_na` runs through `np.vectorize`, which strips pint units. This holds for gaps *inside* a run's
+  range; a run that does not span the merged range (e.g. a different
+  `nperiod`) stays NaN at its ends, and filling those with 0 would add a
+  spurious end segment. `SaturationRules` integrates this way; do not add a
+  custom NaN-skipping integration helper.
+
 ## File reading infrastructure
 
 ### `Factory` (`factory.py`)
