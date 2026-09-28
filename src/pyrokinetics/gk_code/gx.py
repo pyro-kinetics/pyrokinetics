@@ -237,12 +237,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         except KeyError:
             return False
 
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to GX input file
-        """
-        super().add_flags(flags)
-
     def get_local_geometry(self) -> LocalGeometry:
         """
         Returns local geometry. Delegates to more specific functions
