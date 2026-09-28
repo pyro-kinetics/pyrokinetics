@@ -1,9 +1,6 @@
-
-from pathlib import Path
-
+import matplotlib.pyplot as plt
 import numpy as np
-
-from pyrokinetics import Pyro, template_dir
+from pyrokinetics import template_dir
 from pyrokinetics.diagnostics.extent import Extent
 from pyrokinetics.pyroscan import PyroScan
 
@@ -13,8 +10,6 @@ pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=T
 pyro_scan.load_gk_output()
 
 Extent(pyro_scan.gk_output)
-
-import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
 
@@ -26,3 +21,4 @@ ax.axvspan(
     color="orange",
     alpha=0.3,
 )
+
