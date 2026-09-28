@@ -1620,6 +1620,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             else None
         )
 
+        field_time = fields.pop("_time", None) if fields is not None else None
+        flux_time = fluxes.pop("_time", None) if fluxes is not None else None
+        moment_time = moments.pop("_time", None) if moments is not None else None
+
         if coords["linear"] and not fields:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
         else:
@@ -1627,8 +1631,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             eigenvalues = None
 
         # Assign units and return GKOutput
-        field_dims = ("theta", "kx", "ky", "time")
-        moment_dims = ("theta", "kx", "species", "ky", "time")
+        field_dims = ("theta", "kx", "ky", "field_time")
+        if kxky_flux_spectra:
+            flux_dims = ("field", "species", "kx", "ky", "flux_time")
+        else:
+            flux_dims = ("field", "species", "flux_time")
+        moment_dims = ("theta", "kx", "species", "ky", "moment_time")
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
@@ -1636,7 +1644,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         return GKOutput(
             coords=Coords(
-                time=coords["time"],
                 kx=coords["kx"],
                 ky=coords["ky"],
                 theta=coords["theta"],
@@ -1644,6 +1651,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 energy=coords["energy"],
                 species=coords["species"],
                 field=coords["field"],
+                field_time=field_time,
+                flux_time=flux_time,
+                moment_time=moment_time,
             ).with_units(convention),
             norm=norm,
             fields=(
@@ -1861,41 +1871,197 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         """
         nml = gk_input.data
 
-        # The last time step is not always written, but depends on
-        # whatever condition is met first between simtimelim and timelim
+        # # The last time step is not always written, but depends on
+        # # whatever condition is met first between simtimelim and timelim
+        # species = gk_input.get_local_species_names()
+
+        # if ".h5" not in str(raw_data["nrg"]):
+        #     with open(raw_data["nrg"], "r") as f:
+        #         full_data = f.readlines()
+        #         ntime = len(full_data) // (len(species) + 1)
+        #         lasttime = float(full_data[-(len(species) + 1)])
+
+        #         if (
+        #             ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"]
+        #             == 0
+        #         ):
+        #             add_on = 0
+        #         else:
+        #             add_on = 1
+        # else:
+        #     with h5py.File(raw_data["nrg"], "r") as file:
+        #         key = list(file.keys())[1]
+        #         time = file[f"{key}/time"][:]
+        #         ntime = len(time)
+        #         lasttime = time[-1]
+        #         if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
+        #             add_on = 0
+        #         else:
+        #             add_on = 1
+
+        # ntime = (
+        #     int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
+        # ) + add_on
+
+        # ntime = ntime
+
+        # # Set time to index for now, gets overwritten by field data
+        # time = np.linspace(0, ntime - 1, ntime)
+
         species = gk_input.get_local_species_names()
 
-        if ".h5" not in str(raw_data["nrg"]):
-            with open(raw_data["nrg"], "r") as f:
-                full_data = f.readlines()
+        # Determine a legacy/common time grid from the highest-cadence
+        # diagnostic available. The diagnostic with the smallest istep
+        # produces the most time samples.
+        available_diagnostics = {
+            "field": (
+                nml["in_out"]["istep_field"],
+                raw_data.get("field"),
+            ),
+            "moment": (
+                nml["in_out"].get("istep_mom"),
+                raw_data.get(f"mom_{species[0]}"),
+            ),
+            "flux": (
+                nml["in_out"]["istep_nrg"],
+                raw_data.get("nrg"),
+            ),
+        }
+
+        # Only keep diagnostics that have both an istep and an output file.
+        available_diagnostics = {
+            name: (istep, path)
+            for name, (istep, path) in available_diagnostics.items()
+            if istep is not None and path is not None
+        }
+
+        if not available_diagnostics:
+            raise FileNotFoundError(
+                "Could not determine a GENE output time axis: no field, "
+                "moment, or flux output was found."
+            )
+
+        # Choose the highest-cadence diagnostic.
+        selected_name, (selected_istep, selected_file) = min(
+            available_diagnostics.items(),
+            key=lambda item: item[1][0],
+        )
+
+        # Count the records and determine the final recorded time.
+        if selected_name == "flux":
+            if ".h5" not in str(selected_file):
+                with open(selected_file, "r") as f:
+                    full_data = f.readlines()
+
                 ntime = len(full_data) // (len(species) + 1)
-                lasttime = float(full_data[-(len(species) + 1)])
+                lasttime = float(full_data[-(len(species) + 1)].split()[0])
+            else:
+                with h5py.File(selected_file, "r") as file:
+                    key = list(file.keys())[1]
+                    selected_time = np.asarray(file[f"{key}/time"])
+                    ntime = len(selected_time)
+                    lasttime = float(selected_time[-1])
 
-                if (
-                    ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"]
-                    == 0
-                ):
-                    add_on = 0
-                else:
-                    add_on = 1
-        else:
-            with h5py.File(raw_data["nrg"], "r") as file:
-                key = list(file.keys())[1]
-                time = file[f"{key}/time"][:]
-                ntime = len(time)
-                lasttime = time[-1]
-                if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
-                    add_on = 0
-                else:
-                    add_on = 1
+        elif selected_name == "field":
+            precision = nml["info"]["PRECISION"]
 
-        ntime = (
-            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
-        ) + add_on
+            if precision == "SINGLE":
+                time_data_fmt = "=ifi"
+                time_data_size = struct.calcsize(time_data_fmt)
+            elif precision == "DOUBLE":
+                time_data_fmt = "=idi"
+                time_data_size = struct.calcsize(time_data_fmt)
+            else:
+                raise ValueError(
+                    f"Pyrokinetics can't handle cases when GENE precision "
+                    f"is {precision}"
+                )
 
-        ntime = ntime
+            if ".h5" not in str(selected_file):
+                field_size = (
+                    nml["box"]["nx0"]
+                    * nml["box"]["nz0"]
+                    * nml["box"]["nky0"]
+                    * (8 if precision == "SINGLE" else 16)
+                )
+                nfield = nml["info"]["n_fields"]
+                int_size = 4
+                time_block_size = (
+                    time_data_size
+                    + nfield * (2 * int_size + field_size)
+                )
 
-        # Set time to index for now, gets overwritten by field data
+                with open(selected_file, "rb") as f:
+                    f.seek(0, 2)
+                    file_size = f.tell()
+
+                ntime = file_size // time_block_size
+
+                with open(selected_file, "rb") as f:
+                    f.seek((ntime - 1) * time_block_size)
+                    lasttime = struct.unpack(
+                        time_data_fmt,
+                        f.read(time_data_size),
+                    )[1]
+            else:
+                with h5py.File(selected_file, "r") as file:
+                    selected_time = np.asarray(file["field/time"])
+                    ntime = len(selected_time)
+                    lasttime = float(selected_time[-1])
+
+        elif selected_name == "moment":
+            precision = nml["info"]["PRECISION"]
+
+            if precision == "SINGLE":
+                time_data_fmt = "=ifi"
+                time_data_size = struct.calcsize(time_data_fmt)
+            elif precision == "DOUBLE":
+                time_data_fmt = "=idi"
+                time_data_size = struct.calcsize(time_data_fmt)
+            else:
+                raise ValueError(
+                    f"Pyrokinetics can't handle cases when GENE precision "
+                    f"is {precision}"
+                )
+
+            if ".h5" not in str(selected_file):
+                complex_size = 8 if precision == "SINGLE" else 16
+                int_size = 4
+                nx = nml["box"]["nx0"]
+                nz = nml["box"]["nz0"]
+                nky = nml["box"]["nky0"]
+                nmoment_output = 6
+
+                if nml["info"]["n_fields"] > 2:
+                    nmoment_output += 3
+
+                moment_size = nx * nz * nky * complex_size
+                time_block_size = (
+                    time_data_size
+                    + nmoment_output * (2 * int_size + moment_size)
+                )
+
+                with open(selected_file, "rb") as f:
+                    f.seek(0, 2)
+                    file_size = f.tell()
+
+                ntime = file_size // time_block_size
+
+                with open(selected_file, "rb") as f:
+                    f.seek((ntime - 1) * time_block_size)
+                    lasttime = struct.unpack(
+                        time_data_fmt,
+                        f.read(time_data_size),
+                    )[1]
+            else:
+                with h5py.File(selected_file, "r") as file:
+                    selected_time = np.asarray(
+                        file[f"mom_{species[0]}"]["time"]
+                    )
+                    ntime = len(selected_time)
+                    lasttime = float(selected_time[-1])
+
+        # Preserve the legacy generic time coordinate.
         time = np.linspace(0, ntime - 1, ntime)
 
         nfield = nml["info"]["n_fields"]
@@ -2055,29 +2221,33 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nkx = len(coords["kx"])
         nky = len(coords["ky"])
         ntheta = len(coords["theta"])
-        ntime = len(coords["time"])
         nfield = len(coords["field"])
 
         full_nky = len(coords["full_ky"])
-        full_ntime = len(coords["full_time"])
 
         # Account for kx data being ifft shifted
         kx_shifted = list(range(*kx_idx.indices((nx))))
         kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
 
         field_size = nx * nz * full_nky * complex_size
-
         time_block_size = time_data_size + nfield * (2 * int_size + field_size)
 
-        if gk_input.is_linear():
-            sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
-        else:
-            sliced_field = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
-        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as f:
-                for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                f.seek(0, 2)
+                file_size = f.tell()
+            full_ntime = file_size // time_block_size
+            time_indices = list(range(*time_idx.indices(full_ntime)))
+            ntime = len(time_indices)
+
+            if gk_input.is_linear():
+                sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+            else:
+                sliced_field = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
+            fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
+            with open(raw_data["field"], "rb") as f:
+                for it_out, it in enumerate(time_indices):
                     # Seek to requested time block
                     f.seek(it * time_block_size)
 
@@ -2113,17 +2283,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # Read .h5 file if binary file absent
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
-            fields = np.empty(
-                (nfield, nx, nky, nz, ntime),
-                dtype=complex,
-            )
             with h5py.File(raw_data["field"], "r") as file:
-                # Read in time data. Take the same time steps as the binary
-                # reader above, so that the time coordinate lines up with the
-                # data read here, downsampling included.
-                time_indices = list(range(*time_idx.indices(full_ntime)))
                 h5_time = np.asarray(file.get("field/time"))
+                full_ntime = len(h5_time)
+                time_indices = list(range(*time_idx.indices(full_ntime)))
                 time.extend(float(h5_time[it]) for it in time_indices)
+                ntime = len(time)
+                fields = np.empty(
+                    (nfield, nx, nky, nz, ntime),
+                    dtype=complex,
+                )
                 for i_field in range(nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
                     h5_dataset_names = sorted(file[h5_subgroup].keys())
@@ -2167,9 +2336,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # =================================================
 
-        # Overwrite 'time' coordinate as determined in _init_dataset
-        coords["time"] = time
-
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
@@ -2179,6 +2345,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         for ifield, field_name in enumerate(coords["field"]):
             result[field_name] = fields[ifield, ...]
 
+        result["_time"] = np.asarray(time)
         return result
 
     @staticmethod
@@ -2251,13 +2418,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = len(coords["theta"])
 
         full_nky = len(coords["full_ky"])
-        full_ntime = len(coords["full_time"])
-
-        # Take the time indices from the iteration count rather than from
-        # ``coords["time"]``, which _get_fields may already have overwritten
-        # with the raw field times.
-        time_indices = list(range(*time_idx.indices(full_ntime)))
-        ntime = len(time_indices)
 
         # Account for kx data being ifft shifted
         kx_shifted = list(range(*kx_idx.indices((nx))))
@@ -2270,6 +2430,19 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         moment_size = nx * nz * full_nky * complex_size
 
         time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
+
+        if ".h5" not in str(raw_data[f"mom_{species[0]}"]):
+            with open(raw_data[f"mom_{species[0]}"], "rb") as f:
+                f.seek(0, 2)
+                file_size = f.tell()
+            full_ntime = file_size // time_block_size
+            time_indices = list(range(*time_idx.indices(full_ntime)))
+        else:
+            with h5py.File(raw_data[f"mom_{species[0]}"], "r") as file:
+                full_ntime = len(np.asarray(file[f"mom_{species[0]}"]["time"]))
+            time_indices = list(range(*time_idx.indices(full_ntime)))
+
+        ntime = len(time_indices)
 
         if gk_input.is_linear():
             moments = np.empty(
@@ -2408,9 +2581,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # =================================================
 
-        # Overwrite 'time' coordinate as determined in _init_dataset
-        coords["time"] = time
-
         # Original method coords: (species, moment, kx, ky, theta, time)
         # New coords: (moment, theta, kx, species, ky, time)
         moments = moments.transpose(1, 4, 2, 0, 3, 5)
@@ -2420,6 +2590,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         result["density"] = moments[0, ...]
         result["temperature"] = moments[1, ...] / 3 + moments[2, ...] * 2 / 3
         result["velocity"] = moments[5, ...]
+        result["_time"] = np.asarray(time)
 
         return result
 
@@ -2437,14 +2608,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
 
         # ky data not available in the nrg file so no ky coords here
-        coord_names = ["species", "flux", "field", "full_time"]
-        shape = [len(coords[coord_name]) for coord_name in coord_names]
-        fluxes = np.empty(shape)
-
         nfield = len(coords["field"])
         nspecies = len(coords["species"])
-        ntime = len(coords["time"])
-        full_ntime = len(coords["full_time"])
 
         if downsample:
             time_idx = downsample.get("time_idx", None)
@@ -2454,98 +2619,96 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
-            fluxes[...] = 0
-            result = {"fluxes": fluxes}
+            fluxes = np.zeros((nspecies, len(coords["flux"]), nfield, 1))
+            result = {}
+            fluxes = fluxes.transpose(1, 2, 0, 3)
+            for iflux, flux in enumerate(coords["flux"]):
+                result[flux] = fluxes[iflux, ...]
+            result["_time"] = np.asarray([0.0])
             return result
-
-        flux_istep = nml["in_out"]["istep_nrg"]
-        field_istep = nml["in_out"]["istep_field"]
-
-        ntime_flux = nml["info"]["steps"][0] // flux_istep + 1
-        if nml["info"]["steps"][0] % flux_istep > 0:
-            ntime_flux += 1
-
-        if flux_istep < field_istep:
-            time_skip = int(field_istep / flux_istep) - 1
-        else:
-            time_skip = 0
 
         if ".h5" not in str(raw_data["nrg"]):
             with open(raw_data["nrg"], "r") as csv_file:
-                nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+                nrg_data = list(
+                    csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+                )
 
-                if nfield == 3:
-                    logging.warning(
-                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
-                    )
-                    fluxes[:, :, 2, :] = 0.0
-                    field_size = 2
-                else:
-                    field_size = nfield
+            block = nspecies + 1
+            full_ntime = len(nrg_data) // block
+            time_full = np.asarray(
+                [float(nrg_data[i * block][0]) for i in range(full_ntime)]
+            )
+            time_indices = list(range(*time_idx.indices(full_ntime)))
+            time = time_full[time_indices]
+            ntime = len(time_indices)
+            fluxes = np.zeros((nspecies, len(coords["flux"]), nfield, ntime))
 
-                for i_time in range(full_ntime):
-                    time = next(nrg_data)  # noqa
-                    coords["full_time"][i_time] = float(time[0])
-                    for i_species in range(nspecies):
-                        nrg_line = np.array(next(nrg_data), dtype=float)
+            if nfield == 3:
+                logging.warning(
+                    "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
+                )
+                fluxes[:, :, 2, :] = 0.0
+                field_size = 2
+            else:
+                field_size = nfield
 
-                        # Particle
-                        fluxes[i_species, 0, :field_size, i_time] = nrg_line[
-                            4 : 4 + field_size,
+            for it_out, i_time in enumerate(time_indices):
+                base = i_time * block
+                for i_species in range(nspecies):
+                    nrg_line = np.array(nrg_data[base + 1 + i_species], dtype=float)
+
+                    # Particle
+                    fluxes[i_species, 0, :field_size, it_out] = nrg_line[
+                        4 : 4 + field_size,
+                    ]
+
+                    # Heat
+                    fluxes[i_species, 1, :field_size, it_out] = nrg_line[
+                        6 : 6 + field_size,
+                    ]
+
+                    # Momentum
+                    if len(nrg_line) < 11:
+                        # The default fluxes saved by GENE are the radial fluxes of parallel momentum
+                        # which are *not* those that enter the transport equations. Should we warn
+                        # the user here?
+
+                        fluxes[i_species, 2, :field_size, it_out] = nrg_line[
+                            8 : 8 + field_size,
                         ]
 
-                        # Heat
-                        fluxes[i_species, 1, :field_size, i_time] = nrg_line[
-                            6 : 6 + field_size,
-                        ]
+                    else:
+                        # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                        # fluxes of toroidal angular momentum, which we here load preferentially
 
-                        # Momentum
-                        if len(nrg_line) < 11:
-                            # The default fluxes saved by GENE are the radial fluxes of parallel momentum
-                            # which are *not* those that enter the transport equations. Should we warn
-                            # the user here?
+                        field_columns = {
+                            0: [10, 11],  # Phi
+                            1: [12, 13, 17],  # Apar
+                            2: [15, 16],  # Bpar
+                        }
 
-                            fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                                8 : 8 + field_size,
-                            ]
+                        for i_field, cols in field_columns.items():
+                            if (
+                                i_field < field_size
+                            ):  # Only process fields that exist
+                                if len(nrg_line) >= max(cols) + 1:
+                                    fluxes[i_species, 2, i_field, it_out] = (
+                                        nrg_line[cols].sum()
+                                    )
+                                else:
+                                    fluxes[i_species, 2, i_field, it_out] = 0.0
 
-                        else:
-                            # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
-                            # fluxes of toroidal angular momentum, which we here load preferentially
-
-                            field_columns = {
-                                0: [10, 11],  # Phi
-                                1: [12, 13, 17],  # Apar
-                                2: [15, 16],  # Bpar
-                            }
-
-                            for i_field, cols in field_columns.items():
-                                if (
-                                    i_field < field_size
-                                ):  # Only process fields that exist
-                                    if len(nrg_line) >= max(cols) + 1:
-                                        fluxes[i_species, 2, i_field, i_time] = (
-                                            nrg_line[cols].sum()
-                                        )
-                                    else:
-                                        fluxes[i_species, 2, i_field, i_time] = 0.0
-
-                    # Skip time/data values in field print out is less
-                    if i_time < ntime - 1:
-                        for skip_t in range(time_skip):
-                            for skip_s in range(nspecies + 1):
-                                next(nrg_data)
         else:
             with h5py.File(raw_data["nrg"], "r") as file:
                 spec_keys = list(file.keys())[1:]
                 suffixes = ["es", "em"]
                 prefixes = ["Gamma", "Q", "P"]
-                if len(coords["time"]) != len(
-                    file[spec_keys[0]]["time"][:: time_skip + 1]
-                ):
-                    final_append = True
-                else:
-                    final_append = False
+                time_full = np.asarray(file[spec_keys[0]]["time"])
+                full_ntime = len(time_full)
+                time_indices = list(range(*time_idx.indices(full_ntime)))
+                time = time_full[time_indices]
+                ntime = len(time_indices)
+                fluxes = np.zeros((nspecies, len(coords["flux"]), nfield, ntime))
 
                 if nfield == 3:
                     logging.warning(
@@ -2569,7 +2732,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         2: ["paremB", "peremB"],  # Bpar
                     }
 
-                time_nrg = file[spec_keys[0]]["time"]
 
                 for i_species, spec_key in enumerate(spec_keys):
                     species_data = file[spec_key]
@@ -2584,7 +2746,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                                         if f"{prefixes[i_flux]}_{suffix}"
                                         in species_data
                                     ),
-                                    np.zeros(len(time_nrg)),
+                                    np.zeros(full_ntime),
                                 )
 
                                 # Add Maxwell stress contribution
@@ -2594,28 +2756,17 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                                 flux_data = (
                                     species_data.get(
                                         f"{prefixes[i_flux]}_{suffixes[i_field]}",
-                                        np.zeros(len(time_nrg)),
+                                        np.zeros(full_ntime),
                                     )
                                     if i_field < len(suffixes)
-                                    else np.zeros(len(time_nrg))
+                                    else np.zeros(full_ntime)
                                 )
 
-                            if final_append:
-                                fluxes[i_species, i_flux, i_field, :-1] = flux_data[
-                                    :: time_skip + 1
-                                ]
-                                fluxes[i_species, i_flux, i_field, -1] = flux_data[-1]
-                            else:
-                                fluxes[i_species, i_flux, i_field, :] = flux_data[
-                                    :: time_skip + 1
-                                ]
+                            fluxes[i_species, i_flux, i_field, :] = flux_data[time_indices]
 
         results = {}
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
-
-        fluxes = fluxes[..., time_idx]
-        coords["time"] = coords["full_time"][time_idx]
 
         if gk_input.data["geometry"].get("norm_flux_projection", False):
             geometry_type = gk_input.data["geometry"]["magn_geometry"]
@@ -2634,6 +2785,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         for iflux, flux in enumerate(coords["flux"]):
             results[flux] = fluxes[iflux, ...] / flux_norm
 
+        results["_time"] = np.asarray(time)
         return results
 
     @staticmethod
@@ -2704,10 +2856,14 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             raw_data, gk_input, coords, downsample
         )
 
-        # The spectra multiply moments and fields at equal times and are stored
-        # on the standard time coordinate, so the two must share a cadence.
-        time = np.asarray(coords["time"])
-        if len(moment_time) != len(time) or not np.allclose(moment_time, time):
+        # The spectra multiply moments and fields at equal times, so the two
+        # time axes must match exactly for this calculation.
+        if "_time" not in fields:
+            raise ValueError(
+                "GENE field output time is required to build flux spectra"
+            )
+        field_time = np.asarray(fields["_time"])
+        if len(moment_time) != len(field_time) or not np.allclose(moment_time, field_time):
             raise ValueError(
                 "GENE moments and fields must be written at the same times to "
                 "build flux spectra, but their time axes differ. Check that "
@@ -2721,9 +2877,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 "as it provides the per-theta Jacobian"
             )
 
-        return GKOutputReaderGENE._get_flux_spectra(
+        result = GKOutputReaderGENE._get_flux_spectra(
             raw_moments, fields, jac_norm, gk_input, coords
         )
+        result["_time"] = field_time
+        return result
 
     @staticmethod
     def _get_flux_spectra(
