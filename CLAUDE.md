@@ -79,6 +79,13 @@ docs/                Sphinx (rst + myst markdown)
   `update_gk_code` rather than mutating `gk_input.data` directly.
 - **Style.** black + isort (profile black), NumPy-style docstrings, type hints on
   public functions, British spelling in identifiers (`normalisation`).
+- **Helpers earn their place.** Add a helper function only when you can name a
+  reasonable second use, or when it hides a distinct piece of logic behind a
+  clear name (e.g. a function with its own rules and docstring). Do not create
+  helpers for the sake of reusability: do not wrap a one-line call, and inline
+  short single-use helpers, since each extra layer is something a reader has to
+  look up. Prefer an existing library method (e.g. pint-xarray's
+  `.pint.interpolate_na`) over writing a custom one.
 - **Tests.** Every reader/writer change needs a test in the matching `tests/`
   subdirectory. Round-trip conversions are covered by `tests/test_roundtrip.py`.
   Output readers compare against netCDF golden answers; regenerate these only
