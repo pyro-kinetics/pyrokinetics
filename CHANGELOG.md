@@ -17,7 +17,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
     different `NMODES`, different `theta` resolution, different `kx` values)
     on the sorted union of their coordinates, NaN where a run has no value,
     instead of failing or labelling every run with the last run's
-    coordinates. Adds `load_eigenfunctions`.
+    coordinates. Integrate over such an axis with
+    `.pint.interpolate_na(dim, method="linear").integrate(dim)`, as
+    `SaturationRules` now does.
 
 ## [0.0.1] - 2021-01-26  
  

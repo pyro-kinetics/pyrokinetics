@@ -97,8 +97,15 @@ scan, output times). Rules to keep:
   another's: integrals and interpolation over `theta` need it monotonic.
 - A dimension without a coordinate (e.g. `mode`) is padded by position.
 - Never label every run with the last run's coordinate values.
-- Eigenfunctions of runs at different `theta` resolution make the union large;
-  `load_gk_output(load_eigenfunctions=False)` skips them.
+- **Integrating over a merged axis.** A run with gaps on the merged axis makes
+  `.integrate` NaN. Call `.pint.interpolate_na(dim, method="linear")` first:
+  the trapezoid rule is exact for the linear interpolant, so the result equals
+  each run's integral on its own grid. Use the `.pint` accessor: plain
+  `interpolate_na` runs through `np.vectorize`, which strips pint units. This holds for gaps *inside* a run's
+  range; a run that does not span the merged range (e.g. a different
+  `nperiod`) stays NaN at its ends, and filling those with 0 would add a
+  spurious end segment. `SaturationRules` integrates this way; do not add a
+  custom NaN-skipping integration helper.
 
 ## File reading infrastructure
 

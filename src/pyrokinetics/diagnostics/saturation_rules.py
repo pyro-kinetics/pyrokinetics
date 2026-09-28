@@ -174,11 +174,23 @@ class SaturationRules:
             / field_squared.sel(field="phi").max(dim="theta")
         )
 
+        # Runs at different theta resolution are NaN off their own grid points;
+        # linear interpolation fills those gaps without changing the trapezoid
+        # integral, so each run is integrated exactly as on its own grid. The
+        # pint accessor keeps the units that plain interpolate_na would strip.
         # Numerator in Lambda
-        numerator = (field_squared * jacobian).integrate(coord="theta")
+        numerator = (
+            (field_squared * jacobian)
+            .pint.interpolate_na("theta", method="linear")
+            .integrate(coord="theta")
+        )
 
         # Denominator
-        denom = (field_squared * jacobian * k_perp**2).integrate(coord="theta")
+        denom = (
+            (field_squared * jacobian * k_perp**2)
+            .pint.interpolate_na("theta", method="linear")
+            .integrate(coord="theta")
+        )
 
         # Sum over fields
         ql_metric_full = (growth_rate * numerator * field_factor / denom).sum(

@@ -641,10 +641,37 @@ def test_stack_runs_pads_dimension_without_coordinate():
     assert not np.isnan(q.isel(kappa=1).data.magnitude).any()
 
 
-def test_pyroscan_without_eigenfunctions():
-    json_path = template_dir / "outputs" / "CGYRO_linear_scan"
-    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+def test_stack_runs_integrate_after_interpolate_na():
+    """
+    Integrating along theta after interpolate_na gives each run's integral on
+    its own grid: the trapezoid rule is exact for the linear interpolant, so the
+    points added in a run's gaps do not change it. Units must survive: the
+    test suite turns pint.UnitStrippedWarning into an error.
+    """
+    import pint_xarray  # noqa: F401 (registers the .pint accessor)
+    import xarray as xr
+    from scipy.integrate import trapezoid
 
-    pyro_scan.load_gk_output(load_eigenfunctions=False)
-    assert "eigenfunctions" not in pyro_scan.gk_output.data.data_vars
-    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    from pyrokinetics.pyroscan import add_quantity
+
+    grids = [np.linspace(-np.pi, np.pi, 5), np.linspace(-np.pi, np.pi, 9)]
+    arrays = [
+        xr.DataArray(
+            (np.cos(theta) + 2.0) * units.meter, dims="theta", coords={"theta": theta}
+        )
+        for theta in grids
+    ]
+    scan_coords = {"kappa": np.arange(len(grids), dtype=float)}
+    q = add_quantity(
+        xr.Dataset(coords=scan_coords), "q", arrays, (len(grids),), scan_coords
+    )["q"]
+
+    # Plain integration is NaN for the coarse run, which has gaps
+    assert np.isnan(q.integrate("theta").isel(kappa=0).data.magnitude)
+
+    # The pint accessor keeps the units that plain interpolate_na strips
+    integral = q.pint.interpolate_na("theta", method="linear").integrate("theta")
+    for i, array in enumerate(arrays):
+        expected = trapezoid(array.data.magnitude, array["theta"].values)
+        assert np.isclose(integral.isel(kappa=i).data.magnitude, expected)
+    assert integral.data.units == units.meter

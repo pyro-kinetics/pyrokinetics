@@ -737,7 +737,6 @@ class PyroScan:
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
-        load_eigenfunctions=True,
         sum_ky=True,
         drop_nan=False,
         **kwargs,
@@ -756,10 +755,6 @@ class PyroScan:
         load_fields (bool, default True) – Flag to load fields or not
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
-        load_eigenfunctions (bool, default True) – Flag to load eigenfunctions or
-            not. Runs at different theta resolution are stacked on the union of
-            their theta grids, which can be far larger than any one run's; turn
-            eigenfunctions off when only the eigenvalues are wanted.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
@@ -854,12 +849,6 @@ class PyroScan:
         if load_fields:
             load_specs["linear"]["fields"].extend(["phi", "bpar", "apar"])
             load_specs["nonlinear"]["fields"].extend(["phi", "bpar", "apar"])
-
-        if not load_eigenfunctions:
-            for load_spec in load_specs.values():
-                for names in load_spec.values():
-                    if "eigenfunctions" in names:
-                        names.remove("eigenfunctions")
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
