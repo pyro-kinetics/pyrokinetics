@@ -129,12 +129,6 @@ def _is_numeric(values):
     return np.issubdtype(np.asarray(values).dtype, np.number)
 
 
-def _tolerance(axes):
-    """Tolerance for matching coordinate values: relative to their largest value."""
-    scale = max((np.max(np.abs(a)) for a in axes if np.size(a)), default=0.0)
-    return 1e-8 * scale
-
-
 def _same_axis(a, b, tol):
     if _is_numeric(a) and _is_numeric(b):
         return np.shape(a) == np.shape(b) and np.all(np.abs(a - b) <= tol)
@@ -156,11 +150,7 @@ def _union_axis(axes, tol):
                 union.append(v)
         return np.asarray(union)
 
-    seen = {}
-    for a in axes:
-        for v in np.ravel(a):
-            seen.setdefault(v, None)
-    return np.asarray(list(seen))
+    return np.asarray(list(dict.fromkeys(v for a in axes for v in np.ravel(a))))
 
 
 def _positions(values, axis, tol):
@@ -210,10 +200,14 @@ def stack_runs(arrays, last):
 
     coord_dims = [dim for dim in dims if dim in last.coords]
     run_axes = {dim: [np.asarray(a[dim].values) for a in arrays] for dim in coord_dims}
-    tols = {
-        dim: _tolerance(axes) if all(_is_numeric(x) for x in axes) else 0.0
-        for dim, axes in run_axes.items()
-    }
+    # Coordinate values match to a tolerance relative to their largest value
+    tols = {}
+    for dim, axes in run_axes.items():
+        if all(_is_numeric(x) for x in axes):
+            scale = max((np.max(np.abs(a)) for a in axes if np.size(a)), default=0.0)
+            tols[dim] = 1e-8 * scale
+        else:
+            tols[dim] = 0.0
 
     aligned = len({r.shape for r in raw}) == 1 and all(
         _same_axis(x, run_axes[dim][-1], tols[dim])
