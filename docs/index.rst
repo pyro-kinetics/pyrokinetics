@@ -73,6 +73,7 @@ local parameters can be calculated.
    :caption: Developer Guide
 
    Contributing Guide <developer_guide/contributing_guide>
+   Architecture <architecture>
    Writing Documentation <developer_guide/writing_docs>
 
 Indices and tables
