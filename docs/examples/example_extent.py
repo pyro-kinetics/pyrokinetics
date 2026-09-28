@@ -22,4 +22,3 @@ ax.axvspan(
     color="orange",
     alpha=0.3,
 )
-
