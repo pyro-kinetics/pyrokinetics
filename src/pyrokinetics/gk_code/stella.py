@@ -427,12 +427,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         except (KeyError, AttributeError, TypeError):
             return False
 
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to STELLA input file
-        """
-        super().add_flags(flags)
-
     def get_local_geometry(self) -> LocalGeometry:
         """
         Returns local geometry. Delegates to more specific functions
