@@ -11,6 +11,7 @@ from itertools import product
 
 import numpy as np
 import pint
+import pint_xarray  # noqa: F401 (registers the .pint accessor)
 import xarray as xr
 from pint import Quantity
 
@@ -138,6 +139,148 @@ def normalize_failed_runs(buffers: dict[str, list]) -> None:
 
 
 # ---- dataset assembly ----
+def _is_numeric(values):
+    return np.issubdtype(np.asarray(values).dtype, np.number)
+
+
+def _same_axis(a, b, tol):
+    if _is_numeric(a) and _is_numeric(b):
+        return np.shape(a) == np.shape(b) and np.all(np.abs(a - b) <= tol)
+    return np.array_equal(a, b)
+
+
+def _union_axis(axes, tol):
+    """
+    The union of several runs' values of one coordinate.
+
+    Numeric values are sorted and values within ``tol`` of each other are
+    merged, so grids of different resolution interleave in order rather than
+    one being appended to the other. Other values keep first-seen order.
+    """
+    if all(_is_numeric(a) for a in axes):
+        union = []
+        for v in np.sort(np.concatenate([np.ravel(a) for a in axes])):
+            if not union or v - union[-1] > tol:
+                union.append(v)
+        return np.asarray(union)
+
+    return np.asarray(list(dict.fromkeys(v for a in axes for v in np.ravel(a))))
+
+
+def _positions(values, axis, tol):
+    """Index of each of ``values`` on ``axis``."""
+    if _is_numeric(axis):
+        idx = np.clip(np.searchsorted(axis, values - tol), 0, len(axis) - 1)
+        if np.any(np.abs(axis[idx] - values) > tol):
+            raise ValueError("Coordinate value not found on the merged axis")
+        return idx
+    lookup = {v: i for i, v in enumerate(axis)}
+    return np.asarray([lookup[v] for v in np.ravel(values)])
+
+
+def stack_runs(arrays, last):
+    """
+    Put every run's array for one quantity onto a single set of non-scan axes.
+
+    Runs of a scan need not share a grid: TGLF runs at ``NMODES=2`` and ``4``
+    give ``mode`` axes of different length, runs at different resolution give
+    different ``theta`` grids, and runs can share a shape but not its values
+    (e.g. ``kx`` in a ``theta0`` scan). Where the runs agree they are stacked
+    as they are. Otherwise each dimension with a coordinate becomes the sorted
+    union of the runs' values (matched to a relative tolerance), and a run is
+    NaN wherever it has no value; a dimension without a coordinate is padded
+    to the longest run.
+
+    Returns ``(magnitudes, units, coords, shape)``: one array per run on the
+    common axes, their pint units (``None`` if unitless), and the coordinates
+    and shape of those axes, in the order of ``last.dims``.
+    """
+    dims = last.dims
+    for a in arrays:
+        if set(a.dims) != set(dims):
+            raise ValueError(
+                f"Runs have different dimensions: {a.dims} and {dims}; "
+                "they cannot be stacked."
+            )
+    arrays = [a.transpose(*dims) for a in arrays]
+
+    raw, units = [], None
+    for a in arrays:
+        data = a.data
+        if hasattr(data, "magnitude"):
+            units = data.units
+            data = data.magnitude
+        raw.append(np.asarray(data))
+
+    coord_dims = [dim for dim in dims if dim in last.coords]
+    run_axes = {dim: [np.asarray(a[dim].values) for a in arrays] for dim in coord_dims}
+    # Coordinate values match to a tolerance relative to their largest value
+    tols = {}
+    for dim, axes in run_axes.items():
+        if all(_is_numeric(x) for x in axes):
+            scale = max((np.max(np.abs(a)) for a in axes if np.size(a)), default=0.0)
+            tols[dim] = 1e-8 * scale
+        else:
+            tols[dim] = 0.0
+
+    aligned = len({r.shape for r in raw}) == 1 and all(
+        _same_axis(x, run_axes[dim][-1], tols[dim])
+        for dim in coord_dims
+        for x in run_axes[dim]
+    )
+    if aligned:
+        return raw, units, dict(last.coords), last.shape
+
+    axes = {}
+    for i, dim in enumerate(dims):
+        if dim in coord_dims:
+            axes[dim] = _union_axis(run_axes[dim], tols[dim])
+        else:
+            axes[dim] = np.arange(max(r.shape[i] for r in raw))
+    shape = tuple(len(axes[dim]) for dim in dims)
+
+    dtype = complex if any(np.iscomplexobj(r) for r in raw) else float
+    padded = []
+    for a, r in zip(arrays, raw):
+        out = np.full(shape, np.nan, dtype=dtype)
+        take = tuple(
+            (
+                _positions(np.asarray(a[dim].values), axes[dim], tols[dim])
+                if dim in coord_dims
+                else np.arange(r.shape[i])
+            )
+            for i, dim in enumerate(dims)
+        )
+        out[np.ix_(*take)] = r
+        padded.append(out)
+
+    return padded, units, {dim: axes[dim] for dim in coord_dims}, shape
+
+
+def integrate_over_valid_range(da, dim="theta"):
+    """
+    Trapezoid integral of ``da`` along ``dim``, over each run's own valid range.
+
+    Runs stacked on a merged axis are NaN off their own points: in gaps inside
+    their range (a coarser grid) and beyond its ends (a shorter range). Gaps are
+    filled by linear interpolation, for which the trapezoid rule is exact, so
+    they do not change the integral. Only segments with both ends valid are
+    then summed, so each run is integrated exactly over its own range and never
+    extrapolated beyond it. A run with no valid segment gives NaN.
+
+    The pint accessor keeps units that plain ``interpolate_na`` would strip.
+    """
+    filled = da.pint.interpolate_na(dim, method="linear")
+    units = getattr(filled.data, "units", None)
+    y = filled.copy(data=getattr(filled.data, "magnitude", filled.data))
+    x = y[dim]
+
+    segments = 0.5 * (x.shift({dim: -1}) - x) * (y + y.shift({dim: -1}))
+    integral = segments.sum(dim, skipna=True, min_count=1)
+
+    return integral if units is None else integral * units
+
+
 def add_quantity(ds, name, arrays, base_shape, scan_coords):
     if not any(isinstance(a, xr.DataArray) for a in arrays):
         return ds
@@ -151,19 +294,9 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
                 for a in arrays
             ]
 
-    shape = base_shape + last.shape
+    raw, units, run_coords, run_shape = stack_runs(arrays, last)
 
-    raw = []
-    units = None
-
-    for a in arrays:
-        data = a.data
-        if hasattr(data, "magnitude"):
-            raw.append(data.magnitude)
-            units = data.units
-        else:
-            raw.append(np.asarray(data))
-
+    shape = base_shape + run_shape
     stacked = np.stack(raw).reshape(shape)
 
     if units is not None:
@@ -176,7 +309,7 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         dims=dims,
         coords={
             **scan_coords,
-            **last.coords,
+            **run_coords,
         },
     )
 

@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   - `PyroScan.convert_gk_code` now sets `file_name` to the new code's default and
     keeps each run's `gk_file` in its run directory, so a following `write`
     writes the new code's input files. It also takes `template_file`.
+  - `PyroScan.load_gk_output` stacks runs whose grids differ (e.g. TGLF runs at
+    different `NMODES`, different `theta` resolution, different `kx` values)
+    on the sorted union of their coordinates, NaN where a run has no value,
+    instead of failing or labelling every run with the last run's
+    coordinates. `integrate_over_valid_range` integrates over such an axis,
+    each run exactly over its own range. `SaturationRules` uses it, and no
+    longer holds the Jacobian, k_perp and |B| constant beyond the base Pyro's
+    theta range: integrals are restricted to that range, with a warning.
 
 ## [0.0.1] - 2021-01-26  
  

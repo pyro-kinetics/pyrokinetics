@@ -606,6 +606,8 @@ def test_pyroscan_convert_gk_code(tmp_path):
     for name in scan.pyro_dict:
         run = Pyro(gk_file=tmp_path / "tglf" / name / "input.TGLF", gk_code="TGLF")
         assert run.gk_code == "TGLF"
+
+
 # Linear outputs with phi, apar and bpar; GX's has more than one ky
 ELECTROMAGNETIC_RUNS = [
     ("STELLA_linear", "stella.in"),
@@ -749,3 +751,122 @@ def test_pyroscan_linear_time_trace(tmp_path, template, file_name):
         assert "time" not in data[name].dims
     assert "eigenfunctions_squared" in data.data_vars
     assert "eigenfunctions" not in data.data_vars
+
+
+# ---------------------------------------------------------------------------
+# Stacking runs whose grids differ
+# ---------------------------------------------------------------------------
+def _stack(*runs, dims=("theta",)):
+    """Stack one quantity from runs given as {dim: values} coordinate dicts."""
+    import xarray as xr
+
+    from pyrokinetics.pyroscan import add_quantity
+
+    arrays = []
+    for coords in runs:
+        shape = tuple(len(coords[d]) if d in coords else coords["_len"] for d in dims)
+        data = np.arange(np.prod(shape), dtype=float).reshape(shape) + 1.0
+        arrays.append(
+            xr.DataArray(
+                data * units.meter,
+                dims=dims,
+                coords={d: v for d, v in coords.items() if d in dims},
+            )
+        )
+    scan_coords = {"kappa": np.arange(len(runs), dtype=float)}
+    ds = add_quantity(
+        xr.Dataset(coords=scan_coords), "q", arrays, (len(runs),), scan_coords
+    )
+    return ds["q"], arrays
+
+
+def test_stack_runs_on_one_grid_unchanged():
+    theta = np.linspace(-np.pi, np.pi, 5)
+    q, arrays = _stack({"theta": theta}, {"theta": theta})
+    assert q.dims == ("kappa", "theta")
+    assert np.array_equal(q["theta"].values, theta)
+    assert not np.isnan(q.data.magnitude).any()
+
+
+def test_stack_runs_different_resolution_interleaves_in_order():
+    coarse = np.linspace(-np.pi, np.pi, 3)
+    fine = np.linspace(-np.pi, np.pi, 5)
+    q, arrays = _stack({"theta": coarse}, {"theta": fine})
+
+    # The merged axis is sorted, not the coarse grid with the fine appended
+    assert np.allclose(q["theta"].values, fine)
+    assert np.all(np.diff(q["theta"].values) > 0)
+    assert q.data.units == units.meter
+
+    # Each run keeps its own values at its own points, NaN elsewhere
+    coarse_row = q.isel(kappa=0).data.magnitude
+    assert np.allclose(coarse_row[[0, 2, 4]], arrays[0].data.magnitude)
+    assert np.isnan(coarse_row[[1, 3]]).all()
+    assert np.allclose(q.isel(kappa=1).data.magnitude, arrays[1].data.magnitude)
+
+
+def test_stack_runs_same_shape_different_values_are_aligned():
+    """kx in a theta0 scan: same length, different values."""
+    q, _ = _stack({"kx": [0.0, 0.1]}, {"kx": [0.0, 0.2]}, dims=("kx",))
+    assert np.allclose(q["kx"].values, [0.0, 0.1, 0.2])
+    assert np.isnan(q.sel(kappa=0, kx=0.2).data.magnitude)
+    assert np.isnan(q.sel(kappa=1, kx=0.1).data.magnitude)
+
+
+def test_stack_runs_matches_values_to_a_tolerance():
+    third = 1.0 / 3.0
+    q, _ = _stack({"theta": [0.0, third]}, {"theta": [0.0, third * (1 + 1e-12)]})
+    assert q.sizes["theta"] == 2
+    assert not np.isnan(q.data.magnitude).any()
+
+
+def test_stack_runs_pads_dimension_without_coordinate():
+    """TGLF runs at NMODES=2 and 4: a mode index with no coordinate."""
+    q, _ = _stack({"_len": 2}, {"_len": 4}, dims=("mode",))
+    assert q.sizes["mode"] == 4
+    assert np.isnan(q.isel(kappa=0, mode=[2, 3]).data.magnitude).all()
+    assert not np.isnan(q.isel(kappa=1).data.magnitude).any()
+
+
+def test_integrate_over_valid_range():
+    """
+    Each run is integrated exactly over its own points: a coarser grid leaves
+    gaps inside the merged axis, and a shorter range leaves NaN at its ends.
+    Neither may change the integral, and nothing may be extrapolated.
+    """
+    import xarray as xr
+    from scipy.integrate import trapezoid
+
+    from pyrokinetics.pyroscan import add_quantity, integrate_over_valid_range
+
+    grids = [
+        np.linspace(-np.pi, np.pi, 5),  # coarse: gaps on the merged axis
+        np.linspace(-np.pi, np.pi, 9),
+        np.linspace(-3 * np.pi, 3 * np.pi, 13),  # longer range
+        np.linspace(-np.pi / 2, np.pi / 2, 3),  # shorter range: NaN at the ends
+    ]
+    arrays = [
+        xr.DataArray(
+            (np.cos(theta) + 2.0) * units.meter, dims="theta", coords={"theta": theta}
+        )
+        for theta in grids
+    ]
+    scan_coords = {"kappa": np.arange(len(grids), dtype=float)}
+    q = add_quantity(
+        xr.Dataset(coords=scan_coords), "q", arrays, (len(grids),), scan_coords
+    )["q"]
+
+    # Plain integration is NaN for every run that does not fill the merged axis
+    assert np.isnan(q.integrate("theta").isel(kappa=0).data.magnitude)
+
+    integral = integrate_over_valid_range(q, "theta")
+    for i, array in enumerate(arrays):
+        expected = trapezoid(array.data.magnitude, array["theta"].values)
+        assert np.isclose(integral.isel(kappa=i).data.magnitude, expected)
+    assert integral.data.units == units.meter
+
+    # A run with no values at all integrates to NaN, not 0
+    empty = q.where(q["kappa"] != 0)
+    assert np.isnan(
+        integrate_over_valid_range(empty, "theta").isel(kappa=0).data.magnitude
+    )
