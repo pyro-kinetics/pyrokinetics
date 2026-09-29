@@ -1113,8 +1113,12 @@ class PyroScan:
                     )
 
                 if tearing and "apar" in pyro.gk_output:
-                    # Needs apar's sign along theta, which "average" discards
-                    tp = FieldLine(pyro).compute_linear_tearing_parameter()
+                    # Needs apar's sign along theta, which "average" discards.
+                    # Geometry comes from the run's own deck: a reloaded scan's
+                    # pyros are copies of the base without the scan parameters
+                    run = Pyro(gk_file=pyro.gk_file)
+                    run.gk_output = pyro.gk_output
+                    tp = FieldLine(run).compute_linear_tearing_parameter()
                     run_buffers["tearing_parameter"] = select_kx_ky_time(
                         tp.copy(data=tp.values * ureg.dimensionless),
                         kx_min=kx_min,
