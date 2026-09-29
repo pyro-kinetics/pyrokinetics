@@ -40,8 +40,7 @@ def test_pyro_output(gk_code, gk_file):
 def test_pyroscan_output():
     json_path = template_dir / "outputs" / "CGYRO_linear_scan"
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
-    # The default time_mode="average" stores eigenfunctions_squared instead
-    pyro_scan.load_gk_output(time_mode="last")
+    pyro_scan.load_gk_output()
     output = pyro_scan.gk_output
 
     Extent(output)
@@ -54,7 +53,7 @@ def test_pyroscan_output():
     assert "theta" not in bounds.dims
     assert "field" in bounds.dims
     assert "phi" in bounds.field.values
-    theta_units = getattr(output["eigenfunctions"].theta.data, "units", None)
+    theta_units = getattr(output["eigenfunctions_squared"].theta.data, "units", None)
     if theta_units is not None:
         assert result.data.units == theta_units
         assert bounds.data.units == theta_units
