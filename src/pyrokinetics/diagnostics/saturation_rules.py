@@ -71,7 +71,18 @@ class SaturationRules:
         shat = pyro.local_geometry.shat
 
         theta = data["theta"].data
-        eigenfunctions = data["eigenfunctions"]
+        # The rule needs |eigenfunction|**2: loaded with time_mode="average" it
+        # is already stored, averaged in time; otherwise take the final time
+        if "eigenfunctions_squared" in data:
+            eigenfunctions_squared = data["eigenfunctions_squared"]
+        else:
+            eigenfunctions_squared = np.abs(data["eigenfunctions"]) ** 2
+            if "time" in eigenfunctions_squared.dims:
+                eigenfunctions_squared = eigenfunctions_squared.isel(time=-1, drop=True)
+        # The scan keeps kx; the rule uses one kx
+        if "kx" in eigenfunctions_squared.dims:
+            kx_min = abs(eigenfunctions_squared["kx"]).argmin().item()
+            eigenfunctions_squared = eigenfunctions_squared.isel(kx=kx_min, drop=True)
         growth_rate_tolerance = data["growth_rate_tolerance"]
 
         growth_rate = data["growth_rate"].where(
@@ -92,9 +103,8 @@ class SaturationRules:
             / heat_tot
         )
 
-        field_squared = (
-            np.abs(eigenfunctions.where(growth_rate_tolerance < gamma_tolerance, 0.0))
-            ** 2
+        field_squared = eigenfunctions_squared.where(
+            growth_rate_tolerance < gamma_tolerance, 0.0
         )
 
         # Set up Jacobian and k_perp
