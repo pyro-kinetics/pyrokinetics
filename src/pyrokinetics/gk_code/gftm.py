@@ -38,7 +38,7 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
     """Reader for GFTM input files"""
 
     code_name = "GFTM"
-    default_file_name = "input.GFTM"
+    default_file_name = "input.gftm"
     norm_convention = "cgyro"
     _convention_dict = {}
 
