@@ -39,7 +39,8 @@ def test_pyro_output(gk_code, gk_file):
 def test_pyroscan_output():
     json_path = template_dir / "outputs" / "CGYRO_linear_scan"
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
-    pyro_scan.load_gk_output()
+    # The default time_mode="average" stores eigenfunctions_squared instead
+    pyro_scan.load_gk_output(time_mode="last")
     output = pyro_scan.gk_output
 
     Extent(output)

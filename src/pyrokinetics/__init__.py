@@ -33,6 +33,7 @@ from .kinetics import Kinetics, read_kinetics, supported_kinetics_types
 from .metadata import __commit__, __version__
 from .numerics import Numerics
 from .pyro import Pyro
+from .pyrohypercube import PyroHypercube
 from .pyroscan import PyroScan
 from .templates import eq_templates, gk_templates, kinetics_templates, template_dir
 
@@ -40,6 +41,7 @@ __all__ = [
     "__version__",
     "Pyro",
     "PyroScan",
+    "PyroHypercube",
     "template_dir",
     "Equilibrium",
     "FluxSurface",

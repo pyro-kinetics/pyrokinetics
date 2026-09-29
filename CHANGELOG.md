@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased] - 2021-01-26
  
 ### Added
+  - `PyroHypercube`: non-gridded parameter sets (one value per sample), with a
+    single `sample` output dimension, and `from_directory` to read existing run
+    trees. Shares output loading with `PyroScan` through
+    `PyroScan.output_layout`.
 
 ### Changed
   - `add_flags` has one implementation per input format: `GKInput.add_flags` for grouped inputs and the new `GKInputFlat.add_flags` for flat `KEY = value` inputs. Per-code overrides are removed and `GKInput.add_flags` is no longer abstract
