@@ -1,6 +1,7 @@
+import pytest
+
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.pyroscan import PyroScan
-import pytest
 
 
 @pytest.mark.parametrize("code", ["GFTM", "TGLF"])
