@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import xarray as xr
 from numpy.testing import assert_allclose
 
 from pyrokinetics import Pyro, PyroScan, template_dir
@@ -82,3 +83,35 @@ def test_tglf_eigenfunctions_without_fields():
     output.data = output.data.drop_vars("eigenfunctions")
     with pytest.raises(ValueError, match="no eigenfunctions"):
         Extent(output)
+
+
+def _gs2_output():
+    pyro = Pyro(gk_file=template_dir / "outputs" / "GS2_linear" / "gs2.in")
+    pyro.load_gk_output()
+    return pyro.gk_output
+
+
+def test_extent_independent_of_phase():
+    output = _gs2_output()
+    Extent(output)
+    expected = output["extent"].data
+
+    theta = output["eigenfunctions"].theta
+    phase = np.exp(3j * getattr(theta.data, "magnitude", theta.data))
+    output.data["eigenfunctions"] = output["eigenfunctions"] * xr.DataArray(
+        phase, dims="theta"
+    )
+    Extent(output)
+    assert_allclose(output["extent"].data, expected)
+
+
+def test_extent_from_eigenfunctions_squared():
+    output = _gs2_output()
+    Extent(output)
+    expected = output["extent"].data
+
+    squared = np.abs(output["eigenfunctions"]) ** 2
+    output.data = output.data.drop_vars(["eigenfunctions", "extent", "bounds"])
+    output.data["eigenfunctions_squared"] = squared
+    Extent(output)
+    assert_allclose(output["extent"].data, expected)

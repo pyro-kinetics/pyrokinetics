@@ -10,23 +10,31 @@ from ..gk_code.gk_output import GKOutput
 
 
 class Extent:
-    def __init__(
-        self,
-        output: GKOutput,
-        dl_dtheta: xr.DataArray | None = None,
-        fraction: float = 0.95,
-    ) -> None:
+    """
+    Extent in ballooning angle ``theta`` of each eigenfunction.
+
+    The extent is the width in ``theta`` holding ``fraction`` of the integral
+    of ``|eigenfunction|**2``, leaving ``(1 - fraction) / 2`` in each tail.
+    ``|eigenfunction|**2`` is used as it does not depend on the eigenfunction's
+    complex phase. If the output holds ``eigenfunctions_squared`` (as a
+    ``PyroScan`` loaded with ``time_mode="average"`` does), that is used.
+
+    ``extent`` and ``bounds`` (the ``theta`` of each tail, along ``bound``) are
+    added to ``output``.
+    """
+
+    def __init__(self, output: GKOutput, fraction: float = 0.95) -> None:
         if not isinstance(output, DatasetWrapper):
             raise TypeError("output must be a DatasetWrapper")
 
-        if "eigenfunctions" not in output:
+        if "eigenfunctions_squared" in output:
+            power = output["eigenfunctions_squared"]
+        elif "eigenfunctions" in output:
+            power = np.abs(output["eigenfunctions"]) ** 2
+        else:
             raise ValueError("output contains no eigenfunctions")
 
-        extent, bounds = self._compute(
-            output["eigenfunctions"],
-            dl_dtheta=dl_dtheta,
-            fraction=fraction,
-        )
+        extent, bounds = self._compute(power, fraction=fraction)
 
         output.data = output.data.assign(
             extent=extent,
@@ -34,16 +42,12 @@ class Extent:
         )
 
     @staticmethod
-    def _compute(
-        field: xr.DataArray,
-        dl_dtheta: xr.DataArray | None = None,
-        fraction: float = 0.05,
-    ) -> xr.DataArray:
-        if not isinstance(field, xr.DataArray):
-            raise TypeError("field must be an xarray.DataArray")
-        if "theta" not in field.dims or "theta" not in field.coords:
-            raise ValueError("field must have a theta coordinate")
-        coordinate = field["theta"]
+    def _compute(power: xr.DataArray, fraction: float) -> xr.DataArray:
+        if not isinstance(power, xr.DataArray):
+            raise TypeError("power must be an xarray.DataArray")
+        if "theta" not in power.dims or "theta" not in power.coords:
+            raise ValueError("power must have a theta coordinate")
+        coordinate = power["theta"]
         values = getattr(coordinate.data, "magnitude", coordinate.data)
         if (
             coordinate.dims != ("theta",)
@@ -56,35 +60,11 @@ class Extent:
                 "with at least two points"
             )
 
-        if dl_dtheta is not None:
-            if not isinstance(dl_dtheta, xr.DataArray):
-                raise TypeError("dl_dtheta must be an xarray.DataArray")
-            if "theta" not in dl_dtheta.dims or not set(dl_dtheta.dims) <= set(
-                field.dims
-            ):
-                raise ValueError(
-                    "dl_dtheta dimensions must be a subset of field dimensions "
-                    "and include 'theta'"
-                )
-            if "theta" not in dl_dtheta.coords:
-                raise ValueError("dl_dtheta must have a theta coordinate")
-            xr.align(field, dl_dtheta, join="exact", copy=False)
-            weights = getattr(dl_dtheta.data, "magnitude", dl_dtheta.data)
-            if (
-                np.iscomplexobj(weights)
-                or not np.all(np.isfinite(weights))
-                or not np.all(weights > 0)
-            ):
-                raise ValueError("dl_dtheta must contain finite, positive real weights")
-            coordinate = field["theta"].values
-
         if not isinstance(fraction, Real) or not np.isfinite(fraction):
             raise ValueError("fraction must be a finite real scalar")
         if not 0 < fraction < 1:
             raise ValueError("fraction must lie strictly between 0 and 1")
 
-        field_amplitude = np.abs(np.real(field))
-        power = (field_amplitude / field_amplitude.max()) ** 2
         total_power = power.integrate("theta")
         cdf = power.cumulative_integrate("theta") / total_power
         cdf = cdf.copy(data=getattr(cdf.data, "magnitude", cdf.data))
