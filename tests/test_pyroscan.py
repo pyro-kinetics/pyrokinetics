@@ -574,7 +574,9 @@ def test_default_file_name_is_lowercase(code, tmp_path):
     pyro.convert_gk_code(code)
     ps = PyroScan(pyro, {"ky": [0.1, 0.2]}, base_directory=tmp_path)
     ps.write()
-    decks = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob(f"input.{code.lower()}"))
+    decks = sorted(
+        p.relative_to(tmp_path) for p in tmp_path.rglob(f"input.{code.lower()}")
+    )
     assert len(decks) == 2
     assert not list(tmp_path.rglob(f"input.{code}"))
 
@@ -590,5 +592,7 @@ def test_old_uppercase_file_name_json_still_loads(code, tmp_path):
     pyro.convert_gk_code(code)
     ps = PyroScan(pyro, {"ky": [0.1, 0.2]}, base_directory=tmp_path)
     ps.write(file_name=f"input.{code}")
-    reloaded = PyroScan(pyro, pyroscan_json=tmp_path / "pyroscan.json", base_directory=tmp_path)
+    reloaded = PyroScan(
+        pyro, pyroscan_json=tmp_path / "pyroscan.json", base_directory=tmp_path
+    )
     assert reloaded.file_name == f"input.{code}"
