@@ -1,4 +1,5 @@
 import numpy as np
+import xarray as xr
 from numpy.typing import ArrayLike
 from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
@@ -15,31 +16,29 @@ class FieldLine:
 
     def compute_linear_tearing_parameter(
         self,
-    ):
-        """
-        Computes the distance along the field line per poloidal turn.
+    ) -> xr.DataArray:
+        r"""
+        Computes the linear tearing parameter
 
-        Use metric_terms to determine the field aligned covariant metric
-        g_theta_theta from which we can get dLdtheta by
+        .. math::
+            T = |\int A_\parallel \sqrt{g_{\theta\theta}} d\theta| /
+                \int |A_\parallel \sqrt{g_{\theta\theta}}| d\theta
 
-        dLdtheta = 1 / sqrt(g_theta_theta)
-
-        This is then integrated over the poloidal turn to determine the
-        distance travelled along the field line
-
-        Parameters
-        ----------
-        ntheta: int
-            Number of theta points to be used for MetricTerms
+        over the symmetric part of the ballooning domain. :math:`T \approx 1`
+        for tearing parity, :math:`T \approx 0` for ballooning parity.
 
         Returns
         -------
-        length_per_turn : float, units [lref]
-            The field line length per turn.
+        linear_tearing_parameter : xr.DataArray
+            One value for every non-theta dimension of ``gk_output["apar"]``
+            (``kx``, ``ky`` and ``mode`` where present), taken at the final time
+            if the output has one. NaN for an empty mode.
         """
 
-        # 1) load & dequantify A_par
-        apar = self.pyro.gk_output["apar"].isel(kx=0, ky=0, time=-1).pint.dequantify()
+        apar = self.pyro.gk_output["apar"]
+        if "time" in apar.dims:
+            apar = apar.isel(time=-1)
+        apar = apar.pint.dequantify()
 
         theta = apar.theta.values
 
@@ -50,7 +49,9 @@ class FieldLine:
 
         theta = apar.theta.values
         ntheta = apar.theta.size
-        nperiod = self.pyro.numerics.nperiod
+        # Enough periods to cover theta, which need not match numerics.nperiod
+        # (GFTM has none and writes a fixed grid)
+        nperiod = int(np.ceil((theta_limits / np.pi + 1) / 2))
 
         self.pyro.load_metric_terms(ntheta=ntheta * 4)
         metric = self.pyro.metric_terms
@@ -70,15 +71,22 @@ class FieldLine:
         g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
         g_tt_long = np.append(g_tt_long, g_tt[-1])
 
-        g_tt_balloon = np.interp(theta, theta_long, g_tt_long)
+        g_tt_balloon = np.interp(theta, theta_long, getattr(g_tt_long, "m", g_tt_long))
 
-        apar_dl = apar * np.sqrt(g_tt_balloon)
+        apar_dl = apar * xr.DataArray(np.sqrt(g_tt_balloon), coords={"theta": theta})
+        axis = apar_dl.get_axis_num("theta")
 
-        linear_tearing_parameter = np.abs(simpson(apar_dl, x=theta)) / simpson(
-            np.abs(apar_dl), x=theta
+        linear_tearing_parameter = np.abs(
+            simpson(apar_dl.values, x=theta, axis=axis)
+        ) / simpson(np.abs(apar_dl.values), x=theta, axis=axis)
+
+        ref = apar_dl.isel(theta=0, drop=True)
+        return xr.DataArray(
+            linear_tearing_parameter,
+            dims=ref.dims,
+            coords=ref.coords,
+            name="tearing_parameter",
         )
-
-        return linear_tearing_parameter
 
     def compute_length_per_turn(self, ntheta=256):
         """

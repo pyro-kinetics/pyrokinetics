@@ -841,6 +841,17 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         norm.default_convention = output_convention.lower()
 
         field_dims = ("ky", "mode")
+        # A linear run's fields are its theta-resolved eigenfunctions, laid out
+        # as the other codes' fields with a mode dim in place of time (pyro#594).
+        # ``eigenfunctions`` keeps its old (field, theta, mode) layout as a
+        # deprecated alias; the per-mode amplitudes of field_spectrum only exist
+        # for transport runs, which keep them.
+        if eigenfunctions is not None and load_fields:
+            fields = {
+                name: eigenfunctions[i][:, np.newaxis, np.newaxis, :]
+                for i, name in enumerate(coords["field"])
+            }
+            field_dims = ("theta", "kx", "ky", "mode")
         flux_dims = ("field", "species", "ky")
         moment_dims = ("field", "species", "ky")
         eigenvalues_dims = ("ky", "mode")
