@@ -39,7 +39,7 @@ class GKInputTGLF(GKInputFlat, FileReader, file_type="TGLF", reads=GKInput):
 
     code_name = "TGLF"
     flag_key_case = staticmethod(str.lower)
-    default_file_name = "input.TGLF"
+    default_file_name = "input.tglf"
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
     _convention_dict = {}
