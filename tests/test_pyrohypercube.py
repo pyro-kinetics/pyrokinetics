@@ -174,7 +174,7 @@ def test_from_directory_nested_tree(gs2_run_tree, tmp_path):
     cube.convert_gk_code("TGLF")
     cube.write(base_directory=nested / "tglf")
     for name in cube.sample_names:
-        assert (nested / "tglf" / name / "input.TGLF").is_file()
+        assert (nested / "tglf" / name / "input.tglf").is_file()
 
 
 def test_from_directory_explicit_parameter_location(gs2_run_tree):
@@ -414,13 +414,13 @@ def test_convert_gs2_hypercube_to_tglf(gs2_run_tree, tmp_path):
 
     cube.convert_gk_code("TGLF")
     assert cube.gk_code == "TGLF"
-    assert cube.file_name == "input.TGLF"
+    assert cube.file_name == "input.tglf"
 
     target = tmp_path / "tglf"
     cube.write(base_directory=target)
 
     for name, ky in zip(cube.sample_names, FOREIGN_KY):
-        path = target / name / "input.TGLF"
+        path = target / name / "input.tglf"
         written = Pyro(gk_file=path, gk_code="TGLF")
         convention = written.norms.pyrokinetics
         assert written.numerics.ky.to(convention, convention.context).magnitude == (

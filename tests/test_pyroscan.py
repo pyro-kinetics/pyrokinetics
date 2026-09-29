@@ -656,13 +656,13 @@ def test_pyroscan_convert_gk_code(tmp_path):
     )
 
     scan.convert_gk_code("TGLF")
-    assert scan.file_name == "input.TGLF"
+    assert scan.file_name == "input.tglf"
     for name, run in scan.pyro_dict.items():
-        assert run.gk_file == tmp_path / "gs2" / name / "input.TGLF"
+        assert run.gk_file == tmp_path / "gs2" / name / "input.tglf"
 
     scan.write(base_directory=tmp_path / "tglf")
     for name in scan.pyro_dict:
-        run = Pyro(gk_file=tmp_path / "tglf" / name / "input.TGLF", gk_code="TGLF")
+        run = Pyro(gk_file=tmp_path / "tglf" / name / "input.tglf", gk_code="TGLF")
         assert run.gk_code == "TGLF"
 
 
