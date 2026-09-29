@@ -860,14 +860,30 @@ class PyroScan:
         #      The setter has been replaced by the function 'convert_gk_code'
         return self.base_pyro.gk_code
 
-    def convert_gk_code(self, gk_code: str) -> None:
+    def convert_gk_code(self, gk_code: str, template_file=None) -> None:
         """
         Converts all gyrokinetics codes to the code type 'gk_code'. This can be any
         viable GKInput type (GS2, CGYRO, GENE,...)
+
+        ``file_name`` becomes the new code's default, and every run keeps its run
+        directory, so a following ``write`` writes one input file per run for the
+        new code. Pass ``base_directory`` to ``write`` to keep the original runs.
+
+        Parameters
+        ----------
+        gk_code: str
+            The gyrokinetics code to convert to.
+        template_file: PathLike, default None
+            Template used to populate each new input file. If unset, the default
+            template for ``gk_code`` is used.
         """
-        self.base_pyro.convert_gk_code(gk_code)
+        self.base_pyro.convert_gk_code(gk_code, template_file=template_file)
         for pyro in self.pyro_dict.values():
-            pyro.convert_gk_code(gk_code)
+            pyro.convert_gk_code(gk_code, template_file=template_file)
+
+        self.file_name = GKInput._factory[gk_code].default_file_name
+        for name, pyro in self.pyro_dict.items():
+            pyro.gk_file = self.base_directory / name / self.file_name
 
     @property
     def base_directory(self):
