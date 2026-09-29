@@ -40,7 +40,6 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
     code_name = "GFTM"
     default_file_name = "input.GFTM"
     norm_convention = "cgyro"
-    gftm_max_ntheta = 32
     _convention_dict = {}
 
     pyro_gftm_miller = {
@@ -213,6 +212,12 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
         self.verify_expected_keys(filename, expected_keys)
 
+        # Shared inputs default to TGLF unless a GFTM velocity-basis key
+        # is supplied. Explicit file_type="GFTM" bypasses autodetection.
+        data = type(self)().read_from_file(filename, detect_norm=False)
+        if not {"nu", "ne"}.intersection(data):
+            raise ValueError("GFTM autodetection requires NU or NE in the input")
+
     def write(
         self,
         filename: PathLike,
@@ -252,9 +257,14 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to GFTM input file
+
+        GFTM keys are case-insensitive. A flag matching an existing key in any
+        capitalisation overwrites that key; new keys are stored in lowercase, as
+        :meth:`parse_gftm` does.
         """
+        existing_keys = {key.lower(): key for key in self.data}
         for key, value in flags.items():
-            self.data[key] = value
+            self.data[existing_keys.get(key.lower(), key.lower())] = value
 
     def get_local_geometry(self) -> LocalGeometry:
         """
@@ -779,7 +789,7 @@ class GKInputGFTM(GKInput, FileReader, file_type="GFTM", reads=GKInput):
         self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
-        self.data["nxgrid"] = min(numerics.ntheta, self.gftm_max_ntheta)
+        self.data["nxgrid"] = numerics.ntheta
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:

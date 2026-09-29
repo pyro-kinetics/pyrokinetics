@@ -2,7 +2,7 @@ import copy
 from abc import abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import f90nml
 import numpy as np
@@ -179,13 +179,28 @@ class GKInput(AbstractFileReader, ReadableFromFile):
     def is_linear(self) -> bool:
         return not self.is_nonlinear()
 
-    @abstractmethod
-    def add_flags(self, flags) -> None:
+    def add_flags(self, flags: Dict[str, Dict[str, Any]]) -> None:
         """
-        Add extra flags to a GK code input file
+        Add extra flags to a GK code input file made of groups
 
-        Default version assumes a Fortran90 namelist
+        Used by codes whose input is grouped, such as Fortran namelists or TOML
+        tables. ``flags`` maps each group name to a dict of parameters, e.g.
+        ``{"knobs": {"delt": 0.1}}``. Codes with flat ``KEY = value`` input files
+        inherit `GKInputFlat.add_flags` instead.
+
+        Raises
+        ------
+        TypeError
+            If any value in ``flags`` is not a dict. No flags are added.
         """
+        for key, parameter in flags.items():
+            if not isinstance(parameter, dict):
+                raise TypeError(
+                    f"{type(self).__name__}.add_flags: '{key}' must map to a dict of "
+                    f"parameters in that group, e.g. {{'{key}': {{'param': value}}}}, "
+                    f"got {parameter!r}"
+                )
+
         for key, parameter in flags.items():
             if key not in self.data:
                 self.data[key] = dict()
@@ -411,6 +426,42 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         elif references != default_references:
             self.norm_convention = f"{gk_code}_bespoke"
             self._convention_dict = references
+
+
+class GKInputFlat(GKInput):
+    """
+    Base class for GK codes whose input file is a flat list of ``KEY = value``
+    lines, such as TGLF, CGYRO and NEO
+
+    Subclasses set `flag_key_case` to the case of the keys stored in ``self.data``.
+    """
+
+    flag_key_case: Callable[[str], str]
+    """Case of keys in ``self.data``, e.g. ``staticmethod(str.lower)``"""
+
+    def add_flags(self, flags: Dict[str, Any]) -> None:
+        """
+        Add extra flags to a flat ``KEY = value`` input file
+
+        Keys match existing keys in ``self.data`` case-insensitively, so a flag
+        overwrites an existing entry whatever its capitalisation. New keys are
+        converted with `flag_key_case`.
+
+        Raises
+        ------
+        TypeError
+            If any value in ``flags`` is a dict. No flags are added.
+        """
+        for key, value in flags.items():
+            if isinstance(value, dict):
+                raise TypeError(
+                    f"{type(self).__name__}.add_flags: input has no groups, so "
+                    f"'{key}' must map to a single value, got {value!r}"
+                )
+
+        existing_keys = {key.lower(): key for key in self.data}
+        for key, value in flags.items():
+            self.data[existing_keys.get(key.lower(), self.flag_key_case(key))] = value
 
 
 def supported_gk_input_types() -> List[str]:
