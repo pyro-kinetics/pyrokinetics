@@ -11,6 +11,7 @@ from itertools import product
 
 import numpy as np
 import pint
+import pint_xarray  # noqa: F401 (registers the .pint accessor)
 import xarray as xr
 from pint import Quantity
 
@@ -241,6 +242,30 @@ def stack_runs(arrays, last):
         padded.append(out)
 
     return padded, units, {dim: axes[dim] for dim in coord_dims}, shape
+
+
+def integrate_over_valid_range(da, dim="theta"):
+    """
+    Trapezoid integral of ``da`` along ``dim``, over each run's own valid range.
+
+    Runs stacked on a merged axis are NaN off their own points: in gaps inside
+    their range (a coarser grid) and beyond its ends (a shorter range). Gaps are
+    filled by linear interpolation, for which the trapezoid rule is exact, so
+    they do not change the integral. Only segments with both ends valid are
+    then summed, so each run is integrated exactly over its own range and never
+    extrapolated beyond it. A run with no valid segment gives NaN.
+
+    The pint accessor keeps units that plain ``interpolate_na`` would strip.
+    """
+    filled = da.pint.interpolate_na(dim, method="linear")
+    units = getattr(filled.data, "units", None)
+    y = filled.copy(data=getattr(filled.data, "magnitude", filled.data))
+    x = y[dim]
+
+    segments = 0.5 * (x.shift({dim: -1}) - x) * (y + y.shift({dim: -1}))
+    integral = segments.sum(dim, skipna=True, min_count=1)
+
+    return integral if units is None else integral * units
 
 
 def add_quantity(ds, name, arrays, base_shape, scan_coords):

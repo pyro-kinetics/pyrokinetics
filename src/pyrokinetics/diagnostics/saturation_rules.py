@@ -1,7 +1,9 @@
+import warnings
+
 import numpy as np
 import xarray as xr
 
-from ..pyroscan import PyroScan
+from ..pyroscan import PyroScan, integrate_over_valid_range
 
 
 class SaturationRules:
@@ -137,10 +139,13 @@ class SaturationRules:
                 ky=1.0, theta0=theta0, nperiod=nperiod
             )
 
-            k_perp_interp = np.interp(theta, theta_long, k_perp_long)
+            # NaN beyond the metric's theta range, rather than its end value
+            k_perp_interp = np.interp(
+                theta, theta_long, k_perp_long.m, left=np.nan, right=np.nan
+            )
             for iky, ky in enumerate(kys.data):
                 # Technically k_perp / ky
-                k_perp[iky, itheta0, :, :] = k_perp_interp.m * ky
+                k_perp[iky, itheta0, :, :] = k_perp_interp * ky
 
         bmag = pyro.metric_terms.B_magnitude
 
@@ -150,14 +155,37 @@ class SaturationRules:
         g_tt_long = np.append(g_tt_long, g_tt[-1])
         bmag_long = np.append(bmag_long, bmag[-1])
         pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_long) / bmag_long
-        bmag_balloon = np.interp(theta, theta_geo_long, bmag_long)
+        bmag_balloon = (
+            np.interp(theta, theta_geo_long, bmag_long.m, left=np.nan, right=np.nan)
+            * bmag_long.units
+        )
 
         jacobian_long = pyro_jacob
 
-        # Extend onto ballooning space
-        jacobian = np.interp(theta, theta_long, jacobian_long)[
-            np.newaxis, np.newaxis, np.newaxis, :
-        ]
+        # Extend onto ballooning space, NaN beyond the metric's theta range: the
+        # Jacobian is not known there, and holding its end value would be wrong
+        jacobian = (
+            np.interp(
+                theta,
+                theta_long,
+                getattr(jacobian_long, "magnitude", jacobian_long),
+                left=np.nan,
+                right=np.nan,
+            )
+            * getattr(jacobian_long, "units", 1.0)
+        )[np.newaxis, np.newaxis, np.newaxis, :]
+
+        theta_min = np.min(getattr(theta_long, "magnitude", theta_long))
+        theta_max = np.max(getattr(theta_long, "magnitude", theta_long))
+        outside = (data["theta"] < theta_min) | (data["theta"] > theta_max)
+        if bool(field_squared.where(outside).notnull().any()):
+            warnings.warn(
+                "Eigenfunctions extend beyond the theta range of the base Pyro's "
+                f"metric terms [{theta_min:.3g}, {theta_max:.3g}], where the "
+                "Jacobian is not known; theta integrals are restricted to that "
+                "range.",
+                stacklevel=2,
+            )
 
         # Account for GS2 field normalisation used in training
         b_units = bmag_balloon.units
@@ -174,23 +202,13 @@ class SaturationRules:
             / field_squared.sel(field="phi").max(dim="theta")
         )
 
-        # Runs at different theta resolution are NaN off their own grid points;
-        # linear interpolation fills those gaps without changing the trapezoid
-        # integral, so each run is integrated exactly as on its own grid. The
-        # pint accessor keeps the units that plain interpolate_na would strip.
+        # Each run is integrated over its own valid theta range: gaps from a
+        # coarser grid are filled exactly, and nothing is extrapolated
         # Numerator in Lambda
-        numerator = (
-            (field_squared * jacobian)
-            .pint.interpolate_na("theta", method="linear")
-            .integrate(coord="theta")
-        )
+        numerator = integrate_over_valid_range(field_squared * jacobian)
 
         # Denominator
-        denom = (
-            (field_squared * jacobian * k_perp**2)
-            .pint.interpolate_na("theta", method="linear")
-            .integrate(coord="theta")
-        )
+        denom = integrate_over_valid_range(field_squared * jacobian * k_perp**2)
 
         # Sum over fields
         ql_metric_full = (growth_rate * numerator * field_factor / denom).sum(

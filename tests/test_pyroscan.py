@@ -641,20 +641,23 @@ def test_stack_runs_pads_dimension_without_coordinate():
     assert not np.isnan(q.isel(kappa=1).data.magnitude).any()
 
 
-def test_stack_runs_integrate_after_interpolate_na():
+def test_integrate_over_valid_range():
     """
-    Integrating along theta after interpolate_na gives each run's integral on
-    its own grid: the trapezoid rule is exact for the linear interpolant, so the
-    points added in a run's gaps do not change it. Units must survive: the
-    test suite turns pint.UnitStrippedWarning into an error.
+    Each run is integrated exactly over its own points: a coarser grid leaves
+    gaps inside the merged axis, and a shorter range leaves NaN at its ends.
+    Neither may change the integral, and nothing may be extrapolated.
     """
-    import pint_xarray  # noqa: F401 (registers the .pint accessor)
     import xarray as xr
     from scipy.integrate import trapezoid
 
-    from pyrokinetics.pyroscan import add_quantity
+    from pyrokinetics.pyroscan import add_quantity, integrate_over_valid_range
 
-    grids = [np.linspace(-np.pi, np.pi, 5), np.linspace(-np.pi, np.pi, 9)]
+    grids = [
+        np.linspace(-np.pi, np.pi, 5),  # coarse: gaps on the merged axis
+        np.linspace(-np.pi, np.pi, 9),
+        np.linspace(-3 * np.pi, 3 * np.pi, 13),  # longer range
+        np.linspace(-np.pi / 2, np.pi / 2, 3),  # shorter range: NaN at the ends
+    ]
     arrays = [
         xr.DataArray(
             (np.cos(theta) + 2.0) * units.meter, dims="theta", coords={"theta": theta}
@@ -666,12 +669,17 @@ def test_stack_runs_integrate_after_interpolate_na():
         xr.Dataset(coords=scan_coords), "q", arrays, (len(grids),), scan_coords
     )["q"]
 
-    # Plain integration is NaN for the coarse run, which has gaps
+    # Plain integration is NaN for every run that does not fill the merged axis
     assert np.isnan(q.integrate("theta").isel(kappa=0).data.magnitude)
 
-    # The pint accessor keeps the units that plain interpolate_na strips
-    integral = q.pint.interpolate_na("theta", method="linear").integrate("theta")
+    integral = integrate_over_valid_range(q, "theta")
     for i, array in enumerate(arrays):
         expected = trapezoid(array.data.magnitude, array["theta"].values)
         assert np.isclose(integral.isel(kappa=i).data.magnitude, expected)
     assert integral.data.units == units.meter
+
+    # A run with no values at all integrates to NaN, not 0
+    empty = q.where(q["kappa"] != 0)
+    assert np.isnan(
+        integrate_over_valid_range(empty, "theta").isel(kappa=0).data.magnitude
+    )
