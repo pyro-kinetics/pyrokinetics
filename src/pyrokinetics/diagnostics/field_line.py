@@ -14,27 +14,12 @@ class FieldLine:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
-    def compute_linear_tearing_parameter(
-        self,
-    ) -> xr.DataArray:
+    def _linear_apar(self):
         r"""
-        Computes the linear tearing parameter
-
-        .. math::
-            T = |\int A_\parallel \sqrt{g_{\theta\theta}} d\theta| /
-                \int |A_\parallel \sqrt{g_{\theta\theta}}| d\theta
-
-        over the symmetric part of the ballooning domain. :math:`T \approx 1`
-        for tearing parity, :math:`T \approx 0` for ballooning parity.
-
-        Returns
-        -------
-        linear_tearing_parameter : xr.DataArray
-            One value for every non-theta dimension of ``gk_output["apar"]``
-            (``kx``, ``ky`` and ``mode`` where present), taken at the final time
-            if the output has one. NaN for an empty mode.
+        ``gk_output["apar"]`` at the final time (if any), restricted to the
+        symmetric part of the ballooning domain, and :math:`\sqrt{g_{\theta\theta}}`
+        on the same theta grid.
         """
-
         apar = self.pyro.gk_output["apar"]
         if "time" in apar.dims:
             apar = apar.isel(time=-1)
@@ -73,7 +58,32 @@ class FieldLine:
 
         g_tt_balloon = np.interp(theta, theta_long, getattr(g_tt_long, "m", g_tt_long))
 
-        apar_dl = apar * xr.DataArray(np.sqrt(g_tt_balloon), coords={"theta": theta})
+        return apar, xr.DataArray(np.sqrt(g_tt_balloon), coords={"theta": theta})
+
+    def compute_linear_tearing_parameter(
+        self,
+    ) -> xr.DataArray:
+        r"""
+        Computes the linear tearing parameter
+
+        .. math::
+            T = |\int A_\parallel \sqrt{g_{\theta\theta}} d\theta| /
+                \int |A_\parallel \sqrt{g_{\theta\theta}}| d\theta
+
+        over the symmetric part of the ballooning domain. :math:`T \approx 1`
+        for tearing parity, :math:`T \approx 0` for ballooning parity.
+
+        Returns
+        -------
+        linear_tearing_parameter : xr.DataArray
+            One value for every non-theta dimension of ``gk_output["apar"]``
+            (``kx``, ``ky`` and ``mode`` where present), taken at the final time
+            if the output has one. NaN for an empty mode.
+        """
+
+        apar, dl = self._linear_apar()
+        theta = apar.theta.values
+        apar_dl = apar * dl
         axis = apar_dl.get_axis_num("theta")
 
         linear_tearing_parameter = np.abs(
@@ -87,6 +97,38 @@ class FieldLine:
             coords=ref.coords,
             name="tearing_parameter",
         )
+
+    def compute_linear_parity(self) -> xr.DataArray:
+        r"""
+        Computes the even fraction of :math:`A_\parallel` about :math:`\theta = 0`
+
+        .. math::
+            E = \frac{\int |A_\parallel(\theta) + A_\parallel(-\theta)|^2 dl}
+                {\int |A_\parallel(\theta) + A_\parallel(-\theta)|^2 dl
+                 + \int |A_\parallel(\theta) - A_\parallel(-\theta)|^2 dl}
+
+        with :math:`dl = \sqrt{g_{\theta\theta}} d\theta`, over the same symmetric
+        ballooning domain as :meth:`compute_linear_tearing_parameter`.
+        :math:`E > 0.5` is tearing parity (even :math:`A_\parallel`), otherwise
+        ballooning parity. Unlike the tearing parameter, :math:`E` is insensitive
+        to how the phase of :math:`A_\parallel` varies along theta.
+
+        Returns
+        -------
+        apar_even_fraction : xr.DataArray
+            One value for every non-theta dimension of ``gk_output["apar"]``
+            (``kx``, ``ky`` and ``mode`` where present). NaN for an empty mode.
+        """
+        apar, dl = self._linear_apar()
+        flipped = apar.assign_coords(theta=-apar.theta).sortby("theta")
+        # Grids are symmetric only to rounding, which leaves the end points NaN
+        flipped = flipped.interp(theta=apar.theta, kwargs={"fill_value": "extrapolate"})
+
+        def norm(field):
+            return (np.abs(field) ** 2 * dl).integrate("theta")
+
+        even = norm(apar + flipped)
+        return (even / (even + norm(apar - flipped))).rename("apar_even_fraction")
 
     def compute_length_per_turn(self, ntheta=256):
         """

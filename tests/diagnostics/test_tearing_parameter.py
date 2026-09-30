@@ -2,6 +2,7 @@ import shutil
 
 import numpy as np
 import pytest
+import xarray as xr
 
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics.field_line import FieldLine
@@ -68,6 +69,10 @@ def test_gftm_tearing_parameter_per_mode(tmp_path):
     assert tearing.sel(mode=0) > 0.99
     assert tearing.sel(mode=1) < 0.01
 
+    even = FieldLine(pyro).compute_linear_parity()
+    assert even.dims == ("kx", "ky", "mode")
+    np.testing.assert_allclose(even.isel(kx=0, ky=0).values, [1.0, 0.0], atol=1e-12)
+
 
 def test_stella_tearing_parameter_has_no_mode():
     pyro = Pyro(gk_file=template_dir / "outputs" / "STELLA_linear" / "stella.in")
@@ -77,6 +82,10 @@ def test_stella_tearing_parameter_has_no_mode():
 
     assert set(tearing.dims) == {"kx", "ky"}
     assert np.all((tearing >= 0) & (tearing <= 1))
+
+    even = FieldLine(pyro).compute_linear_parity()
+    assert set(even.dims) == {"kx", "ky"}
+    assert np.all((even >= 0) & (even <= 1))
 
 
 def test_pyroscan_tearing_parameter_matches_per_run(tmp_path):
@@ -100,16 +109,36 @@ def test_pyroscan_tearing_parameter_matches_per_run(tmp_path):
     )
     scan.load_gk_output(load_tearing_parameter=True)
     tearing = scan.gk_output.data["tearing_parameter"]
-    assert tearing.dims == ("kappa", "ky", "mode")
+    even = scan.gk_output.data["apar_even_fraction"]
+    assert tearing.dims == even.dims == ("kappa", "ky", "mode")
 
     for i, name in enumerate(scan.pyro_dict):
         run = Pyro(gk_file=tmp_path / "scan" / name / "input.gftm")
         run.load_gk_output()
-        expected = FieldLine(run).compute_linear_tearing_parameter().isel(kx=0)
+        field_line = FieldLine(run)
         # ky is ky/bunit_over_b0, which kappa changes, so each run has its own ky
-        actual = tearing.isel(kappa=i).dropna("ky", how="all")
-        np.testing.assert_allclose(actual.data.m, expected.values)
+        for stored, expected in (
+            (tearing, field_line.compute_linear_tearing_parameter()),
+            (even, field_line.compute_linear_parity()),
+        ):
+            actual = stored.isel(kappa=i).dropna("ky", how="all")
+            np.testing.assert_allclose(actual.data.m, expected.isel(kx=0).values)
 
     # Each run uses its own geometry
     per_run = [tearing.isel(kappa=i).dropna("ky", how="all").data.m for i in (0, 1)]
     assert not np.allclose(*per_run)
+
+
+def test_parity_of_synthetic_fields():
+    pyro = Pyro(gk_file=template_dir / "outputs" / "STELLA_linear" / "stella.in")
+    pyro.load_gk_output()
+    apar = pyro.gk_output.data["apar"]
+    theta = apar.theta
+    envelope = np.exp(-((theta / 3) ** 2)) * (1 + 0.5j * np.cos(theta))
+
+    for shape, expected in ((envelope, 1.0), (np.sin(theta) * envelope, 0.0)):
+        pyro.gk_output.data["apar"] = apar.copy(
+            data=(shape * xr.ones_like(apar.pint.dequantify())).values * apar.data.u
+        )
+        even = FieldLine(pyro).compute_linear_parity()
+        np.testing.assert_allclose(even.values, expected, atol=1e-12)

@@ -993,7 +993,9 @@ class PyroScan:
         load_tearing_parameter (bool, default False) – Linear runs only. Store
             ``FieldLine.compute_linear_tearing_parameter`` of every run, computed
             with that run's own geometry before any time reduction, as
-            ``tearing_parameter`` (one value per mode for TGLF/GFTM).
+            ``tearing_parameter`` (one value per mode for TGLF/GFTM), and
+            ``FieldLine.compute_linear_parity`` as ``apar_even_fraction``
+            (> 0.5 is tearing parity).
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -1070,7 +1072,7 @@ class PyroScan:
         if tearing:
             from .diagnostics.field_line import FieldLine
 
-            spec["scalars"].append("tearing_parameter")
+            spec["scalars"] += ["tearing_parameter", "apar_even_fraction"]
 
         buffers = {
             name: []
@@ -1118,12 +1120,19 @@ class PyroScan:
                     # pyros are copies of the base without the scan parameters
                     run = Pyro(gk_file=pyro.gk_file)
                     run.gk_output = pyro.gk_output
-                    tp = FieldLine(run).compute_linear_tearing_parameter()
-                    run_buffers["tearing_parameter"] = select_kx_ky_time(
-                        tp.copy(data=tp.values * ureg.dimensionless),
-                        kx_min=kx_min,
-                        time_mode=time_mode,
-                    )
+                    field_line = FieldLine(run)
+                    for name, value in (
+                        (
+                            "tearing_parameter",
+                            field_line.compute_linear_tearing_parameter(),
+                        ),
+                        ("apar_even_fraction", field_line.compute_linear_parity()),
+                    ):
+                        run_buffers[name] = select_kx_ky_time(
+                            value.copy(data=value.values * ureg.dimensionless),
+                            kx_min=kx_min,
+                            time_mode=time_mode,
+                        )
 
                 for name in spec["scalars"]:
                     if name in pyro.gk_output:
