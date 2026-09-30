@@ -907,7 +907,11 @@ def test_add_flags_with_physical_reference_values(tmp_path, gk_code):
     gs2_file = tmp_path / "input.gs2"
     nml = f90nml.read(gk_templates["GS2"])
     nml["normalisations_knobs"] = {
-        "tref": 1000.0, "nref": 1e19, "bref": 2.0, "aref": 1.0, "mref": 2.0
+        "tref": 1000.0,
+        "nref": 1e19,
+        "bref": 2.0,
+        "aref": 1.0,
+        "mref": 2.0,
     }
     nml.write(gs2_file)
 
