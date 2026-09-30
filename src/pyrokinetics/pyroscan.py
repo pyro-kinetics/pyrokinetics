@@ -951,6 +951,7 @@ class PyroScan:
         sum_ky=False,
         sum_kx=False,
         drop_nan=False,
+        load_tearing_parameter=False,
         **kwargs,
     ):
         """
@@ -989,6 +990,10 @@ class PyroScan:
             are already kx-integrated). If True, sum over kx; if False, preserve the
             kx dimension.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
+        load_tearing_parameter (bool, default False) – Linear runs only. Store
+            ``FieldLine.compute_linear_tearing_parameter`` of every run, computed
+            with that run's own geometry before any time reduction, as
+            ``tearing_parameter`` (one value per mode for TGLF/GFTM).
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -1061,6 +1066,11 @@ class PyroScan:
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
+        tearing = load_tearing_parameter and regime == "linear"
+        if tearing:
+            from .diagnostics.field_line import FieldLine
+
+            spec["scalars"].append("tearing_parameter")
 
         buffers = {
             name: []
@@ -1100,6 +1110,19 @@ class PyroScan:
                         pyro.gk_output.get_growth_rate_tolerance(
                             tolerance_time_range
                         ).sel(kx=kx_min)
+                    )
+
+                if tearing and "apar" in pyro.gk_output:
+                    # Needs apar's sign along theta, which "average" discards.
+                    # Geometry comes from the run's own deck: a reloaded scan's
+                    # pyros are copies of the base without the scan parameters
+                    run = Pyro(gk_file=pyro.gk_file)
+                    run.gk_output = pyro.gk_output
+                    tp = FieldLine(run).compute_linear_tearing_parameter()
+                    run_buffers["tearing_parameter"] = select_kx_ky_time(
+                        tp.copy(data=tp.values * ureg.dimensionless),
+                        kx_min=kx_min,
+                        time_mode=time_mode,
                     )
 
                 for name in spec["scalars"]:

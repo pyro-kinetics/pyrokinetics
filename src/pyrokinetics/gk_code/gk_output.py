@@ -842,6 +842,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         """
 
         amplitude = self._get_field_amplitude(fields, theta)
+        # Eigenvalue solvers (TGLF/GFTM) have no time: normalise each mode
+        if "time" not in fields.dims:
+            for f in fields:
+                fields[f] *= 1.0 / amplitude
+            return fields
+
         final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
         final_amplitude = amplitude[..., final_index]
 
