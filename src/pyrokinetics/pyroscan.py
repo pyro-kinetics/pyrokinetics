@@ -813,6 +813,11 @@ class PyroScan:
                 # Get attribute name and keys where param is stored in Pyro
                 attr_name, keys_to_param = self.parameter_map[param]
 
+                # Scan values are stored in generic simulation units; a run
+                # with physical reference values needs them in its own units
+                if isinstance(value, Quantity):
+                    value = value.to(pyro.norms.pyrokinetics)
+
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 

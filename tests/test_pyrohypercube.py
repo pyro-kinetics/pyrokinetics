@@ -431,6 +431,54 @@ def test_convert_gs2_hypercube_to_tglf(gs2_run_tree, tmp_path):
     assert sorted(p.name for p in (gs2_run_tree / "iteration_0").iterdir()) == source
 
 
+def test_write_runs_with_physical_reference_values(tmp_path):
+    """
+    Runs carrying their own physical reference values get each scan value in
+    their own units, so the decks match converting each run on its own.
+    """
+    f90nml = pytest.importorskip("f90nml")
+    root = tmp_path / "runs"
+    for i, ky in enumerate(FOREIGN_KY):
+        nml = f90nml.read(GS2_TEMPLATE_DIR / "gs2.in")
+        nml["normalisations_knobs"] = {
+            "tref": 1000.0,
+            "nref": 1e19,
+            "bref": 2.0,
+            "aref": 1.0,
+            "mref": 2.0,
+        }
+        nml["kt_grids_single_parameters"]["aky"] = ky
+        (root / f"iteration_{i}").mkdir(parents=True)
+        nml.write(root / f"iteration_{i}" / "gs2.in")
+
+    params = {
+        "ky": ["numerics", ["ky"]],
+        "electron_dens_gradient": ["local_species", ["electron", "inverse_ln"]],
+        "electron_temp_gradient": ["local_species", ["electron", "inverse_lt"]],
+        "electron_nu": ["local_species", ["electron", "nu"]],
+    }
+    cube = PyroHypercube.from_directory(
+        root, pattern="iteration_*", params=params, gk_code="GS2"
+    )
+    cube.convert_gk_code("GFTM")
+    cube.write(base_directory=tmp_path / "gftm")
+
+    for name in cube.sample_names:
+        single = Pyro(gk_file=root / name / "gs2.in")
+        single.convert_gk_code("GFTM")
+        single.write_gk_file(file_name=tmp_path / "single" / name / "input.gftm")
+        written, expected = (
+            Pyro(
+                gk_file=tmp_path / arm / name / "input.gftm", gk_code="GFTM"
+            ).gk_input.data
+            for arm in ("gftm", "single")
+        )
+        assert written.keys() == expected.keys()
+        for key, value in expected.items():
+            # Equal up to round-off from the extra unit conversion
+            assert written[key] == pytest.approx(value, rel=1e-12), key
+
+
 # ---------------------------------------------------------------------------
 # Round trip through pyroscan.json
 # ---------------------------------------------------------------------------
