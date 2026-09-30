@@ -552,7 +552,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.normalise()
+        local_species.normalise(convention)
 
         zeff = self._get_physics_var("zeff", None)
         if zeff is not None:

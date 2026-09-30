@@ -351,7 +351,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.normalise()
+        local_species.normalise(convention)
 
         local_species.set_zeff()
 

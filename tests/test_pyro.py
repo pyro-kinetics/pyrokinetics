@@ -898,3 +898,25 @@ def test_pyro_read_reference_values(pyro_with_reference_values, tmp_path):
     # Check that the initial and final reference values are the same
     for key in ref_vals_initial:
         assert ref_vals_initial[key] == ref_vals_final[key]
+
+
+@pytest.mark.parametrize("gk_code", ["GS2", "GFTM", "TGLF", "CGYRO"])
+def test_add_flags_with_physical_reference_values(tmp_path, gk_code):
+    # A GS2 deck with &normalisations_knobs leaves the Pyro's conventions in
+    # physical units, so re-reading local species on add_flags needs their context
+    gs2_file = tmp_path / "input.gs2"
+    nml = f90nml.read(gk_templates["GS2"])
+    nml["normalisations_knobs"] = {
+        "tref": 1000.0, "nref": 1e19, "bref": 2.0, "aref": 1.0, "mref": 2.0
+    }
+    nml.write(gs2_file)
+
+    before, after = Pyro(gk_file=gs2_file), Pyro(gk_file=gs2_file)
+    if gk_code != "GS2":
+        before.convert_gk_code(gk_code)
+        after.convert_gk_code(gk_code)
+    after.add_flags({})
+
+    before.write_gk_file(tmp_path / "before")
+    after.write_gk_file(tmp_path / "after")
+    assert (tmp_path / "before").read_text() == (tmp_path / "after").read_text()

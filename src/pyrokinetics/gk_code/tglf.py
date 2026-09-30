@@ -491,7 +491,7 @@ class GKInputTGLF(GKInputFlat, FileReader, file_type="TGLF", reads=GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
-        local_species.normalise()
+        local_species.normalise(convention)
 
         local_species.zeff = self.data.get("zeff", 1.0) * convention.qref
 
