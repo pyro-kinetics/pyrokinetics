@@ -367,6 +367,7 @@ class SimulationNormalisation(Normalisation):
         # it works
 
         new_object = SimulationNormalisation("COPY")
+        memodict[id(self)] = new_object
         new_object.name = self.name
         new_object.units = self.units
         new_object.context = self.context
@@ -1128,6 +1129,7 @@ class ConventionNormalisation(Normalisation):
         parent: SimulationNormalisation,
     ):
         self.convention = convention
+        self.parent = parent
         self.name = convention.name
         self.run_name = parent.name
         self.context = parent.context
@@ -1154,9 +1156,11 @@ class ConventionNormalisation(Normalisation):
         """Overrides deepcopy behaviour to perform regular copy of the Pint registry."""
         new_obj = object.__new__(type(self))
         for k, v in self.__dict__.items():
-            if k == "_registry" or k == "_system":
+            if k in ("_registry", "_system", "parent"):
                 continue
             new_obj.__dict__[k] = copy.deepcopy(v, memodict)
+        # Point at the parent's copy when it is being copied too
+        new_obj.parent = memodict.get(id(self.parent), self.parent)
         new_obj._registry = self._registry
         new_obj._system = self._registry.get_system(
             f"{self.convention.name}_{self.run_name}"

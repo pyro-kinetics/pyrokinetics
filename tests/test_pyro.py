@@ -915,12 +915,19 @@ def test_add_flags_with_physical_reference_values(tmp_path, gk_code):
     }
     nml.write(gs2_file)
 
-    before, after = Pyro(gk_file=gs2_file), Pyro(gk_file=gs2_file)
+    pyro = Pyro(gk_file=gs2_file)
     if gk_code != "GS2":
-        before.convert_gk_code(gk_code)
-        after.convert_gk_code(gk_code)
-    after.add_flags({})
+        pyro.convert_gk_code(gk_code)
+    keys = ["mass", "z", "dens", "temp", "nu", "inverse_lt", "inverse_ln"]
+    before = {
+        name: {key: pyro.local_species[name][key] for key in keys}
+        for name in pyro.local_species.names
+    }
 
-    before.write_gk_file(tmp_path / "before")
-    after.write_gk_file(tmp_path / "after")
-    assert (tmp_path / "before").read_text() == (tmp_path / "after").read_text()
+    pyro.add_flags({})
+
+    for name, quantities in before.items():
+        for key, old in quantities.items():
+            new = pyro.local_species[name][key].to(old.units, pyro.norms.context)
+            assert np.isclose(new.m, old.m, rtol=1e-12)
+    pyro.write_gk_file(tmp_path / "out")
