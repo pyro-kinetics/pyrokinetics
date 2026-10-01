@@ -14,13 +14,13 @@ class FieldLine:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
-    def _linear_apar(self):
+    def _linear_apar(self, field="apar"):
         r"""
-        ``gk_output["apar"]`` at the final time (if any), restricted to the
+        ``gk_output[field]`` (``"apar"`` unless told otherwise) at the final time (if any), restricted to the
         symmetric part of the ballooning domain, and :math:`\sqrt{g_{\theta\theta}}`
         on the same theta grid.
         """
-        apar = self.pyro.gk_output["apar"]
+        apar = self.pyro.gk_output[field]
         if "time" in apar.dims:
             apar = apar.isel(time=-1)
         apar = apar.pint.dequantify()
@@ -98,9 +98,10 @@ class FieldLine:
             name="tearing_parameter",
         )
 
-    def compute_linear_parity(self) -> xr.DataArray:
+    def compute_linear_parity(self, field: str = "apar") -> xr.DataArray:
         r"""
-        Computes the even fraction of :math:`A_\parallel` about :math:`\theta = 0`
+        Computes the even fraction of :math:`A_\parallel` (or ``field``, e.g.
+        ``"phi"``) about :math:`\theta = 0`
 
         .. math::
             E = \frac{\int |A_\parallel(\theta) + A_\parallel(-\theta)|^2 dl}
@@ -113,13 +114,19 @@ class FieldLine:
         ballooning parity. Unlike the tearing parameter, :math:`E` is insensitive
         to how the phase of :math:`A_\parallel` varies along theta.
 
+        Parameters
+        ----------
+        field: str, default "apar"
+            Field of ``gk_output`` to take the parity of.
+
         Returns
         -------
         apar_even_fraction : xr.DataArray
-            One value for every non-theta dimension of ``gk_output["apar"]``
-            (``kx``, ``ky`` and ``mode`` where present). NaN for an empty mode.
+            One value for every non-theta dimension of ``gk_output[field]``
+            (``kx``, ``ky`` and ``mode`` where present), named
+            ``<field>_even_fraction``. NaN for an empty mode.
         """
-        apar, dl = self._linear_apar()
+        apar, dl = self._linear_apar(field)
         flipped = apar.assign_coords(theta=-apar.theta).sortby("theta")
         # Grids are symmetric only to rounding, which leaves the end points NaN
         flipped = flipped.interp(theta=apar.theta, kwargs={"fill_value": "extrapolate"})
@@ -128,7 +135,7 @@ class FieldLine:
             return (np.abs(field) ** 2 * dl).integrate("theta")
 
         even = norm(apar + flipped)
-        return (even / (even + norm(apar - flipped))).rename("apar_even_fraction")
+        return (even / (even + norm(apar - flipped))).rename(f"{field}_even_fraction")
 
     def compute_length_per_turn(self, ntheta=256):
         """

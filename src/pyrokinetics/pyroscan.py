@@ -1000,7 +1000,8 @@ class PyroScan:
             with that run's own geometry before any time reduction, as
             ``tearing_parameter`` (one value per mode for TGLF/GFTM), and
             ``FieldLine.compute_linear_parity`` as ``apar_even_fraction``
-            (> 0.5 is tearing parity).
+            (> 0.5 is tearing parity), and the same for phi as ``phi_even_fraction``
+            (> 0.5 is ballooning-like phi parity).
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -1077,7 +1078,11 @@ class PyroScan:
         if tearing:
             from .diagnostics.field_line import FieldLine
 
-            spec["scalars"] += ["tearing_parameter", "apar_even_fraction"]
+            spec["scalars"] += [
+                "tearing_parameter",
+                "apar_even_fraction",
+                "phi_even_fraction",
+            ]
 
         buffers = {
             name: []
@@ -1132,6 +1137,11 @@ class PyroScan:
                             field_line.compute_linear_tearing_parameter(),
                         ),
                         ("apar_even_fraction", field_line.compute_linear_parity()),
+                        *(
+                            [("phi_even_fraction", field_line.compute_linear_parity("phi"))]
+                            if "phi" in pyro.gk_output
+                            else []
+                        ),
                     ):
                         run_buffers[name] = select_kx_ky_time(
                             value.copy(data=value.values * ureg.dimensionless),

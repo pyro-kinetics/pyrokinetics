@@ -73,6 +73,11 @@ def test_gftm_tearing_parameter_per_mode(tmp_path):
     assert even.dims == ("kx", "ky", "mode")
     np.testing.assert_allclose(even.isel(kx=0, ky=0).values, [1.0, 0.0], atol=1e-12)
 
+    # the synthetic phi is even in both modes, whatever apar does
+    phi_even = FieldLine(pyro).compute_linear_parity("phi")
+    assert phi_even.name == "phi_even_fraction"
+    np.testing.assert_allclose(phi_even.isel(kx=0, ky=0).values, [1.0, 1.0], atol=1e-12)
+
 
 def test_stella_tearing_parameter_has_no_mode():
     pyro = Pyro(gk_file=template_dir / "outputs" / "STELLA_linear" / "stella.in")
@@ -111,6 +116,7 @@ def test_pyroscan_tearing_parameter_matches_per_run(tmp_path):
     tearing = scan.gk_output.data["tearing_parameter"]
     even = scan.gk_output.data["apar_even_fraction"]
     assert tearing.dims == even.dims == ("kappa", "ky", "mode")
+    np.testing.assert_allclose(scan.gk_output.data["phi_even_fraction"].data.m[~np.isnan(even.data.m)], 1.0)
 
     for i, name in enumerate(scan.pyro_dict):
         run = Pyro(gk_file=tmp_path / "scan" / name / "input.gftm")
@@ -142,3 +148,22 @@ def test_parity_of_synthetic_fields():
         )
         even = FieldLine(pyro).compute_linear_parity()
         np.testing.assert_allclose(even.values, expected, atol=1e-12)
+
+
+def test_parity_of_synthetic_phi():
+    pyro = Pyro(gk_file=template_dir / "outputs" / "STELLA_linear" / "stella.in")
+    pyro.load_gk_output()
+    phi = pyro.gk_output.data["phi"]
+    apar_before = FieldLine(pyro).compute_linear_parity()
+    theta = phi.theta
+    envelope = np.exp(-((theta / 3) ** 2)) * (1 + 0.5j * np.cos(theta))
+
+    for shape, expected in ((envelope, 1.0), (np.sin(theta) * envelope, 0.0)):
+        pyro.gk_output.data["phi"] = phi.copy(
+            data=(shape * xr.ones_like(phi.pint.dequantify())).values * phi.data.u
+        )
+        even = FieldLine(pyro).compute_linear_parity("phi")
+        np.testing.assert_allclose(even.values, expected, atol=1e-12)
+
+    # apar is untouched by a change of phi
+    np.testing.assert_allclose(FieldLine(pyro).compute_linear_parity().values, apar_before.values)
