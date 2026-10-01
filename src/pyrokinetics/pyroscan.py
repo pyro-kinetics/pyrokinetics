@@ -1138,7 +1138,12 @@ class PyroScan:
                         ),
                         ("apar_even_fraction", field_line.compute_linear_parity()),
                         *(
-                            [("phi_even_fraction", field_line.compute_linear_parity("phi"))]
+                            [
+                                (
+                                    "phi_even_fraction",
+                                    field_line.compute_linear_parity("phi"),
+                                )
+                            ]
                             if "phi" in pyro.gk_output
                             else []
                         ),
