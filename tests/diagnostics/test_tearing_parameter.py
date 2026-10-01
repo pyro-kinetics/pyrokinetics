@@ -116,7 +116,9 @@ def test_pyroscan_tearing_parameter_matches_per_run(tmp_path):
     tearing = scan.gk_output.data["tearing_parameter"]
     even = scan.gk_output.data["apar_even_fraction"]
     assert tearing.dims == even.dims == ("kappa", "ky", "mode")
-    np.testing.assert_allclose(scan.gk_output.data["phi_even_fraction"].data.m[~np.isnan(even.data.m)], 1.0)
+    np.testing.assert_allclose(
+        scan.gk_output.data["phi_even_fraction"].data.m[~np.isnan(even.data.m)], 1.0
+    )
 
     for i, name in enumerate(scan.pyro_dict):
         run = Pyro(gk_file=tmp_path / "scan" / name / "input.gftm")
@@ -166,4 +168,6 @@ def test_parity_of_synthetic_phi():
         np.testing.assert_allclose(even.values, expected, atol=1e-12)
 
     # apar is untouched by a change of phi
-    np.testing.assert_allclose(FieldLine(pyro).compute_linear_parity().values, apar_before.values)
+    np.testing.assert_allclose(
+        FieldLine(pyro).compute_linear_parity().values, apar_before.values
+    )
