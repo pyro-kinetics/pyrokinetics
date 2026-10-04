@@ -167,6 +167,160 @@ def test_merge_fuel_impurity(
         )
 
 
+@pytest.mark.parametrize(
+    "keep_z,expected_zeff",
+    (
+        # After merging every ion into one, zeff = n_i Z_i^2 / n_e, and
+        # quasineutrality gives n_i Z_i = n_e, so zeff collapses to the merged Z.
+        (True, 1.0),
+        (False, 18.0 / 13.0),
+    ),
+)
+def test_merge_update_zeff(
+    simple_local_species: LocalSpecies, keep_z: bool, expected_zeff: float
+):
+    """``update_zeff`` recalculates zeff from the species left after the merge."""
+    simple_local_species.set_zeff()
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+    simple_local_species.merge_species(
+        "deuterium",
+        ["carbon12", "carbon13"],
+        keep_base_species_z=keep_z,
+        update_zeff=True,
+    )
+
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, expected_zeff)
+    np.testing.assert_allclose(
+        simple_local_species["deuterium"].z.magnitude, expected_zeff
+    )
+
+
+def test_merge_leaves_zeff_stale_by_default(simple_local_species: LocalSpecies):
+    """Without ``update_zeff`` the cached multi-species zeff survives the merge."""
+    simple_local_species.set_zeff()
+    simple_local_species.merge_species(
+        "deuterium", ["carbon12", "carbon13"], keep_base_species_z=True
+    )
+    # Only hydrogenic species remain, but zeff still describes the original plasma
+    assert simple_local_species.names == ["electron", "deuterium"]
+    np.testing.assert_allclose(simple_local_species["deuterium"].z.magnitude, 1.0)
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+
+def test_merge_update_zeff_isotopes(simple_local_species: LocalSpecies):
+    """Merging equal-charge isotopes conserves sum(n Z^2), so zeff is unchanged."""
+    simple_local_species.set_zeff()
+    simple_local_species.merge_species(
+        "carbon12", ["carbon13"], keep_base_species_z=True, update_zeff=True
+    )
+    np.testing.assert_allclose(simple_local_species.zeff.magnitude, 8.0 / 3.0)
+
+
+def _collision_frequency(z: float, dens: float, temp: float, mass: float) -> float:
+    """Standard like-species scaling, nu ~ z^4 n / (T^3/2 sqrt(m)).
+
+    Written out independently of ``merge_species`` so the tests below check the
+    physics rather than the way the implementation groups its factors.
+    """
+    return z**4 * dens / (temp**1.5 * np.sqrt(mass))
+
+
+@pytest.mark.parametrize(
+    "keep_z,keep_mass,new_z,new_dens,new_mass",
+    (
+        # keep_z: density absorbs all the merged charge, z and mass are held
+        (True, True, 1.0, 1.0, 1.0),
+        # otherwise density is the particle sum, z the number-weighted mean charge,
+        # and mass the density-weighted mean
+        (False, False, 18.0 / 13.0, 13.0 / 18.0, 109.0 / 78.0),
+    ),
+)
+def test_merge_update_nu(
+    simple_local_species: LocalSpecies,
+    keep_z: bool,
+    keep_mass: bool,
+    new_z: float,
+    new_dens: float,
+    new_mass: float,
+):
+    """``update_nu`` rescales nu to the merged charge, density and mass."""
+    deuterium = simple_local_species["deuterium"]
+    old_nu = deuterium.nu.magnitude
+    old = _collision_frequency(
+        deuterium.z.magnitude,
+        deuterium.dens.magnitude,
+        deuterium.temp.magnitude,
+        deuterium.mass.magnitude,
+    )
+    # temp is untouched by a merge
+    temp = deuterium.temp.magnitude
+
+    simple_local_species.merge_species(
+        "deuterium",
+        ["carbon12", "carbon13"],
+        keep_base_species_z=keep_z,
+        keep_base_species_mass=keep_mass,
+        update_nu=True,
+    )
+
+    merged = simple_local_species["deuterium"]
+    # the merge produced the charge/density/mass the scaling is built from
+    np.testing.assert_allclose(merged.z.magnitude, new_z)
+    np.testing.assert_allclose(merged.dens.magnitude, new_dens)
+    np.testing.assert_allclose(merged.mass.magnitude, new_mass)
+
+    expected = old_nu * _collision_frequency(new_z, new_dens, temp, new_mass) / old
+    np.testing.assert_allclose(merged.nu.magnitude, expected)
+
+
+def test_merge_leaves_nu_stale_by_default(simple_local_species: LocalSpecies):
+    """Without ``update_nu`` the merge leaves a nu belonging to the old density."""
+    old_nu = simple_local_species["deuterium"].nu.magnitude
+    old_dens = simple_local_species["deuterium"].dens.magnitude
+
+    simple_local_species.merge_species(
+        "deuterium", ["carbon12", "carbon13"], keep_base_species_z=True
+    )
+
+    # density has changed but nu has not, so the two are no longer consistent
+    assert simple_local_species["deuterium"].dens.magnitude != old_dens
+    np.testing.assert_allclose(simple_local_species["deuterium"].nu.magnitude, old_nu)
+
+
+def test_merge_update_nu_doubles_for_identical_species(
+    simple_local_species: LocalSpecies,
+):
+    """Merging two identical ion populations doubles the collision frequency."""
+    # Rebuild as a quasineutral two-deuterium plasma so the merge is a pure
+    # doubling of density with charge, mass and temperature all unchanged.
+    simple_local_species.remove_species("carbon12", "carbon13")
+    simple_local_species.add_species(
+        name="deuterium_copy",
+        species_data=_species_data(mass=1.0, z=1.0, dens=2.0 / 3.0, inverse_ln=3.0),
+    )
+    electron = simple_local_species["electron"]
+    electron.dens = 4.0 / 3.0 * electron.dens.units
+    electron.inverse_ln = 3.0 * electron.inverse_ln.units
+    assert simple_local_species.check_quasineutrality(tol=1e-8)
+
+    old_nu = simple_local_species["deuterium"].nu.magnitude
+    simple_local_species.merge_species(
+        "deuterium",
+        ["deuterium_copy"],
+        keep_base_species_z=True,
+        keep_base_species_mass=True,
+        update_nu=True,
+    )
+
+    np.testing.assert_allclose(
+        simple_local_species["deuterium"].dens.magnitude, 4.0 / 3
+    )
+    np.testing.assert_allclose(
+        simple_local_species["deuterium"].nu.magnitude, 2.0 * old_nu
+    )
+
+
 def test_normalisation():
     """Test that a local species can be renormalised with simulation units."""
     pyro = pk.Pyro(gk_file=pk.gk_templates["GS2"])

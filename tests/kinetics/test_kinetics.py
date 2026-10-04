@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pytest
 
@@ -5,6 +7,8 @@ from pyrokinetics import template_dir
 from pyrokinetics.constants import deuterium_mass, electron_mass, hydrogen_mass
 from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
+from pyrokinetics.local_species import LocalSpecies
+from pyrokinetics.normalisation import ureg as units
 
 tritium_mass = 1.5 * deuterium_mass
 carbon_mass = 6 * deuterium_mass
@@ -671,4 +675,279 @@ def test_read_pFile_hydrogenic(setup_hydrogenic_pfile, equilibrium, kinetics_typ
         midpoint_temperature_gradient=3.0580150015690317,
         midpoint_angular_velocity=16882.124102721187,
         midpoint_angular_velocity_gradient=4.165436791612331,
+    )
+
+
+def test_kinetics_pressure_consistent_with_manual_local_species(scene_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    local_species = LocalSpecies()
+
+    for name in kinetics.species_names:
+        species = kinetics.species_data[name]
+
+        local_species.add_species(
+            name=name,
+            species_data={
+                "name": name,
+                "mass": species.get_mass(),
+                "z": species.get_charge(psi_n),
+                "dens": species.get_dens(psi_n),
+                "temp": species.get_temp(psi_n),
+                "omega0": species.get_angular_velocity(psi_n),
+                "nu": 0.0 / units.second,
+                "inverse_lt": species.get_norm_temp_gradient(psi_n),
+                "inverse_ln": species.get_norm_dens_gradient(psi_n),
+                "domega_drho": 0.0 / units.second,
+            },
+        )
+
+    np.testing.assert_allclose(
+        local_species.pressure.to("pascal").magnitude,
+        kinetics.get_total_pressure(psi_n).to("pascal").magnitude,
+    )
+
+
+def test_kinetics_pressure_gradient_consistent_with_manual_local_species(scene_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    local_species = LocalSpecies()
+
+    for name in kinetics.species_names:
+        species = kinetics.species_data[name]
+
+        local_species.add_species(
+            name=name,
+            species_data={
+                "name": name,
+                "mass": species.get_mass(),
+                "z": species.get_charge(psi_n),
+                "dens": species.get_dens(psi_n),
+                "temp": species.get_temp(psi_n),
+                "omega0": species.get_angular_velocity(psi_n),
+                "nu": 0.0 / units.second,
+                "inverse_lt": species.get_norm_temp_gradient(psi_n),
+                "inverse_ln": species.get_norm_dens_gradient(psi_n),
+                "domega_drho": 0.0 / units.second,
+            },
+        )
+
+    np.testing.assert_allclose(
+        local_species.inverse_lp.magnitude,
+        kinetics.get_norm_total_pressure_gradient(psi_n).magnitude,
+    )
+
+
+def test_kinetics_total_pressure_prime_finite_difference(scene_file, equilibrium):
+    psi_n = 0.5
+    delta = 1.0e-4
+
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    p_plus = kinetics.get_total_pressure(psi_n + delta)
+    p_minus = kinetics.get_total_pressure(psi_n - delta)
+
+    psi_plus = equilibrium.psi(psi_n + delta)
+    psi_minus = equilibrium.psi(psi_n - delta)
+
+    expected = (p_plus - p_minus) / (psi_plus - psi_minus)
+
+    actual = kinetics.get_total_pressure_prime(psi_n, eq=equilibrium)
+
+    np.testing.assert_allclose(
+        actual.to("pascal / weber").magnitude,
+        expected.to("pascal / weber").magnitude,
+        rtol=1e-3,
+    )
+
+
+def test_kinetics_total_pressure_prime_falls_back_to_kinetics_eq(
+    scene_file, equilibrium
+):
+    psi_n = 0.5
+
+    kinetics = read_kinetics(scene_file, "SCENE")
+    expected = kinetics.get_total_pressure_prime(psi_n, eq=equilibrium)
+
+    kinetics.eq = equilibrium
+    actual = kinetics.get_total_pressure_prime(psi_n)
+
+    np.testing.assert_allclose(
+        actual.to("pascal / weber").magnitude,
+        expected.to("pascal / weber").magnitude,
+    )
+
+
+def _isolated_kinetics(kinetics):
+    """Deep-copy a Kinetics object for tests that mutate species density/charge.
+
+    Kinetics.__deepcopy__ intentionally shares the underlying Species instances
+    (see its docstring), so copy.deepcopy(kinetics) alone is not enough to avoid
+    mutating the session-cached Kinetics object read by read_kinetics(). Deep-copy
+    each Species explicitly to get a fully independent object.
+    """
+    new_kinetics = copy.deepcopy(kinetics)
+    for name in list(new_kinetics.species_names):
+        new_kinetics.species_data[name] = copy.deepcopy(kinetics.species_data[name])
+    return new_kinetics
+
+
+def test_Z_profile_preserves_sign(scene_file):
+    kinetics = read_kinetics(scene_file, "SCENE")
+    psi_n = 0.5 * units.dimensionless
+
+    electron_z = kinetics.Z_profile(kinetics.species_data["electron"], False, psi_n)
+    deuterium_z = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_n)
+
+    assert np.isclose(electron_z, -1.0)
+    assert np.isclose(deuterium_z, 1.0)
+
+
+def test_enforce_quasineutrality_rejects_electron_adjust_species(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    with pytest.raises(ValueError):
+        kinetics.enforce_quasineutrality(adjust_species="electron")
+
+
+def test_enforce_quasineutrality_preserves_quasineutrality(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    psi, n_adj_new = kinetics.enforce_quasineutrality(
+        adjust_species="deuterium", npsi=11
+    )
+    psi_q = psi * units.dimensionless
+
+    ne = kinetics.species_data["electron"].get_dens(psi_q).to("meter**-3").m
+    n_tritium = kinetics.species_data["tritium"].get_dens(psi_q).to("meter**-3").m
+
+    z_deuterium = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_q)
+    z_tritium = kinetics.Z_profile(kinetics.species_data["tritium"], False, psi_q)
+
+    np.testing.assert_allclose(
+        ne, z_deuterium * n_adj_new + z_tritium * n_tritium, rtol=1e-6
+    )
+
+
+def test_merge_species_global_rejects_electron_base_species(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    with pytest.raises(ValueError):
+        kinetics.merge_species_global(
+            base_species="electron", merge_species=["deuterium"]
+        )
+
+
+def test_merge_species_global_round_trip(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    psi = np.linspace(0.0, 1.0, 11)
+    psi_q = psi * units.dimensionless
+
+    deuterium_dens_before = (
+        kinetics.species_data["deuterium"].get_dens(psi_q).to("meter**-3").m
+    )
+    tritium_dens_before = (
+        kinetics.species_data["tritium"].get_dens(psi_q).to("meter**-3").m
+    )
+
+    _, info = kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["tritium"],
+        psi=psi,
+        keep_base_species_z=True,
+        keep_base_species_mass=True,
+    )
+
+    assert sorted(kinetics.species_names) == sorted(["electron", "deuterium"])
+
+    deuterium_dens_after = (
+        kinetics.species_data["deuterium"].get_dens(psi_q).to("meter**-3").m
+    )
+
+    # deuterium and tritium both have Z=1, so merging is a simple density sum
+    np.testing.assert_allclose(
+        deuterium_dens_after, deuterium_dens_before + tritium_dens_before, rtol=1e-6
+    )
+    np.testing.assert_allclose(info["Z_eff_profile"], 1.0)
+
+
+def _zeff_by_hand(kinetics, psi_q):
+    """Zeff = sum_ions n_i Z_i^2 / n_e, evaluated directly from the species."""
+    ne = kinetics.species_data["electron"].get_dens(psi_q).to("meter**-3").m
+    zeff = np.zeros_like(ne)
+    for name in kinetics.species_names:
+        if name == "electron":
+            continue
+        species = kinetics.species_data[name]
+        zeff += (
+            species.get_dens(psi_q).to("meter**-3").m
+            * kinetics.Z_profile(species, False, psi_q) ** 2
+        )
+    return zeff / ne
+
+
+def test_merge_species_global_preserve_zeff(jetto_file):
+    """``preserve_zeff`` stashes the pre-merge Zeff for LocalSpecies to pick up."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+
+    psi = np.linspace(0.05, 0.95, 11)
+    psi_q = psi * units.dimensionless
+    expected = _zeff_by_hand(kinetics, psi_q)
+    # the JETTO template carries carbon, so this is a genuine multi-species case
+    assert np.all(expected > 1.1)
+
+    ions = [name for name in kinetics.species_names if name != "electron"]
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=[name for name in ions if name != "deuterium"],
+        psi=psi,
+        keep_base_species_z=True,
+        preserve_zeff=True,
+    )
+
+    # every ion is now hydrogenic, so a fresh calculation would give 1.0 ...
+    np.testing.assert_allclose(_zeff_by_hand(kinetics, psi_q), 1.0, rtol=1e-6)
+    # ... but the stashed profile still describes the original plasma
+    np.testing.assert_allclose(
+        kinetics.zeff_profile(psi_q).magnitude, expected, rtol=1e-6
+    )
+
+
+def test_merge_species_global_no_zeff_profile_by_default(jetto_file):
+    """Without ``preserve_zeff`` nothing is stashed, so downstream behaviour is
+    unchanged and LocalSpecies keeps deriving Zeff itself."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+    assert not hasattr(kinetics, "zeff_profile")
+
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["impurity1"],
+        keep_base_species_z=True,
+    )
+
+    assert not hasattr(kinetics, "zeff_profile")
+
+
+def test_merge_species_global_preserve_zeff_sums_over_unmerged_ions(jetto_file):
+    """Zeff must cover every ion, including those left out of the merge."""
+    kinetics = _isolated_kinetics(read_kinetics(jetto_file, "JETTO"))
+
+    psi = np.linspace(0.05, 0.95, 11)
+    psi_q = psi * units.dimensionless
+    expected = _zeff_by_hand(kinetics, psi_q)
+
+    # merge only the fast deuterium, leaving carbon (which dominates Zeff) alone
+    kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["deuterium_fast"],
+        psi=psi,
+        keep_base_species_z=True,
+        preserve_zeff=True,
+    )
+
+    np.testing.assert_allclose(
+        kinetics.zeff_profile(psi_q).magnitude, expected, rtol=1e-6
     )

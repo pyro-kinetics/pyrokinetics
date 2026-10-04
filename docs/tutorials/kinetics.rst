@@ -75,7 +75,8 @@ database manual`_.
 .. code-block:: python
 
     >>> import pyrokinetics as pk
-    >>> kin = pk.read_kinetics("my_kinetics_file")
+    >>> kin_file = pk.kinetics_templates["TRANSP"]
+    >>> kin = pk.read_kinetics(kin_file)
 
 We can inspect the contents of the ``Kinetics`` object by printing it:
 
