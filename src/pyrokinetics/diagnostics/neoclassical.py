@@ -15,9 +15,13 @@ class BootstrapModel:
         ntheta=None,
         radial_coordinate="r_minor",
         ion_collisionality="neo",
+        nlambda=101,
     ):
 
         pyro.load_metric_terms(ntheta)
+
+        if nlambda < 3:
+            raise ValueError(f"nlambda must be at least 3, got {nlambda}")
 
         if ion_collisionality not in ("neo", "legacy"):
             raise ValueError(
@@ -28,6 +32,7 @@ class BootstrapModel:
         self.pyro = pyro
         self.radial_coordinate = radial_coordinate
         self.ion_collisionality = ion_collisionality
+        self.nlambda = nlambda
         self.Zeff = self.pyro.local_species.zeff.m
 
         # Catch floating point errors
@@ -81,7 +86,14 @@ class BootstrapModel:
         """
 
         metric = self.pyro.metric_terms
-        dpsidr = metric.dpsidr * -self.ip_ccw
+        # psi is pyrokinetics' poloidal flux: COCOS 11 signs, but without the
+        # COCOS 11 factor of 2 pi, exactly as ``LocalGeometry.dpsidr`` stores it
+        # (``fs.psi_gradient / 2 pi``). It increases outward for a counter-clockwise
+        # plasma current, so sign(dpsidr) = ip_ccw. ``metric.dpsidr`` is rebuilt
+        # from the fitted flux surface as ``Y Rmaj |B0| / q`` and so carries
+        # sign(q) = ip_ccw * bt_ccw, not sign(psi) -- take its magnitude and sign
+        # it with ip_ccw, or the bt_ccw dependence leaks into every current below.
+        dpsidr = np.abs(metric.dpsidr) * self.ip_ccw
         mu0_dpdr = metric.mu0dPdr
         mu0_dpdpsi = mu0_dpdr / dpsidr
 
@@ -189,13 +201,23 @@ class BootstrapModel:
         Grad-Shafranov equation, and the external (non-bootstrap) remainder
 
         .. math::
-            \langle J \cdot B \rangle =
+            \langle J \cdot B \rangle = -\left(
                 \frac{F' \langle B^2 \rangle}{\mu_0} + F \frac{\partial p}{\partial \psi}
+            \right)
+
+        The leading minus sign belongs to the :math:`\psi` convention. Writing
+        :math:`B = F \nabla \phi + \nabla \phi \times \nabla \psi`, which is the
+        sense in which :math:`\psi` increases outward for a counter-clockwise plasma
+        current (COCOS 11, and what :func:`_get_grad_shafranov_terms` returns),
+        :math:`\mu_0 J \cdot B = -(F' B^2 + \mu_0 F \partial p / \partial \psi)`.
+        The opposite representation, :math:`\nabla \psi \times \nabla \phi`, drops
+        the minus sign but flips :math:`\psi`, and mixing the two is what makes the
+        result silently independent of ``ip_ccw``.
         """
 
         _, F, Fprime, mu0_dpdpsi, mu0 = self._get_grad_shafranov_terms()
 
-        self.JdotB = (Fprime * self.B2_fsa + F * mu0_dpdpsi) / mu0
+        self.JdotB = -(Fprime * self.B2_fsa + F * mu0_dpdpsi) / mu0
         self.JextdotB = self.JdotB - self.JbsdotB
 
     def get_Fprime_from_total_current(self, JdotB=None):
@@ -206,7 +228,7 @@ class BootstrapModel:
 
         _, F, _, mu0_dpdpsi, mu0 = self._get_grad_shafranov_terms()
 
-        return (JdotB * mu0 - F * mu0_dpdpsi) / self.B2_fsa
+        return -(JdotB * mu0 + F * mu0_dpdpsi) / self.B2_fsa
 
     def get_toroidal_current(self):
         r"""
@@ -249,10 +271,13 @@ class BootstrapModel:
         calculation cannot separate them, since ``JextdotB`` is obtained by
         subtracting the bootstrap current from the total.
 
-        ``get_bs_current`` takes the absolute value of ``JbsdotB``, so ``JextdotB``
-        and the external toroidal contributions derived from it are only correct
-        when :math:`\langle J \cdot B \rangle` is positive in the sign convention
-        of the equilibrium.
+        All of these follow pyrokinetics' :math:`\psi`, which increases outward for
+        a counter-clockwise plasma current, so :math:`\langle J \cdot B \rangle`
+        and :math:`\langle J_{\rm bs} \cdot B \rangle` carry
+        ``ip_ccw * bt_ccw`` and the toroidal densities and :math:`I_p` carry
+        ``ip_ccw``. Reversed-field equilibria and locally counter-current bootstrap
+        (hollow profiles) therefore come out negative rather than being folded to a
+        magnitude.
 
         Sets ``Jphi``, ``Jphi_fsa``, ``Jphi_bs_fsa``, ``Jphi_ext_fsa``,
         ``Jphi_psdia_fsa``, ``Jphi_eff``, ``Jphi_bs_eff``, ``Jphi_ext_eff``,
@@ -274,32 +299,35 @@ class BootstrapModel:
         Vprime = metric.dVdr
         rho = metric.rho
 
-        # Local toroidal current density from the Grad-Shafranov equation
-        self.Jphi = metric.R * dpdpsi + F * Fprime / (mu0 * metric.R)
+        # Local toroidal current density from the Grad-Shafranov equation.
+        # The leading minus sign is the same psi convention as get_total_current.
+        self.Jphi = -(metric.R * dpdpsi + F * Fprime / (mu0 * metric.R))
 
         # --- Flux-surface averaged toroidal current density, <J_phi> ---
-        self.Jphi_fsa = R_fsa * dpdpsi + F * Fprime * R_inv_fsa / mu0
+        self.Jphi_fsa = -(R_fsa * dpdpsi + F * Fprime * R_inv_fsa / mu0)
 
         # Parallel driven currents, <J_d . B> F <1/R> / <B^2>
         parallel_factor = F * R_inv_fsa / self.B2_fsa
         self.Jphi_bs_fsa = parallel_factor * self.JbsdotB
         self.Jphi_ext_fsa = parallel_factor * self.JextdotB
 
-        # Combined Pfirsch-Schlüter and diamagnetic contribution
-        self.Jphi_psdia_fsa = dpdpsi * (R_fsa - F**2 * R_inv_fsa / self.B2_fsa)
+        # Combined Pfirsch-Schlüter and diamagnetic contribution. The parallel
+        # terms above contain no psi derivative and so keep their sign; this one
+        # does, and follows Jphi_fsa.
+        self.Jphi_psdia_fsa = -dpdpsi * (R_fsa - F**2 * R_inv_fsa / self.B2_fsa)
 
         # --- Effective toroidal current density, (1 / 2 pi rho) dIp/drho ---
         # label_factor = d(r^2)/d(rho_label^2) moves V'/(4 pi^2 r) onto the
         # requested radial label, and is 1 for "r_minor". See _get_radial_label.
         eff_factor = self.label_factor * Vprime / (4 * np.pi**2 * rho)
-        self.Jphi_eff = eff_factor * (dpdpsi + F * Fprime * R_inv2_fsa / mu0)
+        self.Jphi_eff = -eff_factor * (dpdpsi + F * Fprime * R_inv2_fsa / mu0)
 
         parallel_factor_eff = eff_factor * F * R_inv2_fsa / self.B2_fsa
         self.Jphi_bs_eff = parallel_factor_eff * self.JbsdotB
         self.Jphi_ext_eff = parallel_factor_eff * self.JextdotB
 
         self.Jphi_psdia_eff = (
-            eff_factor * dpdpsi * (1.0 - F**2 * R_inv2_fsa / self.B2_fsa)
+            -eff_factor * dpdpsi * (1.0 - F**2 * R_inv2_fsa / self.B2_fsa)
         )
 
         # --- Radial derivative of the enclosed current, dIp/drho = 2 pi rho J_eff ---
@@ -312,38 +340,90 @@ class BootstrapModel:
 
         # --- Total toroidal current enclosed by this flux surface ---
         # mu0 Ip = V' psi' <|grad rho|^2 / R^2> / (4 pi^2), using V' = 2 pi int(J dtheta)
-        # and psi' = 2 pi dpsidr. The leading minus sign puts Ip in the same sign
-        # convention as Jphi above, so that Ip = int(Jphi_eff 2 pi rho drho).
+        # and psi' = 2 pi dpsidr. Ip is in the same sign convention as Jphi above,
+        # so that Ip = int(Jphi_eff 2 pi rho drho), and follows ip_ccw.
         grad_r2 = metric.toroidal_contravariant_metric("r", "r")
         self.Ip = (
-            -dpsidr
+            dpsidr
             * Vprime
             * metric.flux_surface_average(grad_r2 / metric.R**2)
             / (2 * np.pi * mu0)
         )
 
     def get_trapped_fraction(self):
+        r"""
+        Effective trapped particle fraction (Lin-Liu and Miller 1995),
+
+        .. math::
+            f_t = 1 - \frac{3}{4} \langle B^2 \rangle
+                  \int_0^{1/B_{max}}
+                  \frac{\lambda\, \mathrm{d}\lambda}
+                       {\langle \sqrt{1 - \lambda B} \rangle}
+
+        This is the definition the Sauter and Redl coefficients are fitted
+        against, so it is shared by every subclass.
+
+        The pitch angle integral is evaluated in
+        :math:`u = \sqrt{1 - \lambda B_{max}}`, i.e.
+        :math:`\lambda = (1 - u^2) / B_{max}`, which maps it to
+
+        .. math::
+            \frac{2}{B_{max}^2} \int_0^1
+            \frac{u\, (1 - u^2)\, \mathrm{d}u}
+                 {\langle \sqrt{1 - (1 - u^2) B / B_{max}} \rangle}
+
+        an exact change of variables that is far better behaved for quadrature.
+        On a uniform grid in :math:`\lambda`, :math:`\langle \sqrt{1 - \lambda B}
+        \rangle` collapses over a boundary layer of width
+        :math:`\sim 2 \epsilon / B_{max}` at the trapped-passing boundary, so as
+        the flux surface shrinks the layer carrying most of the integral falls
+        between grid points: the quadrature then underestimates
+        :math:`f_t` and, close enough to the axis, returns a negative value.
+        Substituting :math:`\lambda = (1 - u^2) / B_{max}` widens that layer to
+        :math:`\sqrt{2 \epsilon}` and the factor :math:`u` in the numerator
+        cancels the square root endpoint behaviour, keeping ``nlambda`` points
+        sufficient over the whole radial range.
+
+        Sets ``trapped_fraction`` and ``B2_fsa``.
+        """
 
         metric = self.pyro.metric_terms
         Jacobian = metric.Jacobian
         theta = metric.regulartheta
-        ntheta = len(theta)
         B_mod = abs(metric.B_magnitude)
         B_max = np.max(B_mod)
 
         B2_fsa_units = metric.flux_surface_average(B_mod**2)
         B2_fsa = B2_fsa_units.m
 
-        lambd_grid = np.linspace(0, 1 / B_max, 100)
-        lambd = np.tile(lambd_grid, (ntheta, 1))
+        # u = 0 is the trapped-passing boundary, lambda = 1 / B_max
+        u = np.linspace(0.0, 1.0, self.nlambda)
+        b_ratio = (B_mod / B_max).m
 
-        lambd_fsa = simpson(
-            np.sqrt(1.0 - lambd.m * B_mod.m[:, np.newaxis]) * Jacobian.m[:, np.newaxis],
+        # 1 - lambda B, clipped because B_max is the maximum over the theta
+        # grid, so round off can take the radicand very slightly negative at
+        # the point where |B| peaks
+        radicand = np.clip(
+            1.0 - (1.0 - u**2)[np.newaxis, :] * b_ratio[:, np.newaxis], 0.0, None
+        )
+
+        u_fsa = simpson(
+            np.sqrt(radicand) * Jacobian.m[:, np.newaxis],
             x=theta,
             axis=0,
         ) / simpson(Jacobian.m, x=theta)
 
-        lambda_integral = simpson(lambd_grid.m / lambd_fsa, x=lambd_grid.m)
+        # The integrand vanishes at u = 0 for any non-uniform |B|, and is 0 / 0
+        # only in the limit of a vanishing flux surface, which carries no
+        # trapped particles
+        integrand = np.divide(
+            2.0 * u * (1.0 - u**2),
+            u_fsa,
+            out=np.zeros_like(u),
+            where=u_fsa > 0.0,
+        )
+
+        lambda_integral = simpson(integrand, x=u) / B_max.m**2
         ftrap = 1.0 - (3.0 / 4.0 * B2_fsa * lambda_integral)
 
         self.B2_fsa = B2_fsa_units
@@ -351,11 +431,45 @@ class BootstrapModel:
 
     @staticmethod
     def _is_fast(name, species):
-        """
+        r"""
         Whether a species is fast/non-thermal, and so takes no part in thermal
-        ion-ion collisions. Same heuristic as ``get_kinetic_species_data``.
+        ion-ion collisions.
+
+        Fast species are detected by name, or by being much hotter than the
+        electrons. Used by both ``_get_main_ion`` and the subclass
+        ``get_kinetic_species_data`` implementations, so that the species
+        treated as fast in the pressure terms are the same ones left out of
+        :math:`\nu^*_i`.
         """
         return "fast" in name or species.temp.m > 10
+
+    def _get_thermal_ion_names(self):
+        """
+        Names of the thermal (non-fast) ion species, in ``LocalSpecies`` order
+
+        Falls back to the full ion list if every ion looks fast, so callers always
+        have something to work with.
+        """
+        ls = self.pyro.local_species
+        ion_names = [name for name in ls.names if ls[name].z.m > 0]
+        thermal = [name for name in ion_names if not self._is_fast(name, ls[name])]
+        return thermal or ion_names
+
+    def _get_main_ion(self):
+        """
+        Majority thermal ion: the highest-density species that is not fast
+
+        This is the ion whose charge, temperature and Coulomb logarithm stand in
+        for "the" ion species in the Sauter/Redl fits, and whose temperature and
+        temperature gradient are substituted for those of the fast species in
+        ``get_kinetic_species_data``. Picking it by density rather than by
+        ``LocalSpecies`` order matters when the species list is not ordered by
+        density -- a JETTO run with a trace hydrogen species listed ahead of the
+        D-T majority, say.
+        """
+        ls = self.pyro.local_species
+        # Densities all share units within a LocalSpecies, so compare magnitudes
+        return ls[max(self._get_thermal_ion_names(), key=lambda name: ls[name].dens.m)]
 
     def _get_collisionality_ion(self):
         r"""
@@ -395,18 +509,13 @@ class BootstrapModel:
             summed thermal ion density. 1.0 in ``"legacy"`` mode.
         """
         ls = self.pyro.local_species
-        ion_names = [name for name in ls.names if name != "electron"]
 
         if self.ion_collisionality == "legacy":
+            ion_names = [name for name in ls.names if name != "electron"]
             return ls[ion_names[0]], 1.0
 
-        thermal = [name for name in ion_names if not self._is_fast(name, ls[name])]
-        if not thermal:
-            thermal = ion_names
-
-        # Densities all share units within a LocalSpecies, so compare magnitudes
-        ion = ls[max(thermal, key=lambda name: ls[name].dens.m)]
-        dens_sum = sum(ls[name].dens.m for name in thermal)
+        ion = self._get_main_ion()
+        dens_sum = sum(ls[name].dens.m for name in self._get_thermal_ion_names())
 
         return ion, dens_sum / ion.dens.m
 
@@ -568,10 +677,14 @@ class Redl2021(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0]
-        main_ion = ls[ion_names[0]]
+        main_ion = self._get_main_ion()
 
         # self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
+        # NOTE: ``inverse_lt``/``inverse_ln`` are -(1/X) dX/dr, so these hold
+        # *minus* dln X / dpsi. ``get_bs_current`` relies on that to supply the
+        # leading minus sign of Sauter/Redl eq (2). ``lg.dpsidr`` is pyrokinetics'
+        # dpsi/dr, positive for a counter-clockwise plasma current.
         self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
         self.dlnne_dpsi = electron.inverse_ln / lg.dpsidr
 
@@ -583,7 +696,7 @@ class Redl2021(BootstrapModel):
         self.ptot += self.pe
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
-            if "fast" in ion_name or species.temp.m > 10:
+            if self._is_fast(ion_name, species):
                 self.pion[i_s] = species.dens * main_ion.temp
                 self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
             else:
@@ -720,33 +833,31 @@ class Redl2021(BootstrapModel):
             )
         )
 
-    # Equation (21)
+    # Equation (21): (1 + 0.18 sqrt(nu_star_i)) divides alpha0 as well
     def get_alpha(self):
         a0 = self.get_alpha0()
         num = (
             a0
-            + 0.7
-            * self.Zeff
-            * np.sqrt(self.trapped_fraction)
-            * np.sqrt(self.nu_star_i)
-            / (1.0 + 0.18 * np.sqrt(self.nu_star_i))
-            - 0.002 * (self.nu_star_i**2) * self.trapped_fraction**6
-        )
+            + 0.7 * self.Zeff * np.sqrt(self.trapped_fraction) * np.sqrt(self.nu_star_i)
+        ) / (1.0 + 0.18 * np.sqrt(self.nu_star_i)) - 0.002 * (
+            self.nu_star_i**2
+        ) * self.trapped_fraction**6
         den = 1.0 + 0.004 * (self.nu_star_i**2) * self.trapped_fraction**6
         return num / den
 
     # Equation (2)
     def get_bs_current(self):
 
-        self.JbsdotB = np.abs(
-            -self.Ipsi
-            * (
-                self.ptot * self.L31 * self.dlnne_dpsi
-                + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
-                + np.sum(
-                    self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
-                    axis=0,
-                )
+        # Sauter eq (2) reads <J_bs.B> = -I p_e [... dln X / dpsi ...], but
+        # ``dlnX_dpsi`` here is built from LocalSpecies ``inverse_ln``/``inverse_lt``,
+        # which are *minus* the logarithmic derivative, so the leading minus sign of
+        # eq (2) is already carried by them. See ``get_kinetic_species_data``.
+        self.JbsdotB = self.Ipsi * (
+            self.ptot * self.L31 * self.dlnne_dpsi
+            + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
+            + np.sum(
+                self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
+                axis=0,
             )
         )
 
@@ -765,10 +876,14 @@ class Sauter1999(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0.0]
-        main_ion = ls[ion_names[0]]
+        main_ion = self._get_main_ion()
 
         self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
+        # NOTE: ``inverse_lt``/``inverse_ln`` are -(1/X) dX/dr, so these hold
+        # *minus* dln X / dpsi. ``get_bs_current`` relies on that to supply the
+        # leading minus sign of Sauter/Redl eq (2). ``lg.dpsidr`` is pyrokinetics'
+        # dpsi/dr, positive for a counter-clockwise plasma current.
         self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
         self.dlnne_dpsi = electron.inverse_ln / lg.dpsidr
 
@@ -784,7 +899,7 @@ class Sauter1999(BootstrapModel):
         )
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
-            if "fast" in ion_name or species.temp.m > 10:
+            if self._is_fast(ion_name, species):
                 self.pion[i_s] = species.dens * main_ion.temp
                 self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
                 self.dlnp_dpsi += (
@@ -907,21 +1022,18 @@ class Sauter1999(BootstrapModel):
             + 0.5 * (1.0 - 0.5 * self.trapped_fraction) * self.nu_star_e / self.Zeff
         )
 
-    # Equation (17a)
+    # Equation (17b): (1 + 0.5 sqrt(nu_star_i)) divides alpha0 as well
     def get_alpha(self):
         alpha0 = self.get_alpha0()
         num = (
-            alpha0
-            + 0.25
-            * (1.0 - self.trapped_fraction**2)
-            * np.sqrt(self.nu_star_i)
-            / (1.0 + 0.5 * np.sqrt(self.nu_star_i))
-            + 0.315 * (self.nu_star_i**2) * self.trapped_fraction**6
-        )
+            alpha0 + 0.25 * (1.0 - self.trapped_fraction**2) * np.sqrt(self.nu_star_i)
+        ) / (1.0 + 0.5 * np.sqrt(self.nu_star_i)) + 0.315 * (
+            self.nu_star_i**2
+        ) * self.trapped_fraction**6
         den = 1.0 + 0.15 * (self.nu_star_i**2) * self.trapped_fraction**6
         return num / den
 
-    # Equation (17b) and errata Equation 1
+    # Equation (17a) and errata Equation 1
     def get_alpha0(self):
         return -(1.17 * (1.0 - self.trapped_fraction)) / (
             1.0 - 0.22 * self.trapped_fraction - 0.19 * self.trapped_fraction**2
@@ -929,8 +1041,10 @@ class Sauter1999(BootstrapModel):
 
     # Equation 2 and Errata Equation 2
     def get_bs_current(self):
-        self.JbsdotB = np.abs(
-            -self.Ipsi
+        # As in Redl2021.get_bs_current: the leading minus sign of eq (2) is
+        # already carried by the ``inverse_ln``/``inverse_lt`` sign convention.
+        self.JbsdotB = (
+            self.Ipsi
             * self.pe
             * (
                 self.L31 / self.Rpe * self.dlnp_dpsi
@@ -943,15 +1057,12 @@ class Sauter1999(BootstrapModel):
         )
 
         # Maybe L31 term should be partitioned?
-        # self.JbsdotB = np.abs(
-        #     -self.Ipsi
-        #     * (
-        #         self.ptot * self.L31 * self.dlnne_dpsi
-        #         + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
-        #         + np.sum(
-        #             self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
-        #             axis=0,
-        #         )
+        # self.JbsdotB = self.Ipsi * (
+        #     self.ptot * self.L31 * self.dlnne_dpsi
+        #     + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
+        #     + np.sum(
+        #         self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
+        #         axis=0,
         #     )
         # )
 
