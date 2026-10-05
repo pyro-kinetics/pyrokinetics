@@ -41,9 +41,13 @@ class Geo:
         )
         self.R = cols["R"]
         ga1 = gxx * gyy - gxy**2
+        ga2 = gxx * gyz - gxy * gxz
         ga3 = gxy * gyz - gyy * gxz
         cxy = self.h.get("Cxy", 1.0)
         self.Ky = (dBdx - ga3 / ga1 * dBdz) / cxy
+        # GENE's K_x = -(dBdy + ga2/ga1 dBdz)/C_xy (dBdy = 0 in a local equilibrium)
+        self.Kx = -(ga2 / ga1 * dBdz) / cxy
+        self.theta0 = 0.0
         self.dpdx = (
             self.h.get("my_dpdx", 0.0) / cxy
         )  # absent when dpdx_pm = 0 (no pressure term)
@@ -58,6 +62,35 @@ class Geo:
         Bz = self.sB(zz)
         self.Bmax, self.Bmin = Bz.max(), Bz.min()
         self.zmin = zz[np.argmin(Bz)]
+
+    @property
+    def kx_per_theta0(self):
+        """d(k_x/k_y)/d(theta0): the mean slope of the secular part of g^xy/g^xx over the turn
+        (= C_y q0 shat/r0 in GENE's Miller coordinates), so that k_x = -k_y kx_per_theta0 theta0
+        puts the minimum of k_perp^2 at theta = theta0 (ballooning angle theta0 = k_x/(shat k_y)).
+        """
+        r = self.gxy / self.gxx
+        return float((r[-1] - r[0]) / (self.z[-1] - self.z[0]))
+
+    def shifted(self, theta0):
+        """This geometry for a mode with ballooning angle theta0 (GENE kx_center != 0): the
+        solver sees k_y times effective K_y and g^yy,
+            K_y -> K_y + (k_x/k_y) K_x,   g^yy -> g^yy + 2 (k_x/k_y) g^xy + (k_x/k_y)^2 g^xx,
+        with k_x/k_y = -kx_per_theta0 theta0 (GENE's omega_d ~ K_x k_x + K_y k_y and
+        k_perp^2 = g^xx k_x^2 + 2 g^xy k_x k_y + g^yy k_y^2 on the central turn)."""
+        import copy
+
+        if theta0 == 0:
+            return self
+        g = copy.copy(self)
+        kap = -self.kx_per_theta0 * float(theta0)
+        g.Ky = self.Ky + kap * self.Kx
+        g.gyy = self.gyy + 2 * kap * self.gxy + kap**2 * self.gxx
+        zp = np.append(self.z, np.pi)
+        g.sK = CubicSpline(zp, np.append(g.Ky, g.Ky[0]), bc_type="periodic")
+        g.theta0 = float(theta0)
+        g.kx_over_ky = kap
+        return g
 
     @classmethod
     def from_file(cls, path):

@@ -304,6 +304,7 @@ class Solver:
         self._setup_collisions()
         self._setup_ions()
         self.last_vec = None
+        self.deadline = None  # time.time() after which matrix() raises TimeoutError
         if ions == "stream":
             from . import ion_stream
 
@@ -679,6 +680,8 @@ class Solver:
     # ------------------------------------------------------------------ the Galerkin matrix
     def matrix(self, omega):
         """Return the (row-scaled) Galerkin matrix D(omega) and the block layout."""
+        if self.deadline is not None and time.time() > self.deadline:
+            raise TimeoutError("root search exceeded its time limit")
         omega = complex(omega)
         geo, p, sw = self.geo, self.p, self.sw
         Ti = p["Ti"]

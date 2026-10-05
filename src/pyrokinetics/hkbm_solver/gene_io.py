@@ -28,6 +28,7 @@ L_ref); the conversion factors are applied here (``Deck.units``).
 import json
 import re
 import struct
+import time
 import warnings
 from pathlib import Path
 
@@ -281,18 +282,32 @@ class Deck:
         self.nz0 = int(box.get("nz0", 64))
 
     # ------------------------------------------------------------------ solving
-    def solve(self, ky_ref, omega0=None, verbose=False, scan="auto"):
+    def solve(
+        self, ky_ref, omega0=None, verbose=False, scan="auto", theta0=0.0, timeout=None
+    ):
         """Solve at one k_y (deck units).  omega0: seed (deck units, GENE sign omega + i gamma).
 
         Seeds tried in turn: omega0 (if given; accepted as soon as it converges to a growing
         root), the STEP hKBM root scaled to this k_y (accepted likewise), then drift-wave-like
         seeds in both directions (the most unstable converged root is kept).  scan: 'auto' (a
         coarse search of the smallest singular value of D(omega) when no seed converges to a
-        growing root), True (always also scan) or False."""
+        growing root), True (always also scan) or False.  theta0: ballooning angle of the mode
+        (k_x = shat k_y theta0, see geometry.Geo.shifted); theta0 != 0 breaks the twisting parity,
+        so the basis then has the odd Hermite functions too (16 instead of 8 per field).
+        timeout: seconds; the search raises TimeoutError when it runs longer."""
         rs, cs = self.units["rho_s_over_rho_ref"], self.units["c_s_over_c_ref"]
         ky = ky_ref * rs
-        geom = Geometry(self.geo, nth=1024)
-        Sv = S.Solver(ky, geom=geom, **self.solver_kw)
+        kw = dict(self.solver_kw)
+        if theta0 != 0:
+            b = kw["basis"]
+            kw.update(basis=(b[0], 2 * b[1], b[2]), parity="all")
+        if not hasattr(self, "_geoms"):
+            self._geoms = {}
+        if theta0 not in self._geoms:
+            self._geoms[theta0] = Geometry(self.geo.shifted(theta0), nth=1024)
+        Sv = S.Solver(ky, geom=self._geoms[theta0], **kw)
+        if timeout is not None:
+            Sv.deadline = time.time() + timeout
         first = []
         if omega0 is not None:
             first.append(complex(omega0) / cs)
@@ -345,6 +360,7 @@ class Deck:
         best["solver"] = Sv
         best["ky_ref"] = ky_ref
         best["ky_solver"] = ky
+        best["theta0"] = float(theta0)
         best["omega_ref"] = best["omega_gene"] * cs
         best["gamma_ref"] = best["gamma"] * cs
         return best

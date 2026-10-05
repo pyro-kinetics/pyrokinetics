@@ -70,3 +70,61 @@ twisting parity); QN, PB, TCH projected on the same functions with weight J dthe
 Entries are energy integrals: trapped electrons with the plasma dispersion function (Z-function moments, Landau
 continuation, Zocco App. B), ions by exact exponential integration along the orbits on a generalised Gauss-Laguerre
 energy grid (Im omega > 0 only). ~10 s per root.
+
+## Quasilinear fluxes (`quasilinear.py`)
+
+**Definitions (GENE's nrg).** For one linear mode (k_x = 0 turn, k_y > 0; GENE adds the -k_y
+mirror, factor 2), species s, with h_s the non-adiabatic part and the gyroaveraged potential
+chi_s = J0 phi - v_par J0 A_par + (T_s/q_s) mu I1 dB_par (v_par in c_s units, mu = v_perp^2/(v_Ts^2 B)):
+
+    Gamma_s = -2 n_s < Re[ conj(int d3v h_s ...) i k_y (field) ] >,   Q_s = the same with T_s E,  E = v^2/v_Ts^2
+    phi channel   (Gamma_es, Q_es):  -2 n_s     < Re[ conj(int d3v J0 E^k h_s) i k_y phi ] > T_s^k
+    A_par channel (in Gamma_em, Q_em): +2 n_s   < Re[ conj(int d3v v_par J0 E^k h_s) i k_y A_par ] > T_s^k
+    dB_par channel (in Gamma_em, Q_em): -2 n_s (T_s/q_s) < Re[ conj(int d3v mu I1 E^k h_s) i k_y dB_par ] > T_s^k
+
+k = 0 particles, k = 1 heat; <f> = int f J dtheta / int J dtheta over the central turn. GENE
+(diag.F90 exec_diag_nrg) takes these moments of its gyrocentre f1 = h - (q/T) F0 chi plus the FLR
+corrections of flr_corr_ff.F90 (get_mom00_phi = -(q/T)(1 - Gamma0) n, get_mom00_bpar =
+Delta01 n/B, get_momI00_phi = (q/T) Delta01 n, get_momI00_bpar = 2 Delta01 n/B, ...). These
+corrections turn the f1 moments into the h moments above, plus real multiples of the same
+field (-(q/T) n phi in the density, ...). Such multiples carry no flux, so GENE's phi/em split is
+the h-based split above. GENE's em column is A_par + dB_par. The solver reports the two separately.
+
+**Moments from the model.**
+* Ions: h_i is integrated along every orbit (`ion_stream.StreamingIons.flux_moments`, the same
+  quadrature as the dispersion relation). The two directions sigma = +-1 are kept separately for
+  the v_par moment.
+* Electrons, even part: h_e = -F0 (1 - omega_*e^T/omega) psi (all electrons) plus the trapped
+  response, which is bounce-averaged (energy quadrature with collisions, Z-function moments
+  without). Its moments are the theta <- lambda maps of the matrix (G0, Gl, Gd) applied to the
+  energy moments K_j of the eigenmode's trapped source, one order higher in E for the heat flux.
+  Maxwellian moments: <E^k> = Gamma(k + 3/2)/Gamma(3/2), <(v_perp/v_T)^2 E^k> = (2/3) <E^(k+1)>,
+  <lambda B> = 2/3 at fixed E.
+* Electrons, parallel moments (A_par channel): the bounce-averaged model has no odd part. The
+  moments of the drift-kinetic equation (omega - omega_d) h + i v_par d_l h = (q F0/T)(omega -
+  omega_*^T) chi give, with Gamma_k = int d3v v_par E^k h_e,
+
+        i B d_l(Gamma_k/B) = R_k = -S_k phi + T_k dB_par/B - omega int E^k h_e + int E^k omega_de h_e,
+        S_k = (omega - a_e) <E^k> - b_e <E^(k+1)>,   T_k = (omega - a_e) N_k - b_e N_(k+1),
+
+  (omega_*e^T = a_e + b_e E). This is integrated along theta with the integration constant set
+  by Gamma(-pi)/B(-pi) = -Gamma(pi)/B(pi), which is Gamma(0) = 0 for a twisting-parity mode.
+  Summed over species with charges, the k = 0 equation is the vorticity (TCH) equation the
+  solver imposes. Since that equation holds only projected on the basis, the A_par particle
+  fluxes of ions and electrons agree only approximately (1-50 % of this small channel on STEP,
+  growing with k_y). The phi and dB_par particle fluxes are ambipolar to round-off: QN and PB are
+  imposed on test functions that span phi and dB_par.
+* A_par = -(i/omega) d_l psi, dl = J B dtheta.
+
+**Saturation (mixing length).** <|phi|^2>(k_y) = C (gamma/<k_perp^2>)^2, with <k_perp^2> = int
+k_y^2 g^yy |phi|^2 J / int |phi|^2 J (solver units: rho_s, c_s/L_ref). The fluxes are the trapezoid
+integral over k_y rho_s of weight x <|phi|^2>. One constant C is fitted to nonlinear fluxes (see the
+analysis note QL_FLUX.md); modes without a growing root contribute nothing.
+
+**theta0 != 0.** A mode with k_x = shat k_y theta0 sees k_y K_y -> k_y (K_y + kappa K_x) and
+k_y^2 g^yy -> k_y^2 (g^yy + 2 kappa g^xy + kappa^2 g^xx), with kappa = k_x/k_y = -theta0 d(g^xy/g^xx)/dtheta
+(mean secular slope over the turn, = C_y q0 shat/r0), and GENE's K_x = -(ga2/ga1) dBdz/C_xy. This puts
+the k_perp minimum near theta0. Because of STEP's reversed local shear at the outboard midplane,
+the minimum sits on the other side of theta = 0 for small theta0. The twisting parity is lost,
+so the basis gets the odd Hermite functions too (16 per field). gamma(theta0) = gamma(-theta0)
+holds to 1e-3 for up-down symmetric geometry. theta0 != 0 has not been compared with GENE.

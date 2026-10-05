@@ -120,6 +120,75 @@ The equations are written out in `PHYSICS.md` (this folder). Against GENE for ST
 every GENE delta B_par channel test and the trend of ten geometry/beta design levers; its
 high-k_y cut-off comes ~0.1-0.2 late in k_y.
 
+## Using it as a flux model
+
+`quasilinear.py` turns the eigenmode into quasilinear fluxes. Formulas are in `PHYSICS.md`
+("Quasilinear fluxes").
+
+**Raw linear output for a transport code's own saturation rule** (one process, no MPI; set
+`OMP_NUM_THREADS=1`):
+
+```python
+from pyrokinetics.hkbm_solver.quasilinear import run_linear
+modes = run_linear(pyro, n=[10, 20, 40, 70], theta0=[0.0, 0.2], rho_star=rho_ref_over_L_ref,
+                   timeout=60)
+# or run_linear("run_dir/parameters", ky=[0.1, 0.2, 0.3])   (k_y rho_ref, deck units)
+for m in modes:
+    m["gamma"], m["omega"], m["converged"], m["hkbm_like"], m["checks"]
+    m["theta"], m["phi"], m["apar"], m["bpar"], m["kperp2"], m["jacobian"], m["bmag"]
+    m["weights"]["Q_i"]["total"], m["weights"]["shares"], m["kperp2_avg"]
+```
+
+* `source`: a pyrokinetics `Pyro` object (any code; pyrokinetics writes a GENE deck), a GENE
+  `parameters` file, or its directory. The solver has no flow, flow shear or Z_eff: those are set
+  to zero or ignored, with a warning. Check `pyro.local_geometry.beta_prime`: a Pyro read from a
+  GENE deck with `dpdx_pm = -1` and no reference B0 has beta_prime = 0, and the hKBM depends
+  strongly on beta'. `run_linear` warns when the deck it writes has beta' = 0.
+* k_y: `ky` in 1/rho_ref, or toroidal mode numbers `n` with k_y rho_ref = n rho_star/|C_y| (GENE's
+  convention). rho_star = rho_ref/L_ref comes from `rho_star=`, the Pyro's reference values, or
+  the deck's `rhostar`.
+* `theta0`: ballooning angle (k_x = shat k_y theta0). theta0 != 0 drops the parity of the basis
+  (16 functions per field), which roughly doubles the cost. It is checked for gamma(theta0) =
+  gamma(-theta0) but has not been compared with GENE. At large theta0 (>~ 0.8 on STEP) the
+  search often finds no root, or fails and reports an error for that mode.
+* Units: the deck's GENE normalisation. gamma and omega are in c_ref/L_ref with GENE's sign
+  (omega > 0 is the ion diamagnetic direction). The fields are normalised to max |phi| = 1;
+  kperp2 is in 1/rho_ref^2. `weights` are fluxes per <|phi|^2> in GENE's nrg definitions:
+  Q_s in n_ref T_ref c_ref rho_ref^2/L_ref^2, the Jacobian-weighted average over the central
+  turn, and the factor 2 for +-k_y. Each weight is split into phi (= es), apar and bpar, with em
+  = apar + bpar. `shares` are Q_i, Q_e and Gamma divided by Q_i + Q_e. `weights_solver` is the
+  same in the solver's units (T_e, n_e, m_i, rho_s).
+* Flags: `converged` means a growing root was found. `hkbm_like` means all `checks` passed:
+  converged, growing, ion direction, ballooning (at least half of |phi|^2 within |theta| <
+  pi/2), not Alfvenic (|omega| < 0.8 c_s/L_ref), and k_y rho_s within `HKBM_KY_RANGE` (0.05-0.6,
+  the range compared with GENE on STEP). Drop or replace modes that fail. The solver has only
+  this one branch. Where another instability dominates (ITG/TEM at low beta, MTM, ETG, the
+  electron-direction modes of GENE at high beta), it returns no root, a weak hKBM-like root, or
+  occasionally an Alfvenic or electron-direction root. It never returns the other mode.
+* Cost: about 3-5 s per root at theta0 = 0 on one core (8 Hermite functions per field; about
+  3 secant iterations at 0.5 s per matrix evaluation, plus 0.3 s for the weights), 8-20 s at
+  theta0 != 0, and about 5 s once to import pyrokinetics. Each call is seeded from the previous
+  root: in k_y outward from k_y rho_s ~ 0.2, and in theta0 from the previous theta0. When no seed
+  converges, a coarse search of the complex plane adds about 10 s. `timeout` caps one root.
+
+**The solver's own saturation rule** (a comparison line):
+
+```python
+from pyrokinetics.hkbm_solver.quasilinear import fluxes
+r = fluxes(pyro_or_parameters, ky=None, parallel=1, timeout=60)
+r["Q_i"], r["Q_e"], r["Gamma"], r["Q_i_es"], r["Q_i_em"], r["gamma"], r["converged"]
+```
+
+`fluxes` uses the mixing-length rule <|phi|^2>(k_y) = C (gamma/<k_perp^2>)^2, integrated over
+k_y rho_s (trapezoid; default grid 0.05-0.6), with one constant `C_ML` fitted to the stella STEP
+nonlinear (q, beta_e) scan. Q is in GENE gyro-Bohm units of the deck. The fit quality and its
+limits are in the analysis note (QL_FLUX.md). The rule has no zonal-flow physics, so it cannot
+reproduce the nonlinear cliff (the jump of the flux by orders of magnitude at q^2 beta_e above a
+threshold). Use it for trends and orders of magnitude, not for absolute fluxes near the
+threshold. `parallel=N` splits the k_y list into N chains in N worker processes. Command line:
+`hkbm-solve run_dir/ --fluxes [--ky 0.1 0.2 ...] [--nproc N]` prints the table and writes
+`ql_fluxes.json`.
+
 ## Units of the output
 
 Everything written is in the deck's own GENE normalisation: k_y in 1/rho_ref, gamma and omega in
@@ -130,7 +199,7 @@ is negligible beyond it). `field` holds a short synthetic time series of the eig
 F(z) exp(-i omega_c t) with omega_c = -omega + i gamma (GENE's own convention for the stored
 fields: the raw GENE field grows as exp[(gamma + i omega) t]), so readers that measure gamma and
 omega from the field history (pyrokinetics does) recover the eigenvalue. `nrg` holds zero
-fluxes (the solver computes none). `omega` has GENE's 4-decimal format; use `hkbm.json` for full
+fluxes (quasilinear fluxes: `hkbm-solve --fluxes` or `quasilinear.py`, above). `omega` has GENE's 4-decimal format; use `hkbm.json` for full
 precision.
 
 ## Limitations

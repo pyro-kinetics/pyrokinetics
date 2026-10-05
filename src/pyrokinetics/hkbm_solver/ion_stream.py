@@ -246,7 +246,7 @@ class StreamingIons:
                         q = W[None] * wfun[None] * gbar  # (nb_src, nE, nlam, ncell)
                         for tf in ("phi", "bpar", "psi"):
                             tb = np.conj(o["basis"][tf])  # (nb_t, nlam, ncell)
-                            val = np.einsum("tlc,selc->ts", tb, q)
+                            val = np.tensordot(tb, q.sum(axis=1), axes=([1, 2], [1, 2]))
                             key = (mom, tf, f)
                             out[key] = out.get(key, 0) + val
                     # local source moment L = (1/T_i) int F0 (omega - omega_*) J0 chi  (both sigma: factor 2);
@@ -257,7 +257,7 @@ class StreamingIons:
                     q = 2 * W[None] * J0[None] * Ssrc * (0 if f == "psi" else 1)
                     for tf in ("phi", "bpar", "psi"):
                         tb = np.conj(o["basis"][tf])
-                        val = np.einsum("tlc,selc->ts", tb, q)
+                        val = np.tensordot(tb, q.sum(axis=1), axes=([1, 2], [1, 2]))
                         key = ("L", tf, f)
                         out[key] = out.get(key, 0) + val
             if split:
