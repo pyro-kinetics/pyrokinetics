@@ -749,7 +749,9 @@ class PyroScan:
 
         json_data = dict(self.pyroscan_json)
 
-        unsaved = [k for k, (f, _) in self.parameter_func.items() if not isinstance(f, str)]
+        unsaved = [
+            k for k, (f, _) in self.parameter_func.items() if not isinstance(f, str)
+        ]
         if unsaved:
             warnings.warn(
                 f"parameter_func for {unsaved} are functions and are not saved to "
@@ -952,7 +954,9 @@ class PyroScan:
 
         self.parameter_func[parameter_key] = (parameter_func, parameter_kwargs)
         named = {
-            k: [f, kw or {}] for k, (f, kw) in self.parameter_func.items() if isinstance(f, str)
+            k: [f, kw or {}]
+            for k, (f, kw) in self.parameter_func.items()
+            if isinstance(f, str)
         }
         if named:
             self.pyroscan_json["parameter_func"] = named
