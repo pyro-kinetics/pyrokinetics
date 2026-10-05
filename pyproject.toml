@@ -77,6 +77,7 @@ Documentation = "https://pyrokinetics.readthedocs.io/en/latest/"
 
 [project.scripts]
 pyro = "pyrokinetics.cli:entrypoint"
+hkbm-solve = "pyrokinetics.hkbm_solver.cli:main"
 
 [build-system]
 requires = [
@@ -108,7 +109,7 @@ where = ["src"]
 exclude = ["pyrokinetics.templates.outputs*"]
 
 [tool.setuptools.package-data]
-pyrokinetics = ["templates/**"]
+pyrokinetics = ["templates/**", "hkbm_solver/*.md"]
 
 [tool.setuptools.exclude-package-data]
 pyrokinetics = ["templates/outputs", "templates/outputs/**"]

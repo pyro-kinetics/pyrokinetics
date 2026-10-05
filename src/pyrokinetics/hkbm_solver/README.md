@@ -1,0 +1,155 @@
+# hkbm_solver: a fast hKBM eigenvalue solver that looks like GENE
+
+`pyrokinetics.hkbm_solver` solves the local, linear, electromagnetic eigenproblem of the hybrid
+kinetic ballooning mode (hKBM) of STEP-like plasmas in seconds per k_y. It reads a **GENE
+`parameters` file** and writes **GENE's output files** (`parameters`, `omega`, `field`, `nrg`,
+`miller`) in GENE's format, names and normalisation, so pyrokinetics' existing GENE reader loads
+the result unchanged:
+
+```bash
+hkbm-solve run_dir/                  # reads run_dir/parameters, writes run_dir/*.dat
+```
+
+```python
+from pyrokinetics import Pyro
+pyro = Pyro(gk_file="run_dir/parameters")
+pyro.load_gk_output()
+pyro.gk_output["growth_rate"], pyro.gk_output["mode_frequency"], pyro.gk_output["eigenfunctions"]
+```
+
+## Install
+
+From a checkout of this branch:
+
+```bash
+pip install -e .            # registers the hkbm-solve command
+hkbm-solve --selftest       # internal checks (about a minute)
+pytest tests/hkbm_solver    # geometry against GENE, STEP regression, pyrokinetics round trip (a few minutes)
+```
+
+`python -m pyrokinetics.hkbm_solver run_dir/` works without the console script.
+
+## Usage
+
+```bash
+hkbm-solve run_dir/                       # or run_dir/parameters
+hkbm-solve run_dir/ -o out_dir/           # write elsewhere
+hkbm-solve run_dir/ --omega0 0.1+0.08j    # seed (GENE sign: omega + i gamma, deck units)
+hkbm-solve run_dir/ --scan                # always add a coarse search of the complex-omega plane
+```
+
+```python
+from pyrokinetics.hkbm_solver import run
+res = run("run_dir/parameters")           # list of dicts: ky, gamma, omega, converged, ...
+```
+
+Round trip from another code (what pyrokinetics users will normally do):
+
+```python
+from pyrokinetics import Pyro
+pyro = Pyro(gk_file="input.gs2")          # or input.cgyro, ...
+pyro.convert_gk_code("GENE")
+pyro.write_gk_file("run_dir/parameters", gk_code="GENE")
+
+from pyrokinetics.hkbm_solver import run
+run("run_dir/parameters")
+
+pyro = Pyro(gk_file="run_dir/parameters")
+pyro.load_gk_output()                     # growth rate, frequency, eigenfunctions in pyro units
+```
+
+Output names follow GENE: a single k_y gives `parameters.dat`, `omega.dat`, `field.dat`,
+`nrg.dat`, `miller.dat` (what `Pyro(gk_file=run_dir/parameters)` looks for); several k_y
+(`nky0 > 1`, or GENE's scan syntax `kymin = 0.1 !scanlist: 0.1, 0.2, 0.3`) give one GENE-like run
+per k_y with suffixes `_0001`, `_0002`, ... and a `scan.log`; load them one at a time with
+`Pyro(gk_file="run_dir/parameters_0001")`. `hkbm.json` (`hkbm_0001.json`, ...) holds the
+full-precision eigenvalue, convergence information and the unit factors.
+
+## What is read from the deck
+
+| namelist | used |
+|---|---|
+| `&box` | `kymin`, `nky0` (or a `!scan`/`!scanlist` on `kymin`), `nz0` (grid of the output fields only), `kx_center` (must be 0) |
+| `&general` | `beta`, `bpar`, `coll`, `collision_op`, `nonlinear` (must be false), `hyp_*` (ignored, warned) |
+| `&geometry` | `magn_geometry = 'miller'`, `q0`, `shat`, `trpeps` (or `rho`), `major_R`, `minor_r`, `kappa`, `s_kappa`, `delta`, `s_delta`, `zeta`, `s_zeta`, `drR`, `drZ`, `major_Z`, `amhd`, `dpdx_pm`, `dpdx_term`, `sign_Ip_CW`, `sign_Bt_CW` |
+| `&species` | `name`, `charge`, `mass`, `temp`, `dens`, `omn`, `omt`; the hKBM GENE switches `bpar_vlasov`, `bpar_field`, `bpar_source` (`'full'`/`'none'`) |
+| `&units`, `&external_contr` | echoed; flow (`ExBrate`, `pfsrate`, `Omega0_tor`) must be zero |
+
+`amhd`/`dpdx_pm` are resolved as GENE does (`-1`: from beta and the gradients; `-2`/default: from
+`amhd`; `dpdx_term = 'curv_eq_gradB'`: no pressure term). `dpdx_term = 'gradB_eq_curv'` removes
+beta' from the grad-B drift of both species.
+
+Anything the solver cannot represent stops with `UnsupportedDeck` (exit code 2 from the CLI):
+nonlinear runs, flow or flow shear, k_x != 0, other than one electron species (charge -1) and one
+ion species (charge +1), unequal densities or density gradients, beta = 0, non-Maxwellian or
+passive species, `no_trap`, `bpar_vlasov_terms`/`_pitch` other than `'all'`, geometries other than
+Miller.
+
+## Geometry
+
+`miller.py` is a line-by-line Python port of GENE's `miller_geometry.F90` (Miller et al., Phys.
+Plasmas 5, 973 (1998)) with GENE's grids, third-order Lagrange interpolation, finite differences
+and integrals, plus the `amhd`/`dpdx_pm` logic of `geometry.F90` and the curvature
+`K_y = (dBdx - ga3/ga1 dBdz)/C_xy` of `set_curvature`. It reproduces the `miller.dat` written by
+GENE to 1e-13 relative (tests: nominal STEP, kappa, delta, shat variations, reversed `sign_Ip_CW`
+and `sign_Bt_CW`, squareness, and a pyrokinetics GS2-to-GENE conversion). The solver uses it at
+nz0 = 512 whatever the deck's `nz0` (which only sets the grid of the written fields).
+
+## Physics model (brief)
+
+Units inside the solver: GENE's with T_ref = T_e, n_ref = n_e, m_ref = m_i (same B_ref, L_ref);
+`gene_io.Deck` converts any GENE normalisation to these and back. Time dependence exp(-i omega t).
+
+* **Ions**: gyrokinetic, integrated exactly along every orbit of the central ballooning turn
+  (parallel streaming and bounce motion, passing and trapped), exact Bessel FLR, magnetic drift
+  with beta' (`full_drift`), mu delta B_par in chi.
+* **Trapped electrons**: bounce-averaged (omega_be >> omega >> omega_de), precession with beta'
+  and the mu delta B_par term, pitch-angle scattering by the bounce-averaged Lorentz operator at
+  GENE's nu_ei.
+* **Passing electrons**: through psi (A_par = -(i/omega) d_l psi), no non-adiabatic part.
+* **Fields**: phi, psi (A_par) and delta B_par from quasineutrality, perpendicular pressure balance
+  and the vorticity (parallel current) equation; delta B_par is a field, not a closure.
+* **Eigenfunction**: free, 8 even Hermite-Gaussian functions per field in the ballooning angle
+  (twisting parity, width 0.35 rad); Galerkin projection, det D(omega) = 0 by secant iteration.
+* The GENE delta B_par channel switches (`bpar_vlasov`, `bpar_field`, `bpar_source` per species)
+  and `dpdx_term` are exact switches of the corresponding terms.
+
+The equations are written out in `PHYSICS.md` (this folder). Against GENE for STEP (k_y rho_s
+0.1-0.8, nominal collisionality) the main model gives omega within ~10 % and gamma within
+-25 % ... +15 % at k_y rho_s <= 0.4 (0.064 vs GENE 0.083 at 0.2, 0.097 vs 0.097 at 0.3), the sign of
+every GENE delta B_par channel test and the trend of ten geometry/beta design levers; its
+high-k_y cut-off comes ~0.1-0.2 late in k_y.
+
+## Units of the output
+
+Everything written is in the deck's own GENE normalisation: k_y in 1/rho_ref, gamma and omega in
+c_ref/L_ref, GENE's sign (omega > 0: ion diamagnetic direction), fields phi in
+(T_ref/e) rho_ref/L_ref, A_par in B_ref rho_ref^2/L_ref, B_par in B_ref rho_ref/L_ref on GENE's
+z grid (straight-field-line angle) with `nx0 = 1` (the central ballooning turn; the eigenfunction
+is negligible beyond it). `field` holds a short synthetic time series of the eigenmode,
+F(z) exp(-i omega_c t) with omega_c = -omega + i gamma (GENE's own convention for the stored
+fields: the raw GENE field grows as exp[(gamma + i omega) t]), so readers that measure gamma and
+omega from the field history (pyrokinetics does) recover the eigenvalue. `nrg` holds zero
+fluxes (the solver computes none). `omega` has GENE's 4-decimal format; use `hkbm.json` for full
+precision.
+
+## Limitations
+
+* Local (flux tube), linear, electromagnetic, k_x = 0 ballooning mode only.
+* Exactly two kinetic species: electrons and one singly charged ion species; no impurities,
+  no adiabatic species, no flow or flow shear.
+* Electrons are bounce-averaged (trapped) or adiabatic through psi (passing): valid for
+  omega << omega_be, i.e. core, ion-scale modes at low collisionality. Electron-scale modes, MTMs
+  and collisional (resistive) physics are out of scope.
+* Ions along their orbits have no Landau continuation: only growing modes (gamma > 0) are found;
+  "no root" means stable or not captured.
+* The collision model is the solver's own (Lorentz pitch-angle scattering of trapped electrons,
+  Krook detrapping of trapped ions) at GENE's nu_ei, whatever `collision_op` says.
+* Root finding is local: the default seeds are the STEP hKBM branch and drift-wave-like guesses,
+  with a coarse search of the complex plane when they fail (`--scan` always adds it; the most
+  unstable converged root is kept). The two-field model also has shear-Alfven-like roots at
+  |omega| ~ 1 c_s/a, mostly in the electron direction (on STEP: omega -0.84 and -2.13, gamma
+  ~0.03 at k_y rho_s 0.2), which GENE does not show; a search can land on them. For a new regime
+  give `--omega0` (for instance from one GENE run) and check `hkbm.json`.
+* Validated against GENE only for the STEP hKBM (STEP-EC-HD, Psi_n = 0.49; k_y rho_s 0.05-0.8,
+  the GENE delta B_par channel tests and ten geometry/beta levers).
