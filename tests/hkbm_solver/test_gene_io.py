@@ -227,3 +227,29 @@ def test_impurity_deck_stops(tmp_path):
     with pytest.raises(UnsupportedDeck, match="species"):
         Deck(d / "parameters")
     shutil.rmtree(d)
+
+
+def test_mxh_deck_runs_and_loads(tmp_path):
+    """A miller_mxh deck (MAST #48657 S60, geometry-only GENE deck: no collisions): the solver
+    runs on GENE's MXH geometry, writes miller_mxh.dat equal to GENE's own, and pyrokinetics
+    loads the output with its MXH local geometry."""
+    from pyrokinetics.hkbm_solver.miller import COLUMNS, read_miller_dat
+
+    d = _deck(tmp_path, "MXH_MAST_S60_nom")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        (r,) = run(d / "parameters", omega0=0.006 + 0.122j)
+        pyro = Pyro(gk_file=d / "parameters")
+        pyro.load_gk_output()
+    assert r["converged"]
+    assert r["omega"] == pytest.approx(0.0245097906, abs=1e-8)
+    assert r["gamma"] == pytest.approx(0.3303714046, abs=1e-8)
+    assert type(pyro.local_geometry).__name__ == "LocalGeometryMXH"
+    gr = float(_m(pyro.gk_output["growth_rate"].isel(time=-1))[0])
+    assert gr == pytest.approx(r["gamma"], rel=1e-5)
+    h0, ref = read_miller_dat(DATA / "MXH_MAST_S60_nom" / "miller_mxh.dat")
+    h1, out = read_miller_dat(d / "miller_mxh.dat")
+    assert h1["magn_geometry"] == "miller_mxh"
+    for c in COLUMNS:
+        sc = np.abs(ref[c]).max() or 1.0
+        assert np.abs(out[c] - ref[c]).max() / sc < 1e-10, c

@@ -5,7 +5,7 @@ local linear eigenproblem at each k_y, and write GENE's output files so that GEN
 
 Input (Fortran namelist, read with f90nml): &box kymin, nky0, nz0 (resolution of the output
 grid only), kx_center; &general beta, bpar, coll, collision_op, nonlinear, ExBrate/pfsrate;
-&geometry (magn_geometry = 'miller' and its parameters, amhd, dpdx_pm, dpdx_term, sign_Ip_CW,
+&geometry (magn_geometry = 'miller' or 'miller_mxh' and its parameters, amhd, dpdx_pm, dpdx_term, sign_Ip_CW,
 sign_Bt_CW); &species (name, charge, mass, temp, dens, omn, omt, and the delta B_par switches
 bpar_vlasov, bpar_field, bpar_source of the hKBM GENE branch); &units (optional, echoed).
 
@@ -17,7 +17,7 @@ GENE-like run per k_y as a GENE scan writes them, plus ``scan.log``):
   field       GENE's binary field file (phi, A_par, B_par on GENE's z grid) holding a short time
               series of the eigenmode growing at gamma (a linear GENE run's late-time behaviour)
   nrg         zero fluxes at the same times (the solver computes no fluxes)
-  miller      GENE's miller.dat of the geometry used
+  miller      GENE's miller.dat (miller_mxh.dat for MXH decks) of the geometry used
   hkbm        JSON with the full-precision eigenvalue, convergence data and the unit factors
 
 Units: everything in and out is in the deck's own GENE normalisation (T_ref, n_ref, m_ref,
@@ -187,9 +187,11 @@ class Deck:
             )
         if (
             str(gen.get("magn_geometry", geo.get("magn_geometry", ""))).strip().lower()
-            != "miller"
+            not in ("miller", "miller_mxh")
         ):
-            raise UnsupportedDeck("only magn_geometry = 'miller' is supported")
+            raise UnsupportedDeck(
+                "only magn_geometry = 'miller' or 'miller_mxh' is supported"
+            )
         # units: solver reference T_e, n_e, m_i (B_ref, L_ref unchanged)
         Te, me, mi = float(e["temp"]), float(e["mass"]), float(i["mass"])
         Ti = float(i["temp"])
@@ -500,7 +502,7 @@ def write_parameters(path, deck, ky, nsteps, dt):
     g += [("init_cond", "alm"), ("hyp_z", float(gen.get("hyp_z", 0.0) or 0.0))]
     out.append(_group("general", g))
     ge = [
-        ("magn_geometry", "miller"),
+        ("magn_geometry", str(m.get("magn_geometry", "miller"))),
         ("q0", abs(float(geo["q0"]))),
         ("shat", float(geo["shat"])),
         ("amhd", float(m["amhd"])),
@@ -530,6 +532,16 @@ def write_parameters(path, deck, ky, nsteps, dt):
         ):
             name = {"drr": "drR", "drz": "drZ", "major_z": "major_Z"}.get(k, k)
             ge.append((name, float(geo.get(k, 1.0 if k == "kappa" else 0.0))))
+    if m.get("magn_geometry") == "miller_mxh":
+        # the moments GENE used (after its delta/zeta overrides), trimmed of trailing zeros
+        nmom = max(
+            int(np.max(np.nonzero(np.abs(m[k]) > 0)[0], initial=0)) + 1
+            for k in ("cN_m", "sN_m", "cNdr_m", "sNdr_m")
+        )
+        ge += [
+            (k, [float(x) for x in m[k][:nmom]])
+            for k in ("cN_m", "sN_m", "cNdr_m", "sNdr_m")
+        ]
     ge += [
         ("rhostar", float(geo.get("rhostar", -1.0))),
         ("dpdx_term", str(geo.get("dpdx_term", "full_drift"))),
@@ -613,7 +625,9 @@ def write_run(outdir, suffix, deck, res, nt=11):
     with open(outdir / ("omega" + suffix), "w") as f:
         f.write("%7.3f%11.4f%11.4f\n" % (ky, gam, om))
     write_parameters(outdir / ("parameters" + suffix), deck, ky, nsteps, dt)
-    write_miller_dat(deck.miller, outdir / ("miller" + suffix))
+    # GENE names the geometry file after magn_geometry (miller.dat, miller_mxh.dat)
+    gname = str(deck.miller.get("magn_geometry", "miller"))
+    write_miller_dat(deck.miller, outdir / (gname + suffix))
     info = dict(
         ky=ky,
         gamma=gam,

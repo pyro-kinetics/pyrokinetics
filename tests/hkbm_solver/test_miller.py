@@ -1,5 +1,7 @@
 """GENE's Miller geometry in Python against miller.dat files written by GENE itself (nominal
-STEP deck and three one-parameter variations of it, nz0 = 512)."""
+STEP deck and one-parameter variations of it, nz0 = 512), and GENE's miller_mxh geometry
+against miller_mxh.dat (MAST #48657 surfaces S50, S60, S80 of the MAST-U linear (q, beta)
+scans: nominal decks, one off-nominal member and one at nz0 = 70)."""
 
 from pathlib import Path
 
@@ -29,12 +31,22 @@ DECKS = [
     "STEP_zeta0.1",
     "GS2tmpl",
 ]
+# geometry-only GENE runs (binary 883765d2) of the MAST dense linear (q, beta) scan members
+MXH_DECKS = [
+    "MXH_MAST_S50_nom",
+    "MXH_MAST_S60_nom",
+    "MXH_MAST_S80_nom",
+    "MXH_MAST_S60_q1.25_b1.5",
+    "MXH_MAST_S60_nom_nz70",
+]
 
 
-@pytest.mark.parametrize("deck", DECKS)
+@pytest.mark.parametrize("deck", DECKS + MXH_DECKS)
 def test_miller_matches_gene(deck):
     nml = f90nml.read(DATA / deck / "parameters")
-    h, ref = read_miller_dat(DATA / deck / "miller.dat")
+    mg = str(nml["geometry"]["magn_geometry"]).strip().lower()
+    h, ref = read_miller_dat(DATA / deck / f"{mg}.dat")
+    assert h["magn_geometry"] == mg
     g = miller_from_namelist(nml, nz0=int(h["gridpoints"]))
     lref = h["Lref"] if h["Lref"] > 0 else 1.0
     for c in COLUMNS:
@@ -51,12 +63,13 @@ def test_miller_matches_gene(deck):
     assert g["x0"] ** 2 == pytest.approx(h["s0"], rel=1e-12)
 
 
-@pytest.mark.parametrize("deck", DECKS[:1])
+@pytest.mark.parametrize("deck", DECKS[:1] + MXH_DECKS[1:2])
 def test_curvature_and_roundtrip(deck, tmp_path):
     nml = f90nml.read(DATA / deck / "parameters")
+    mg = str(nml["geometry"]["magn_geometry"]).strip().lower()
     g = miller_from_namelist(nml, nz0=512)
     write_miller_dat(g, tmp_path / "miller.dat")
-    a = Geo.from_file(DATA / deck / "miller.dat")
+    a = Geo.from_file(DATA / deck / f"{mg}.dat")
     b = Geo.from_file(tmp_path / "miller.dat")
     c = Geo.from_miller(g)
     for x in (b, c):
@@ -82,3 +95,19 @@ def test_lag3interp_cubic_exact():
     yo = 1 - 2 * xo + 0.5 * xo**2 - 0.3 * xo**3
     assert np.allclose(lag3interp(y, x, xo), yo, atol=1e-12)
     assert np.allclose(lag3interp(y[::-1], x[::-1], xo), yo, atol=1e-12)
+
+
+def test_mxh_overrides():
+    """GENE's miller_mxh overrides: nonzero delta/zeta/s_delta/s_zeta replace sN_m(1), sN_m(2),
+    sNdr_m(1), sNdr_m(2); zero values leave the moments alone."""
+    nml = f90nml.read(DATA / "MXH_MAST_S60_nom" / "parameters")
+    geo = nml["geometry"]
+    g = miller_from_namelist(nml, nz0=64)
+    assert g["sN_m"][1] == pytest.approx(np.arcsin(geo["delta"]), rel=1e-14)
+    assert g["sN_m"][2] == -geo["zeta"]
+    assert g["sNdr_m"][1] == geo["s_delta"] and g["sNdr_m"][2] == -geo["s_zeta"]
+    for k in ("delta", "zeta", "s_delta", "s_zeta"):
+        geo[k] = 0.0
+    geo["sn_m"] = [0.0, 0.1, 0.02]
+    g = miller_from_namelist(nml, nz0=64)
+    assert list(g["sN_m"][:3]) == [0.0, 0.1, 0.02] and not np.any(g["sN_m"][3:])

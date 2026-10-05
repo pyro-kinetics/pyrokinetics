@@ -1,0 +1,129 @@
+&parallelization
+    n_procs_s = 1
+    n_procs_sim = 1
+    n_procs_v = 1
+    n_procs_w = 1
+    n_procs_x = 1
+    n_procs_y = 1
+    n_procs_z = 1
+/
+
+&box
+    kymin = 0.30679468
+    nexc = -1
+    adapt_lx = .true.
+    adapt_ly = .false.
+    nky0 = 1
+    nv0 = 8
+    nw0 = 4
+    nx0 = 3
+    nz0 = 512
+    kx_center = 0.0
+    lv = 3.0
+    lw = 9.0
+    mu_grid_type = 'eq_vperp'
+    n_spec = 2
+/
+
+&in_out
+diagdir = './out'
+    istep_energy = 0
+    istep_field = 0
+    istep_mom = 0
+    istep_nrg = 1
+    istep_schpt = 0
+    istep_vsp = 0
+    write_checkpoint = .false.
+    read_checkpoint = .false.
+/
+
+&general
+    nonlinear = .false.
+    arakawa_zv = .false.
+    simtimelim = 3000
+    init_cond = 'alm'
+    collision_op = 'none'
+    beta = 0.05796040616
+    bpar = .true.
+    calc_dt = .false.
+    coll = 0.0015859868873380415
+    comp_type = 'IV'
+    debye2 = 0
+    dt_max = 1.0e-4
+    hyp_v = 0.0
+    hyp_z = -1
+    ntimesteps = 1
+    timelim = 3000
+/
+
+&geometry
+    rhostar = -1
+    amhd = 2.652321657
+    cn_m = 0.0026821776229011265, -1.731291676734249e-05, -0.0003150840041875064,
+           0.0003253978041170606, 0.0005166693823888117, 0.00013058328560352673,
+           0.00030634457050187296, -0.00019242477892100852
+    cndr_m = 0.0027037706856540573, 0.0014427198581135339, -0.002589673038125957,
+             0.00012186826684255748, 0.0008364128650501096, 0.001802378657515608,
+             0.001359975351619398, 0.00020516355659394044
+    delta = 0.13088140053939956
+    dpdx_pm = 0.406926527
+    dpdx_term = 'full_drift'
+    drr = -0.29297646191144017
+    drz = 0.002115246205156537
+    kappa = 1.7370950202136057
+    magn_geometry = 'miller_mxh'
+    major_r = 1.7275946378066052
+    major_z = 0.002136252805162152
+    minor_r = 1.0
+    q0 = -1.942379881
+    s_delta = 0.1417191120535877
+    s_kappa = 0.08792187593812209
+    s_zeta = -0.004848767671842285
+    shat = 1.1775465409571142
+    sign_bt_cw = 1
+    sign_ip_cw = -1
+    sn_m = 0.0, 0.13125797575501807, 0.014023309624638713, 0.012294282591075652,
+           0.010784168370214125, 0.006418929308587132, 0.0029668724596252833,
+           0.001537314663122891
+    sndr_m = 0.0, 0.1417191120535877, 0.004848767671842285, 0.005569462196220791,
+             0.02487103625793925, 0.018175052317583165, 0.020444380239078967,
+             0.014734793192369902
+    trpeps = 0.35626710680389645
+    zeta = -0.014023309624638713
+/
+
+&species
+    charge = -1.0
+    dens = 1.0
+    mass = 0.0002724437107605002
+    name = 'electron'
+    omn = 0.6843838895574711
+    omt = 1.3675521492400797
+    temp = 1.0
+/
+
+&species
+    charge = 1.0
+    dens = 1.0
+    mass = 1.0
+    name = 'ion1'
+    omn = 0.6843838895574711
+    omt = 1.6600612654206248
+    temp = 1.3373469525925554
+/
+
+&units
+    bref = 0.5102586616448499
+    lref = 0.5438234801426093
+    mref = 1.9990075012922859
+    nref = 4.926994525168908
+    omegatorref = 90653.67366817352
+    tref = 0.760641222987323
+/
+
+&external_contr
+    exbrate = 0.0
+    omega0_tor = 0.0
+    pfsrate = 0.0
+/
+

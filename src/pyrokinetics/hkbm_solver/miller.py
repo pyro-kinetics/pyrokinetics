@@ -1,8 +1,8 @@
 """
 GENE's local Miller field-line geometry in Python.
 
-A line-by-line port of GENE's ``miller_geometry.F90`` (subroutine ``get_miller``, case
-``magn_geometry = 'miller'``; Miller et al., Phys. Plasmas 5, 973 (1998); Candy, PPCF 51,
+A line-by-line port of GENE's ``miller_geometry.F90`` (subroutine ``get_miller``, cases
+``magn_geometry = 'miller'`` and ``'miller_mxh'``; Miller et al., Phys. Plasmas 5, 973 (1998); Candy, PPCF 51,
 105009 (2009)), together with the parts of ``geometry.F90`` that decide the pressure term
 (``amhd``, ``dpdx_pm``) and the curvature coefficient written by ``set_curvature``.  It
 returns the same arrays GENE writes to ``miller.dat`` (16 columns on GENE's z grid) and can
@@ -17,9 +17,10 @@ round-off (see ``tests/hkbm_solver/test_miller.py``).
 Normalisation (GENE): lengths in L_ref, B in B_ref (B0 = 1 at R = major_R), z = chi in
 [-pi, pi), x = r (dx/dr = 1), C_y = dPsi/dr sign(Ip), C_xy = |B0 dPsi/dr / C_y| = 1.
 
-Only the up-down symmetric Miller parametrisation with elongation, triangularity and
-squareness (kappa, delta, zeta and their shears, drR, drZ) is implemented; n_pol = 1 and
-edge_opt = 0 (GENE's defaults).
+Two of GENE's parametrisations are implemented: 'miller' (elongation, triangularity and
+squareness, kappa, delta, zeta and their shears, drR, drZ; no tilt) and 'miller_mxh' (the
+Miller extended harmonic shape, kappa, s_kappa, drR, drZ and the moments cN_m, sN_m, cNdr_m,
+sNdr_m of theta_R); n_pol = 1 and edge_opt = 0 (GENE's defaults).
 """
 
 import numpy as np
@@ -163,10 +164,58 @@ def get_miller(
     sign_Bt_CW=1,
     nz0=512,
     n_pol=1,
+    magn_geometry="miller",
+    cN_m=None,
+    sN_m=None,
+    cNdr_m=None,
+    sNdr_m=None,
 ):
-    """Port of GENE's get_miller for magn_geometry = 'miller'.  Returns a dict with the 16
-    miller.dat columns on GENE's z grid (R and Z still in units of L_ref, phi = 0) and the
-    scalars q0 (signed), trpeps, rho (= x0), C_y, C_xy, drPsi."""
+    """Port of GENE's get_miller for magn_geometry = 'miller' and 'miller_mxh'.  Returns a dict
+    with the 16 miller.dat columns on GENE's z grid (R and Z still in units of L_ref, phi = 0)
+    and the scalars q0 (signed), trpeps, rho (= x0), C_y, C_xy, drPsi.
+
+    'miller_mxh' (Arbon et al., PPCF 63, 012001 (2021), as GENE implements it): R = R0 + rho
+    cos(theta_R), Z = Z0 + kappa rho sin(theta), theta_R = theta + sum_k [cN_m(k) cos(k theta) +
+    sN_m(k) sin(k theta)], with the radial derivatives cNdr_m, sNdr_m (r d/dr).  As in GENE,
+    a nonzero delta, s_delta, zeta or s_zeta overrides sN_m(1) = asin(delta), sNdr_m(1) =
+    s_delta, sN_m(2) = -zeta, sNdr_m(2) = -s_zeta, and there is no theta shift to B_max."""
+    mg = str(magn_geometry).strip().lower()
+    if mg not in ("miller", "miller_mxh"):
+        raise ValueError(f"magn_geometry = '{magn_geometry}' is not supported")
+    mxh = mg == "miller_mxh"
+    if mxh:
+        ind_m = 64  # GENE's IND_M
+
+        def _arr(a):
+            out = np.zeros(ind_m)
+            if a is not None:
+                a = np.atleast_1d(np.asarray(a, float))
+                out[: a.size] = a
+            return out
+
+        cN, sN, cNdr, sNdr = (_arr(a) for a in (cN_m, sN_m, cNdr_m, sNdr_m))
+        # GENE's overrides (miller_geometry.F90, case 'miller_mxh'), exact comparisons as there
+        if delta != np.sin(sN[1]) and delta != 0.0:
+            sN[1] = np.arcsin(delta)
+        if s_delta != sNdr[1] and s_delta != 0.0:
+            sNdr[1] = s_delta
+        if zeta != -sN[2] and zeta != 0.0:
+            sN[2] = -zeta
+        if s_zeta != -sNdr[2] and s_zeta != 0.0:
+            sNdr[2] = -s_zeta
+        kk = np.arange(ind_m, dtype=float)
+
+        def theta_R_of(th, deriv=False):
+            ck = np.cos(np.outer(th, kk))
+            sk = np.sin(np.outer(th, kk))
+            tR = th + ck @ cN + sk @ sN
+            tR_t = 1.0 + (-sk * kk) @ cN + (ck * kk) @ sN
+            if not deriv:
+                return tR, tR_t
+            tR_r = ck @ cNdr + sk @ sNdr
+            tR_tt = (-ck * kk**2) @ cN + (-sk * kk**2) @ sN
+            return tR, tR_t, tR_r, tR_tt
+
     sign_Ip_CW = int(np.sign(sign_Ip_CW)) or 1
     sign_Bt_CW = int(np.sign(sign_Bt_CW)) or 1
     pi = np.arccos(-1.0)
@@ -186,7 +235,21 @@ def get_miller(
     theta = _linspace(-pi * n_pol_ext, pi * n_pol_ext - 2 * pi * n_pol_ext / npt, npt)
     d_inv = np.arcsin(delta)
 
+    def surface_mxh(th):
+        tR, tR_t, tR_r, tR_tt = theta_R_of(th, deriv=True)
+        R = R0 + rho * np.cos(tR)
+        Z = Z0 + kappa * rho * np.sin(th)
+        R_rho = drR + np.cos(tR) - np.sin(tR) * tR_r
+        Z_rho = drZ + kappa * (s_kappa + 1) * np.sin(th)
+        R_th = -rho * np.sin(tR) * tR_t
+        Z_th = kappa * rho * np.cos(th)
+        R_thth = -rho * np.cos(tR) * tR_t**2 - rho * np.sin(tR) * tR_tt
+        Z_thth = -kappa * rho * np.sin(th)
+        return R, Z, R_rho, Z_rho, R_th, Z_th, R_thth, Z_thth
+
     def surface(th):
+        if mxh:
+            return surface_mxh(th)
         R = R0 + rho * np.cos(th + d_inv * np.sin(th))
         Z = Z0 + kappa * rho * np.sin(th + zeta * np.sin(2 * th))
         R_rho = (
@@ -244,7 +307,7 @@ def get_miller(
         Bphi = F / R
         B = np.sqrt(Bphi**2 + Bp**2)
         bMaxShift = False
-        if thetaShift == 0.0 and abs(drZ) > np.finfo(float).eps:
+        if thetaShift == 0.0 and not mxh and abs(drZ) > np.finfo(float).eps:
             for i in range(1, 500):
                 if B[i] > B[iBmax]:
                     iBmax = i
@@ -300,21 +363,28 @@ def get_miller(
         theta_s = lag3interp(theta, chi, chi_s)
     dtheta_dchi_s = _deriv_fd(theta_s, chi_s)
     thAdj_s = theta_s + thetaShift
-    R_s = R0 + rho * np.cos(thAdj_s + d_inv * np.sin(thAdj_s))
-    R_theta_s = -(
-        dtheta_dchi_s
-        * rho
-        * (1 + d_inv * np.cos(thAdj_s))
-        * np.sin(thAdj_s + d_inv * np.sin(thAdj_s))
-    )
-    Z_s = Z0 + kappa * rho * np.sin(thAdj_s + zeta * np.sin(2 * thAdj_s))
-    Z_theta_s = (
-        dtheta_dchi_s
-        * kappa
-        * rho
-        * (1 + 2 * zeta * np.cos(2 * thAdj_s))
-        * np.cos(thAdj_s + zeta * np.sin(2 * thAdj_s))
-    )
+    if mxh:
+        tR_s, tR_t_s = theta_R_of(thAdj_s)
+        R_s = R0 + rho * np.cos(tR_s)
+        Z_s = Z0 + kappa * rho * np.sin(thAdj_s)
+        R_theta_s = -(dtheta_dchi_s * rho * np.sin(tR_s) * tR_t_s)
+        Z_theta_s = dtheta_dchi_s * kappa * rho * np.cos(thAdj_s)
+    else:
+        R_s = R0 + rho * np.cos(thAdj_s + d_inv * np.sin(thAdj_s))
+        R_theta_s = -(
+            dtheta_dchi_s
+            * rho
+            * (1 + d_inv * np.cos(thAdj_s))
+            * np.sin(thAdj_s + d_inv * np.sin(thAdj_s))
+        )
+        Z_s = Z0 + kappa * rho * np.sin(thAdj_s + zeta * np.sin(2 * thAdj_s))
+        Z_theta_s = (
+            dtheta_dchi_s
+            * kappa
+            * rho
+            * (1 + 2 * zeta * np.cos(2 * thAdj_s))
+            * np.cos(thAdj_s + zeta * np.sin(2 * thAdj_s))
+        )
 
     if sign_Ip_CW < 0:
         # GENE interpolates onto theta_s_reverse and reverses the result
@@ -415,7 +485,10 @@ def get_miller(
         major_R=major_R,
         sign_Ip_CW=sign_Ip_CW,
         sign_Bt_CW=sign_Bt_CW,
+        magn_geometry=mg,
     )
+    if mxh:
+        out.update(cN_m=cN, sN_m=sN, cNdr_m=cNdr, sNdr_m=sNdr)
     return out
 
 
@@ -442,8 +515,10 @@ def miller_from_namelist(nml, nz0=512):
     beta = float(gen.get("beta", 0.0))
     amhd, dpdx_pm = pressure_terms(geo, spec, beta)
     mg = str(geo.get("magn_geometry", "")).strip().lower()
-    if mg != "miller":
-        raise ValueError(f"magn_geometry = '{mg}' is not supported (only 'miller')")
+    if mg not in ("miller", "miller_mxh"):
+        raise ValueError(
+            f"magn_geometry = '{mg}' is not supported (only 'miller', 'miller_mxh')"
+        )
     for key in ("thetak", "thetad"):
         if float(geo.get(key, 0.0)) != 0.0:
             raise ValueError(f"Miller tilt '{key}' is not supported")
@@ -472,6 +547,12 @@ def miller_from_namelist(nml, nz0=512):
         sign_Ip_CW=sign_ip,
         sign_Bt_CW=sign_bt,
         nz0=nz0,
+        magn_geometry=mg,
+        **(
+            {k: geo.get(k.lower()) for k in ("cN_m", "sN_m", "cNdr_m", "sNdr_m")}
+            if mg == "miller_mxh"
+            else {}
+        ),
     )
     units = {k.lower(): v for k, v in nml["units"].items()} if "units" in nml else {}
     Lref = float(units.get("lref", 0.0) or 0.0)
@@ -510,7 +591,7 @@ def write_miller_dat(g, path):
     lines += [
         "Cy = " + e(g["C_y"]),
         "Cxy = " + e(g["C_xy"]),
-        "magn_geometry = 'miller'",
+        "magn_geometry = '%s'" % g.get("magn_geometry", "miller"),
         "",
         "sign_Ip_CW = %3d" % g["sign_Ip_CW"],
         "sign_Bt_CW = %3d" % g["sign_Bt_CW"],
