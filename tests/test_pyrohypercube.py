@@ -545,7 +545,9 @@ def test_sample_pyro_from_saved_json_applies_parameters_and_named_funcs(tmp_path
     scan.write(base_directory=tmp_path)
 
     # Reloaded from disk: no run directory is read, and the derived setting survives
-    loaded = PyroHypercube(pyroscan_json=tmp_path / "pyroscan.json", load_base_pyro=True)
+    loaded = PyroHypercube(
+        pyroscan_json=tmp_path / "pyroscan.json", load_base_pyro=True
+    )
     assert loaded.parameter_func["beta"] == ("enforce_consistent_beta_prime", {})
 
     got = loaded.sample_pyro("c")
