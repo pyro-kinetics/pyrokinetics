@@ -353,9 +353,11 @@ def run_linear(
     rho_star=None,
     timeout=60.0,
     omega0=None,
-    scan="auto",
+    scan=False,
     fields=True,
     verbose=False,
+    maxit=30,
+    wmax=1.0,
 ):
     """Linear hKBM modes on a (k_y, theta0) grid in one process: the raw input of a
     quasilinear transport model (e.g. T3D's GS2-QL machinery).
@@ -370,6 +372,11 @@ def run_linear(
     theta0   ballooning angles (k_x = shat k_y theta0); theta0 != 0 uses a basis without parity
              (twice the cost).  Validated against GENE only at theta0 = 0.
     timeout  seconds per root (the search stops and the mode is returned with converged False).
+    scan     False (default): seeds only (cheap where there is no hKBM: ~15 s for a k_y without a
+             root); 'auto': add a coarse complex-plane search when no seed converges (~40 s more,
+             and it can land on Alfvenic roots).  maxit: secant iterations per seed;
+             wmax: a seed is abandoned when its iteration leaves |omega| < wmax c_s/L_ref (the hKBM
+             has |omega| < 0.5 there; this stops searches drifting to shear-Alfven roots).
     omega0   seed for the first root (GENE sign omega + i gamma, deck units).  Roots are followed
              in k_y outward from k_y rho_s ~ 0.2 and in theta0 from the previous theta0.
 
@@ -433,7 +440,13 @@ def run_linear(
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     r = deck.solve(
-                        kyj, omega0=seed, scan=scan, theta0=th0, timeout=timeout
+                        kyj,
+                        omega0=seed,
+                        scan=scan,
+                        theta0=th0,
+                        timeout=timeout,
+                        maxit=maxit,
+                        wmax=wmax,
                     )
                 r["seconds"] = time.time() - t0
                 rec = _record(deck, r, kyj, th0, ns[j], fields)
@@ -520,7 +533,7 @@ def fluxes(
     parallel=1,
     timeout=60.0,
     omega0=None,
-    scan="auto",
+    scan=False,
     verbose=False,
 ):
     """Quasilinear hKBM fluxes of a flux surface with the solver's own saturation rule (a

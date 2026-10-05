@@ -168,8 +168,10 @@ for m in modes:
 * Cost: about 3-5 s per root at theta0 = 0 on one core (8 Hermite functions per field; about
   3 secant iterations at 0.5 s per matrix evaluation, plus 0.3 s for the weights), 8-20 s at
   theta0 != 0, and about 5 s once to import pyrokinetics. Each call is seeded from the previous
-  root: in k_y outward from k_y rho_s ~ 0.2, and in theta0 from the previous theta0. When no seed
-  converges, a coarse search of the complex plane adds about 10 s. `timeout` caps one root.
+  root: in k_y outward from k_y rho_s ~ 0.2, and in theta0 from the previous theta0. A k_y
+  without a root costs about 15 s, because every seed is tried and a seed is abandoned once its
+  iteration leaves |omega| < `wmax` = 1 c_s/L_ref. `scan="auto"` also searches the complex plane
+  when no seed converges, at about 40 s more per such k_y. `timeout` caps one root.
 
 **The solver's own saturation rule** (a comparison line):
 

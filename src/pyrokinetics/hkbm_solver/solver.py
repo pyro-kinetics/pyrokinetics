@@ -942,8 +942,10 @@ class Solver:
         return np.linalg.det(D)
 
     # ------------------------------------------------------------------ root finding
-    def solve(self, omega0, tol=1e-9, maxit=60, method="det", verbose=False):
-        """Secant iteration on f(omega) = smallest eigenvalue of D(omega) (method 'eig') or det D ('det')."""
+    def solve(self, omega0, tol=1e-9, maxit=60, method="det", verbose=False, wmax=None):
+        """Secant iteration on f(omega) = smallest eigenvalue of D(omega) (method 'eig') or det D ('det').
+        wmax: give up (converged False) when |omega| > wmax or gamma < -0.05 (the iteration has left
+        the region of interest, e.g. towards a shear-Alfven root)."""
         t0 = time.time()
         f = (lambda w: self.fval(w)[0]) if method == "eig" else self.det
         w0 = complex(omega0)
@@ -966,6 +968,8 @@ class Solver:
                 f1 = f(w1)
             if verbose:
                 print("   it %d omega %s |f| %.2e" % (it, w1, abs(f1)))
+            if wmax is not None and (abs(w1) > wmax or w1.imag < -0.05):
+                break
             if abs(w1 - w0) < tol:
                 ok = True
                 break

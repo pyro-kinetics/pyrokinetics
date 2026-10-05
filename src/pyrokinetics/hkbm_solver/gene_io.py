@@ -283,7 +283,15 @@ class Deck:
 
     # ------------------------------------------------------------------ solving
     def solve(
-        self, ky_ref, omega0=None, verbose=False, scan="auto", theta0=0.0, timeout=None
+        self,
+        ky_ref,
+        omega0=None,
+        verbose=False,
+        scan="auto",
+        theta0=0.0,
+        timeout=None,
+        maxit=60,
+        wmax=None,
     ):
         """Solve at one k_y (deck units).  omega0: seed (deck units, GENE sign omega + i gamma).
 
@@ -294,7 +302,9 @@ class Deck:
         growing root), True (always also scan) or False.  theta0: ballooning angle of the mode
         (k_x = shat k_y theta0, see geometry.Geo.shifted); theta0 != 0 breaks the twisting parity,
         so the basis then has the odd Hermite functions too (16 instead of 8 per field).
-        timeout: seconds; the search raises TimeoutError when it runs longer."""
+        timeout: seconds; the search raises TimeoutError when it runs longer.  maxit: secant
+        iterations per seed; wmax: abandon a seed whose iteration leaves |omega| < wmax (solver
+        units, c_s/L_ref)."""
         rs, cs = self.units["rho_s_over_rho_ref"], self.units["c_s_over_c_ref"]
         ky = ky_ref * rs
         kw = dict(self.solver_kw)
@@ -323,7 +333,7 @@ class Deck:
         tried = []
 
         def attempt(sd):
-            r = Sv.solve(complex(-sd.real, sd.imag))
+            r = Sv.solve(complex(-sd.real, sd.imag), maxit=maxit, wmax=wmax)
             tried.append(r)
             if verbose:
                 print(
