@@ -6,7 +6,7 @@ import os
 import pathlib
 import warnings
 from contextlib import contextmanager
-from functools import reduce
+from functools import partial, reduce
 from itertools import product
 from typing import Any, Dict, NamedTuple, Tuple
 
@@ -504,6 +504,9 @@ class PyroScan:
                     }
                     self.pyroscan_json["parameter_dict"] = self.parameter_dict
                     continue
+                elif key == "parameter_func":
+                    self.parameter_func = {k: tuple(v) for k, v in value.items()}
+                    continue
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -746,6 +749,14 @@ class PyroScan:
 
         json_data = dict(self.pyroscan_json)
 
+        unsaved = [k for k, (f, _) in self.parameter_func.items() if not isinstance(f, str)]
+        if unsaved:
+            warnings.warn(
+                f"parameter_func for {unsaved} are functions and are not saved to "
+                "pyroscan.json; pass the name of a Pyro method to make them reloadable.",
+                stacklevel=2,
+            )
+
         if relative_path:
             json_data["base_directory"] = "."
         else:
@@ -799,34 +810,84 @@ class PyroScan:
                 stacklevel=2,
             )
 
+    def _apply_parameters(self, parameter: dict, pyro: Pyro) -> None:
+        """Apply one run's scanned ``parameter`` values (and any ``parameter_func``) to ``pyro``."""
+        for param, value in parameter.items():
+            # Get attribute name and keys where param is stored in Pyro
+            attr_name, keys_to_param = self.parameter_map[param]
+
+            # Scan values are stored in generic simulation units; a run
+            # with physical reference values needs them in its own units
+            if isinstance(value, Quantity):
+                value = value.to(pyro.norms.pyrokinetics)
+
+            # Get attribute in Pyro storing the parameter
+            pyro_attr = getattr(pyro, attr_name)
+
+            # Set the value given the Pyro attribute and location of parameter
+            set_in_dict(pyro_attr, keys_to_param, value)
+
+            if param in self.parameter_func.keys():
+                func, kwargs = self.parameter_func[param]
+                # A string names a Pyro method, so it can be saved to pyroscan.json
+                (getattr(pyro, func) if isinstance(func, str) else partial(func, pyro))(
+                    **(kwargs or {})
+                )
+
     def update_self_parameters(
         self,
     ):
         """
         Updates all pyro object parameters based on pyro_dict values
         """
-        for parameter, run_dir, pyro in zip(
-            self.outer_product(), self.run_directories, self.pyro_dict.values()
-        ):
-            # Param value for each run written accordingly
-            for param, value in parameter.items():
-                # Get attribute name and keys where param is stored in Pyro
-                attr_name, keys_to_param = self.parameter_map[param]
+        for parameter, pyro in zip(self.outer_product(), self.pyro_dict.values()):
+            self._apply_parameters(parameter, pyro)
 
-                # Scan values are stored in generic simulation units; a run
-                # with physical reference values needs them in its own units
-                if isinstance(value, Quantity):
-                    value = value.to(pyro.norms.pyrokinetics)
+    def sample_pyro(self, sample, gk_output=None) -> Pyro:
+        """
+        The Pyro of one run of this scan, with that run's parameters applied
+        (``parameter_map`` and ``parameter_func``) and, if there is output, its
+        ``gk_output`` slice attached, so diagnostics can be run on it unchanged.
 
-                # Get attribute in Pyro storing the parameter
-                pyro_attr = getattr(pyro, attr_name)
+        Works on a scan loaded from ``pyroscan.json``: nothing is read from the
+        run directories.
 
-                # Set the value given the Pyro attribute and location of parameter
-                set_in_dict(pyro_attr, keys_to_param, value)
+        Parameters
+        ----------
+        sample: int or str
+            Position of the run in ``pyro_dict``, or its name.
+        gk_output: xarray.Dataset, default None
+            Scan output to slice. Defaults to ``self.gk_output.data`` if loaded,
+            and no output is attached if neither exists. A hypercube is sliced
+            along ``sample``; a gridded scan along each scanned parameter.
 
-                if param in self.parameter_func.keys():
-                    func, kwargs = self.parameter_func[param]
-                    func(pyro, **kwargs)
+        Returns
+        -------
+        Pyro
+            A copy, so the scan's own ``pyro_dict`` is left untouched.
+        """
+        names = list(self.pyro_dict)
+        i = names.index(sample) if isinstance(sample, str) else int(sample)
+        pyro = copy.deepcopy(self.pyro_dict[names[i]])
+        parameter = next(p for j, p in enumerate(self.outer_product()) if j == i)
+        self._apply_parameters(parameter, pyro)
+
+        if gk_output is None and getattr(self, "gk_output", None) is not None:
+            gk_output = self.gk_output.data
+        if gk_output is not None:
+            if "sample" in gk_output.dims:
+                gk_output = gk_output.isel(sample=i)
+            else:
+                gk_output = gk_output.sel(
+                    {
+                        k: getattr(v, "m", v)
+                        for k, v in parameter.items()
+                        if k in gk_output.dims
+                    },
+                    method="nearest",
+                )
+            pyro.gk_output = gk_output
+        return pyro
 
     def add_parameter_key(
         self, parameter_key=None, parameter_attr=None, parameter_location=None
@@ -882,11 +943,21 @@ class PyroScan:
         parameter_key is set in a scan
 
         parameter_key: string to access variable
-        parameter_func: function that take in a pyro object applies modification
+        parameter_func: function that take in a pyro object applies modification, or
+            the name of a Pyro method (e.g. ``"enforce_consistent_beta_prime"``).
+            Only the name form is saved to ``pyroscan.json``, so a scan reloaded
+            from it applies the same derived settings; a function is not saved.
         parameter_kwargs: Dictionary of kwargs to apply to function
         """
 
         self.parameter_func[parameter_key] = (parameter_func, parameter_kwargs)
+        named = {
+            k: [f, kw or {}] for k, (f, kw) in self.parameter_func.items() if isinstance(f, str)
+        }
+        if named:
+            self.pyroscan_json["parameter_func"] = named
+        else:
+            self.pyroscan_json.pop("parameter_func", None)
 
     def load_default_parameter_keys(self):
         """

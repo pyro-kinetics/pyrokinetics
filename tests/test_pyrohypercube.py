@@ -509,3 +509,63 @@ def test_write_and_reload(tmp_path):
         assert written.numerics.ky.to(convention, convention.context).magnitude == (
             pytest.approx(parameter_dict["ky"][i].magnitude)
         )
+
+
+# ---------------------------------------------------------------------------
+# sample_pyro: one run's Pyro rebuilt from a loaded scan
+# ---------------------------------------------------------------------------
+def test_sample_pyro_attaches_that_samples_output(gs2_run_tree):
+    cube = PyroHypercube.from_directory(
+        gs2_run_tree, pattern="iteration_*", params=["ky"], gk_code="GS2"
+    )
+    cube.load_gk_output()
+
+    pyro = cube.sample_pyro("iteration_1")
+    assert pyro is not cube.pyro_dict["iteration_1"]
+    assert pyro.numerics.ky.m == pytest.approx(FOREIGN_KY[1])
+    assert "sample" not in pyro.gk_output.dims
+    assert float(pyro.gk_output["growth_rate"].data.m) == float(
+        cube.gk_output.data["growth_rate"].isel(sample=1).data.m
+    )
+    # By position as well as by name
+    assert cube.sample_pyro(1).numerics.ky == pyro.numerics.ky
+
+
+def test_sample_pyro_from_saved_json_applies_parameters_and_named_funcs(tmp_path):
+    base = Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in")
+    betas = [0.01, 0.02, 0.03]
+    scan = PyroHypercube(
+        pyro=base,
+        parameter_dict={"beta": betas},
+        base_directory=tmp_path,
+        sample_names=["a", "b", "c"],
+    )
+    scan.add_parameter_key("beta", "numerics", ["beta"])
+    scan.add_parameter_func("beta", "enforce_consistent_beta_prime", {})
+    scan.write(base_directory=tmp_path)
+
+    # Reloaded from disk: no run directory is read, and the derived setting survives
+    loaded = PyroHypercube(pyroscan_json=tmp_path / "pyroscan.json", load_base_pyro=True)
+    assert loaded.parameter_func["beta"] == ("enforce_consistent_beta_prime", {})
+
+    got = loaded.sample_pyro("c")
+    expected = Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in")
+    expected.numerics.beta = betas[2]
+    expected.enforce_consistent_beta_prime()
+    assert got.numerics.beta.m == pytest.approx(betas[2])
+    assert got.local_geometry.beta_prime.m == pytest.approx(
+        expected.local_geometry.beta_prime.m
+    )
+    assert got.local_geometry.beta_prime.m != base.local_geometry.beta_prime.m
+    assert getattr(got, "gk_output", None) is None
+
+
+def test_unnamed_parameter_func_is_not_saved_and_warns(tmp_path):
+    scan = PyroHypercube(
+        pyro=Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in"),
+        parameter_dict={"ky": [0.1, 0.2]},
+        base_directory=tmp_path,
+    )
+    scan.add_parameter_func("ky", lambda pyro: None, {})
+    with pytest.warns(UserWarning, match="not saved"):
+        scan.write(base_directory=tmp_path)
