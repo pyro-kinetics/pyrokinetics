@@ -124,3 +124,19 @@ def test_fluxes_step_regression():
     assert r["Q_i"] == pytest.approx(0.7533, rel=0.02)
     assert r["Q_e"] == pytest.approx(0.6654, rel=0.02)
     assert r["Gamma"] == pytest.approx(0.1758, rel=0.02)
+
+
+@pytest.mark.slow
+def test_no_root_verdict(tmp_path):
+    """q = 1.5, beta_e = 0.04: no hKBM (stella's flux is ~0 there too); the fast search says so."""
+    import re
+
+    t = DECK.read_text()
+    for key, val in (("q0", 1.5), ("beta", 0.04)):
+        t = re.sub(
+            rf"^(\s*){key}\s*=.*$", rf"\g<1>{key} = {val}", t, count=1, flags=re.M
+        )
+    (tmp_path / "parameters").write_text(t)
+    (m,) = QL.run_linear(tmp_path / "parameters", ky=[0.2])
+    assert not m["converged"] and m["no_root_verdict"]
+    assert np.isnan(m["gamma"]) and m["seconds"] < 25

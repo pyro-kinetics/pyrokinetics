@@ -40,6 +40,13 @@ from . import solver as S
 from .geometry import Geo, Geometry
 from .miller import miller_from_namelist, write_miller_dat
 
+# low-resolution solver for the fast root search (Deck.solve scan='fast'): fewer ion orbit
+# quadrature points and 6 Hermite functions per field
+LOWRES = dict(
+    stream_kw=dict(nE=12, nlp=12, nlt=16, nthp=192, nphi=80),
+    basis=("hermite", 6, 0.35),
+)
+
 
 class UnsupportedDeck(ValueError):
     """The deck asks for physics the hKBM solver does not have."""
@@ -299,7 +306,9 @@ class Deck:
         root), the STEP hKBM root scaled to this k_y (accepted likewise), then drift-wave-like
         seeds in both directions (the most unstable converged root is kept).  scan: 'auto' (a
         coarse search of the smallest singular value of D(omega) when no seed converges to a
-        growing root), True (always also scan) or False.  theta0: ballooning angle of the mode
+        growing root), True (always also scan), False, or 'fast': after omega0 and the STEP seed,
+        a low-resolution search (_fast_roots) whose roots seed the full model, no root when it
+        finds none (a few seconds).  theta0: ballooning angle of the mode
         (k_x = shat k_y theta0, see geometry.Geo.shifted); theta0 != 0 breaks the twisting parity,
         so the basis then has the odd Hermite functions too (16 instead of 8 per field).
         timeout: seconds; the search raises TimeoutError when it runs longer.  maxit: secant
@@ -348,7 +357,19 @@ class Deck:
             if attempt(sd):
                 best = tried[-1]
                 break
-        if best is None or scan is True:
+        if best is None and scan == "fast":
+            lowkw = dict(kw)
+            lowkw.update(LOWRES)
+            if theta0 != 0:
+                b = LOWRES["basis"]
+                lowkw.update(basis=(b[0], 2 * b[1], b[2]), parity="all")
+            Sl = S.Solver(ky, geom=self._geoms[theta0], **lowkw)
+            Sl.deadline = Sv.deadline
+            for w in self._fast_roots(Sl, maxit, wmax, verbose):
+                if attempt(complex(-w.real, w.imag)):
+                    best = tried[-1]
+                    break
+        elif best is None or scan is True:
             if best is None:
                 for sd in generic:
                     attempt(sd)
@@ -367,6 +388,7 @@ class Deck:
         if best is None:
             best = dict(tried[-1])
             best["converged"] = False
+            best["no_root_verdict"] = scan == "fast"
         best["solver"] = Sv
         best["ky_ref"] = ky_ref
         best["ky_solver"] = ky
@@ -374,6 +396,40 @@ class Deck:
         best["omega_ref"] = best["omega_gene"] * cs
         best["gamma_ref"] = best["gamma"] * cs
         return best
+
+    @staticmethod
+    def _fast_roots(Sl, maxit, wmax, verbose, nmax=4):
+        """Growing roots of a low-resolution solver Sl (LOWRES: ~10x cheaper matrix, roots
+        within ~2 % of the full model on STEP), most unstable first: local minima of
+        sigma_min/sigma_max of D on a coarse grid of the ion-direction upper half plane
+        (model sign Re omega in [-0.8, 0.05], gamma 0.01-0.25), each followed by secant.  An
+        empty list is the 'no growing ion-direction root' verdict (~4-6 s)."""
+        wr = np.linspace(-0.8, 0.05, 18)
+        wi = np.array([0.01, 0.05, 0.12, 0.25])
+        A = np.empty((wi.size, wr.size))
+        for j, y in enumerate(wi):
+            for i, x in enumerate(wr):
+                D, _ = Sl.matrix(complex(x, y))
+                sv = np.linalg.svd(Sl.scales()[:, None] * D, compute_uv=False)
+                A[j, i] = sv[-1] / sv[0]
+        mins = []
+        for j in range(wi.size):
+            for i in range(wr.size):
+                nb = A[max(j - 1, 0) : j + 2, max(i - 1, 0) : i + 2]
+                if A[j, i] <= nb.min():
+                    mins.append((A[j, i], complex(wr[i], wi[j])))
+        mins.sort(key=lambda t: t[0])
+        roots = []
+        for _, sd in mins[:nmax]:
+            r = Sl.solve(sd, maxit=maxit, wmax=wmax)
+            if r["converged"] and r["gamma"] > 0 and np.isfinite(r["omega"]):
+                if all(abs(r["omega"] - w) > 1e-3 for w in roots):
+                    roots.append(r["omega"])
+        if verbose:
+            print(
+                "  low-resolution roots (model sign):", np.round(roots, 4), flush=True
+            )
+        return sorted(roots, key=lambda w: -w.imag)
 
     @staticmethod
     def _scan_seeds(Sv, ky, verbose, nmax=3):

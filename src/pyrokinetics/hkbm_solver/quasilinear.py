@@ -7,10 +7,14 @@ weights(solver, result)
     normalisation (the columns Gamma_es, Gamma_em, Q_es, Q_em of GENE's nrg file: em = A_par +
     dB_par).  Derivation in PHYSICS.md ("Quasilinear fluxes").
 
+run_linear(source, ky=None, n=None, theta0=(0.0,), ...)
+    The linear modes on a (k_y, theta0) grid in one process (Pyro object or GENE deck in):
+    eigenvalue, fields, k_perp^2 and Jacobian on theta, the weights above in the deck's GENE
+    normalisation, and validity flags; the raw input of a transport model's own QL rule.
+
 fluxes(source, ky=None, ...)
-    Solve the eigenproblem on a k_y grid (continuation from the previous k_y, one worker process
-    per root with a timeout) and return the saturated fluxes Q_i, Q_e, Gamma in gyro-Bohm units
-    of the deck (GENE normalisation), with the per-k_y growth rates, frequencies and weights.
+    run_linear on a k_y grid (optionally several processes) and the solver's own mixing-length
+    saturation: Q_i, Q_e, Gamma in gyro-Bohm units of the deck (GENE normalisation).
 
 Units inside: the solver's (T_ref = T_e, n_ref = n_e, m_ref = m_i, L_ref, B_ref; k_y in 1/rho_s,
 frequencies in c_s/L_ref, fluxes in n_e T_e c_s rho_s^2/L_ref^2 and n_e c_s rho_s^2/L_ref^2).
@@ -302,8 +306,10 @@ def _record(deck, r, ky_ref, theta0, n=None, fields=True):
         hkbm_like=ok,
         checks=checks,
         seconds=r.get("seconds"),
+        no_root_verdict=bool(r.get("no_root_verdict", False)),
     )
-    if not rec["converged"]:
+    if not rec["converged"]:  # no growing root: the last iterate means nothing
+        rec.update(omega=np.nan, gamma=np.nan, gamma_solver=np.nan)
         return rec
     Sv = r["solver"]
     geo = Sv.geo
@@ -351,9 +357,9 @@ def run_linear(
     n=None,
     theta0=(0.0,),
     rho_star=None,
-    timeout=60.0,
+    timeout=None,
     omega0=None,
-    scan=False,
+    scan="fast",
     fields=True,
     verbose=False,
     maxit=30,
@@ -371,10 +377,13 @@ def run_linear(
              from rho_star=, the Pyro reference values or the deck's rhostar).
     theta0   ballooning angles (k_x = shat k_y theta0); theta0 != 0 uses a basis without parity
              (twice the cost).  Validated against GENE only at theta0 = 0.
-    timeout  seconds per root (the search stops and the mode is returned with converged False).
-    scan     False (default): seeds only (cheap where there is no hKBM: ~15 s for a k_y without a
-             root); 'auto': add a coarse complex-plane search when no seed converges (~40 s more,
-             and it can land on Alfvenic roots).  maxit: secant iterations per seed;
+    timeout  wall-clock seconds per root (the search stops and the mode is returned with
+             converged False and error 'timeout'); default 20 s at theta0 = 0, 40 s otherwise.
+    scan     'fast' (default): after the continuation seed and the STEP seed, a low-resolution
+             search of the ion-direction upper half plane whose roots seed the full model; no
+             root when it finds none (~5 s; checks['no_root_verdict']).  False: seeds only;
+             'auto': hkbm-solve's search (drift-wave seeds, then a complex-plane scan).
+             maxit: secant iterations per seed;
              wmax: a seed is abandoned when its iteration leaves |omega| < wmax c_s/L_ref (the hKBM
              has |omega| < 0.5 there; this stops searches drifting to shear-Alfven roots).
     omega0   seed for the first root (GENE sign omega + i gamma, deck units).  Roots are followed
@@ -436,6 +445,7 @@ def run_linear(
             elif j == i0 and it == 0:
                 seed = omega0
             t0 = time.time()
+            tmo = timeout if timeout is not None else (20.0 if th0 == 0 else 40.0)
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -444,7 +454,7 @@ def run_linear(
                         omega0=seed,
                         scan=scan,
                         theta0=th0,
-                        timeout=timeout,
+                        timeout=tmo,
                         maxit=maxit,
                         wmax=wmax,
                     )
@@ -452,7 +462,7 @@ def run_linear(
                 rec = _record(deck, r, kyj, th0, ns[j], fields)
             except TimeoutError:
                 rec = _record(
-                    deck, dict(error="timeout after %g s" % timeout), kyj, th0, ns[j]
+                    deck, dict(error="timeout after %g s" % tmo), kyj, th0, ns[j]
                 )
             except Exception as e:  # reported per mode; T3D drops or falls back
                 rec = _record(deck, dict(error=repr(e)), kyj, th0, ns[j])
@@ -531,9 +541,9 @@ def fluxes(
     C=None,
     rule="mixing_length",
     parallel=1,
-    timeout=60.0,
+    timeout=20.0,
     omega0=None,
-    scan=False,
+    scan="fast",
     verbose=False,
 ):
     """Quasilinear hKBM fluxes of a flux surface with the solver's own saturation rule (a

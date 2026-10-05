@@ -165,13 +165,17 @@ for m in modes:
   this one branch. Where another instability dominates (ITG/TEM at low beta, MTM, ETG, the
   electron-direction modes of GENE at high beta), it returns no root, a weak hKBM-like root, or
   occasionally an Alfvenic or electron-direction root. It never returns the other mode.
-* Cost: about 3-5 s per root at theta0 = 0 on one core (8 Hermite functions per field; about
-  3 secant iterations at 0.5 s per matrix evaluation, plus 0.3 s for the weights), 8-20 s at
-  theta0 != 0, and about 5 s once to import pyrokinetics. Each call is seeded from the previous
-  root: in k_y outward from k_y rho_s ~ 0.2, and in theta0 from the previous theta0. A k_y
-  without a root costs about 15 s, because every seed is tried and a seed is abandoned once its
-  iteration leaves |omega| < `wmax` = 1 c_s/L_ref. `scan="auto"` also searches the complex plane
-  when no seed converges, at about 40 s more per such k_y. `timeout` caps one root.
+* Cost (one core): about 3-5 s per root at theta0 = 0 (8 Hermite functions per field; about 3
+  secant iterations at 0.5 s per matrix evaluation, plus 0.3 s for the weights), 10-20 s at
+  theta0 != 0, and about 5 s once to import pyrokinetics. Each search starts from the previous
+  root: in k_y outward from k_y rho_s ~ 0.2, and in theta0 from the previous theta0. If that
+  seed and the STEP seed fail, the default `scan="fast"` searches the ion-direction upper half
+  plane with a low-resolution model (`gene_io.LOWRES`, 10x cheaper, roots within ~2 % of the
+  full model), and its roots seed the full model. A k_y without a root therefore costs about
+  10 s, and the mode carries `no_root_verdict`. A seed is abandoned once its iteration leaves
+  |omega| < `wmax` = 1 c_s/L_ref or reaches gamma < -0.05. `timeout` is wall-clock per root
+  (default 20 s at theta0 = 0, 40 s otherwise). Modes without a growing root have gamma =
+  omega = NaN.
 
 **The solver's own saturation rule** (a comparison line):
 
