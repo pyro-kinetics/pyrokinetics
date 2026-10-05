@@ -6,7 +6,8 @@ App. B), and the plane-wave streaming surrogate Mint_kpar.
 """
 
 import numpy as np
-from scipy.special import wofz, gamma as Gamma
+from scipy.special import gamma as Gamma
+from scipy.special import wofz
 
 SQPI = np.sqrt(np.pi)
 

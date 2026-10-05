@@ -178,7 +178,8 @@ def get_miller(
     cos(theta_R), Z = Z0 + kappa rho sin(theta), theta_R = theta + sum_k [cN_m(k) cos(k theta) +
     sN_m(k) sin(k theta)], with the radial derivatives cNdr_m, sNdr_m (r d/dr).  As in GENE,
     a nonzero delta, s_delta, zeta or s_zeta overrides sN_m(1) = asin(delta), sNdr_m(1) =
-    s_delta, sN_m(2) = -zeta, sNdr_m(2) = -s_zeta, and there is no theta shift to B_max."""
+    s_delta, sN_m(2) = -zeta, sNdr_m(2) = -s_zeta, and there is no theta shift to B_max.
+    """
     mg = str(magn_geometry).strip().lower()
     if mg not in ("miller", "miller_mxh"):
         raise ValueError(f"magn_geometry = '{magn_geometry}' is not supported")

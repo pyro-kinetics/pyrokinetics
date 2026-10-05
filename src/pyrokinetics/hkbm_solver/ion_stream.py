@@ -19,13 +19,10 @@ integration (S.ion_nu); passing ions collisionless.
 """
 
 import numpy as np
-from scipy.special import (
-    roots_genlaguerre,
-    roots_legendre,
-    j0 as besselj0,
-    j1 as besselj1,
-)
 from scipy.interpolate import CubicSpline
+from scipy.special import j0 as besselj0
+from scipy.special import j1 as besselj1
+from scipy.special import roots_genlaguerre, roots_legendre
 
 SQPI = np.sqrt(np.pi)
 

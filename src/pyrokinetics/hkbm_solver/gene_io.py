@@ -185,10 +185,9 @@ class Deck:
             raise UnsupportedDeck(
                 "beta <= 0: the solver is electromagnetic (A_par always on) and needs beta > 0"
             )
-        if (
-            str(gen.get("magn_geometry", geo.get("magn_geometry", ""))).strip().lower()
-            not in ("miller", "miller_mxh")
-        ):
+        if str(
+            gen.get("magn_geometry", geo.get("magn_geometry", ""))
+        ).strip().lower() not in ("miller", "miller_mxh"):
             raise UnsupportedDeck(
                 "only magn_geometry = 'miller' or 'miller_mxh' is supported"
             )

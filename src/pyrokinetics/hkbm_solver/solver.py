@@ -43,9 +43,10 @@ Root finding: secant on det of the row-scaled Galerkin matrix D(omega); continua
 """
 
 import time
+
 import numpy as np
 from scipy.interpolate import CubicSpline
-from scipy.special import eval_hermite, factorial, erf, roots_legendre
+from scipy.special import erf, eval_hermite, factorial, roots_legendre
 
 from . import kernels as Z  # Mint, Mint_kpar (energy integrals)
 from .geometry import Geo, Geometry
@@ -649,7 +650,7 @@ class Solver:
             return 1 - b, 1 - 1.5 * b, 2 * (1 - 1.5 * b)
         if self.flr == "bessel":
             if not hasattr(self, "_flrB"):
-                from scipy.special import roots_laguerre, j0, j1
+                from scipy.special import j0, j1, roots_laguerre
 
                 sq, ws = roots_laguerre(64)
                 x = np.sqrt(2 * b[:, None] * sq[None, :])
