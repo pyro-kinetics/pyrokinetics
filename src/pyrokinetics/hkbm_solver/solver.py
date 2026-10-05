@@ -1031,6 +1031,7 @@ class Solver:
             frac_pi2=frac_pi2,
             sv_ratio=float(s[-1] / s[0]),
             fields=fields,
+            coef={f: c / nrm for f, c in coef.items()},
         )
 
     def scan(self, wr=(-0.6, 0.3, 46), wi=(-0.1, 0.4, 26)):

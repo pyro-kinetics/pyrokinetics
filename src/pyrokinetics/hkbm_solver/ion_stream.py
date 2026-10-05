@@ -264,11 +264,82 @@ class StreamingIons:
                 outs.append(out)
         return outs if split else out
 
+    def flux_moments(self, omega, fields):
+        """Velocity moments of the ion h for one eigenmode, for the quasilinear fluxes.
+
+        fields: dict(phi, bpar, psi) of basis coefficients (the eigenvector, same normalisation as
+        the fields whose fluxes are wanted) and dapar: callable z -> A_par(z) (A_par = -(i/omega)
+        d_l psi).  Returns dict of complex numbers, k = 0 (particles) and 1 (energy, E = v^2/v_Ti^2):
+            P[k] = int J dtheta int d3v conj(h) J0 E^k phi
+            B[k] = int J dtheta int d3v conj(h) mu I1 E^k dB_par
+            A[k] = int J dtheta int d3v conj(h) v_par J0 E^k A_par     (v_par in c_s units)
+        h is integrated along the orbits exactly as in moments() (same quadrature)."""
+        S = self.S
+        omega = complex(omega)
+        assert not any(getattr(S, "dec", {}).values()), "not for the a_s/d_s split"
+        Ti = self.Ti
+        vT = np.sqrt(2 * Ti)
+        vl = S.sw["vl_i"]
+        ai, bi = S.ai, S.bi
+        pref = (1 / Ti) * np.pi**-1.5 * (np.pi / 2)
+        out = dict(
+            P=np.zeros(2, complex), B=np.zeros(2, complex), A=np.zeros(2, complex)
+        )
+        for o in self.orbits:
+            E = self.E[:, None, None]
+            wE = self.wE[:, None, None]
+            lam = o["lam"][None, :, None]
+            if self.bessel:
+                xx = np.sqrt(2 * o["bB"][None] * E)
+                J0 = besselj0(xx)
+                I1 = np.where(
+                    xx > 1e-8, 2 * besselj1(xx) / np.where(xx > 1e-8, xx, 1), 1.0
+                )
+            else:
+                J0 = np.exp(-0.5 * o["bB"][None] * E)
+                I1 = np.exp(-0.25 * o["bB"][None] * E)
+            mu = lam * E
+            wd = o["wdrift"][None] * E
+            dt = o["dl_over_v"][None] / (self.vT * np.sqrt(E))
+            omk = omega
+            if o["trapped"] and getattr(S, "ion_nu", None) is not None:
+                omk = omega + 1j * S.ion_nu(self.E)[:, None, None]
+            x = 1j * (omk - wd) * dt
+            fac = omega - ai - bi * E
+            bas = o["basis"]
+            phi = np.einsum("n,nlc->lc", fields["phi"], bas["phi"])[None]
+            bpar = np.einsum("n,nlc->lc", fields["bpar"], bas["bpar"])[None]
+            chi = J0 * phi + vl * Ti * mu * I1 * bpar
+            gf, gr = self._integrate(
+                (-1j * fac * chi)[None], x, dt, o["trapped"], split=True
+            )
+            gf, gr = gf[0], gr[0]
+            if self.ion_psi:
+                u = J0 * np.einsum("n,nlc->lc", fields["psi"], bas["psi"])[None]
+                c = fac / omega
+                sp = -(omk - wd) * c * u
+                hf, hr = self._integrate((-1j * sp)[None], x, dt, o["trapped"], True)
+                gf = gf + hf[0] + c * u
+                gr = gr + hr[0] + c * u
+            W = pref * wE * o["wlam"][None, :, None] * o["wgt"][None]
+            gs = np.conj(gf + gr)
+            go = np.conj(gf - gr)
+            vpar = vT * np.sqrt(E * np.clip(1 - o["lB"][None], 0, None))
+            apar = fields["dapar"](o["z"])[None]
+            for k in (0, 1):
+                Ek = E**k
+                out["P"][k] += np.sum(W * gs * J0 * Ek * phi)
+                out["B"][k] += np.sum(W * gs * mu * I1 * Ek * bpar)
+                out["A"][k] += np.sum(W * go * vpar * J0 * Ek * apar)
+        return out
+
     @staticmethod
-    def _integrate(s, x, dt, trapped):
+    def _integrate(s, x, dt, trapped, split=False):
         """Cell-averaged g, summed over both sigma, for dg/dt = s + a g (x = a dt per cell), s: (nb, nE, nlam, ncell).
         Passing: g = 0 entering, sigma = +1 runs over cells 0..n-1, sigma = -1 over n-1..0.
-        Trapped: periodic over the bounce orbit (forward cells then backward cells)."""
+        Trapped: periodic over the bounce orbit (forward cells then backward cells).
+        split=True returns the two directions separately, (g[sigma = +1], g[sigma = -1]).
+        """
         ex = np.exp(x)  # |ex| <= 1 for Im omega > 0
         p1 = _phi1(x)
         p2 = _phi2(x)
@@ -289,7 +360,7 @@ class StreamingIons:
         if not trapped:
             gf, _ = sweep(fwd, z0)
             gr, _ = sweep(bwd, z0)
-            return gf + gr
+            return (gf, gr) if split else gf + gr
         # trapped: one bounce = forward then backward; periodic solution g0 = C/(1 - prod ex)
         gf, g1 = sweep(fwd, z0)
         gr, g2 = sweep(bwd, g1)
@@ -313,4 +384,4 @@ class StreamingIons:
         )
         gf = gf + g0[..., None] * cf * p1
         gr = gr + g0[..., None] * cb * p1
-        return gf + gr
+        return (gf, gr) if split else gf + gr
