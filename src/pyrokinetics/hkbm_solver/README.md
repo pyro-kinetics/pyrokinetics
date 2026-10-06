@@ -147,10 +147,19 @@ for m in modes:
 * k_y: `ky` in 1/rho_ref, or toroidal mode numbers `n` with k_y rho_ref = n rho_star/|C_y| (GENE's
   convention). rho_star = rho_ref/L_ref comes from `rho_star=`, the Pyro's reference values, or
   the deck's `rhostar`.
-* `theta0`: ballooning angle (k_x = shat k_y theta0). theta0 != 0 drops the parity of the basis
-  (16 functions per field), which roughly doubles the cost. It is checked for gamma(theta0) =
-  gamma(-theta0) but has not been compared with GENE. At large theta0 (>~ 0.8 on STEP) the
-  search often finds no root, or fails and reports an error for that mode.
+* `theta0`: the ballooning angle, as in GS2 and in Giacomin et al. (k_x = shat theta0 k_y in GS2's
+  normalisation). The basis then loses its parity (16 functions per field), which roughly doubles
+  the cost. In GENE's Miller coordinates the radial modes connect every 2 pi kappa_s k_y, with
+  kappa_s = C_y q0 shat/x0 (`Geo.kx_per_theta0`; 3.59 for the STEP deck), so a GENE run with
+  `kx_center` has theta0 = kx_center/(kappa_s k_y), not kx_center/(shat k_y). Against GENE
+  kx_center runs (STEP, k_y rho_s 0.2 and 0.3):
+  * theta0 = 0.07-0.27: gamma agrees as well as at theta0 = 0 (0.062-0.066 vs GENE 0.068-0.080
+    at k_y 0.2; 0.093/0.083 vs 0.092/0.080 at k_y 0.3); omega is within 15 %;
+  * theta0 = 0.5: 0.034 vs 0.029 (k_y 0.2) and 0.007 vs stable (k_y 0.3);
+  * theta0 = 1: no root, against GENE's 0.002 and stable;
+  * k_y 0.3, theta0 0.27: 0.040 against GENE's ~0.017. GENE had not converged there in 4 h.
+  The solver's gamma(theta0) falls a little too fast at k_y 0.3 and is right at k_y 0.2.
+  gamma(theta0) = gamma(-theta0) holds to 1e-3.
 * Units: the deck's GENE normalisation. gamma and omega are in c_ref/L_ref with GENE's sign
   (omega > 0 is the ion diamagnetic direction). The fields are normalised to max |phi| = 1;
   kperp2 is in 1/rho_ref^2. `weights` are fluxes per <|phi|^2> in GENE's nrg definitions:
@@ -177,6 +186,39 @@ for m in modes:
   (default 20 s at theta0 = 0, 40 s otherwise). Modes without a growing root have gamma =
   omega = NaN.
 
+**Mapping to the quasilinear model of Giacomin et al. (J. Plasma Phys. 2025; T3D's GS2-QL).**
+Each mode with a root carries `m["giacomin"]`. It is computed in rho_s, c_s/L_ref and T_e units, with
+the fields chi = (e phi/T_e, A_par/(rho_s B_ref), dB_par/B_ref) of their eq. 3.2:
+* `kperp2[f]`: <k_perp^2> weighted with J |chi_f|^2 for each field (their eq. 3.2), with
+  k_perp^2 = g^yy k_y^2 + 2 g^xy k_x k_y + g^xx k_x^2 at the mode's theta0;
+* `amplitude[f]` = max|chi_f| / max|chi_phi|;
+* `Lambda_hat` = gamma sum_f amplitude[f]/kperp2[f] (their eq. 3.3);
+  against GENE (STEP, k_y rho_s 0.2/0.3/0.4) the amplitudes are A_par/phi 0.76/0.32/0.23 vs
+  GENE's 0.89/0.46/0.35, and dB_par/phi 0.42/0.27/0.31 vs 0.35/0.28/0.32. The A_par term of
+  Lambda_hat is therefore 15-35 % low;
+* `Q_i_over_Q`, `Q_e_over_Q`, `Gamma_over_Q`: the weights Q_l,s/Q_l and Gamma_l,s/Q_l of their eqs.
+  3.7-3.8. Q_l is the total linear heat flux of all three fields.
+
+The weights are ratios of fluxes of the same mode, so they do not depend on the normalisation of
+the eigenfunction. GS2's gyro-Bohm units (v_th = sqrt(2) c_s, rho = sqrt(2) rho_s) scale Q and
+Gamma by the same factor 2 sqrt(2), so the weights are the same in GS2 and GENE units when
+T_ref = T_e. With another T_ref, use `giacomin` (always T_e) rather than `weights["shares"]`,
+which is in the deck's units. Two cautions for absolute values:
+* Fluxes per <|phi|^2> differ between codes by the normalisation of phi and the factor 2 for
+  +-k_y. They are not used by the Giacomin rule.
+* B_ref is GENE's Miller B_ref (the deck's &units Bref). If GS2's B0 differs (Bgeo), the A_par
+  and dB_par amplitudes scale with B_ref/B0.
+
+The theta0 average of their eq. 3.4 (up to theta0_max = gamma_E/(shat gamma)) needs Lambda_hat on a
+theta0 grid; run_linear's `theta0` list gives it. On STEP the hKBM's gamma(theta0) falls to zero
+by theta0 ~ 0.5-1 (GENE agrees), so a grid 0-1 is enough there.
+
+**Warm starts.** `run_linear(..., warm=previous_modes)` seeds every (k_y, theta0) with the root of
+a previous call (the last Newton iterate or time step on the same flux tube; the same k_y and
+theta0, or the nearest k_y within a factor 1.6). A warm root costs about 3 s at theta0 = 0 and
+5 s at theta0 != 0. If the warm seed fails, the usual continuation, the STEP seed and the fast
+search follow.
+
 **The solver's own saturation rule** (a comparison line):
 
 ```python
@@ -186,12 +228,23 @@ r["Q_i"], r["Q_e"], r["Gamma"], r["Q_i_es"], r["Q_i_em"], r["gamma"], r["converg
 ```
 
 `fluxes` uses the mixing-length rule <|phi|^2>(k_y) = C (gamma/<k_perp^2>)^2, integrated over
-k_y rho_s (trapezoid; default grid 0.05-0.6), with one constant `C_ML` fitted to the stella STEP
-nonlinear (q, beta_e) scan. Q is in GENE gyro-Bohm units of the deck. The fit quality and its
-limits are in the analysis note (QL_FLUX.md). The rule has no zonal-flow physics, so it cannot
-reproduce the nonlinear cliff (the jump of the flux by orders of magnitude at q^2 beta_e above a
-threshold). Use it for trends and orders of magnitude, not for absolute fluxes near the
-threshold. `parallel=N` splits the k_y list into N chains in N worker processes. Command line:
+k_y rho_s (trapezoid on the default grid 0.05-0.6). The fluxes are in GENE gyro-Bohm units of the
+deck. C_ML = 300 was fitted on the total heat flux (log least squares) of the stella STEP
+nonlinear (q, beta_e) scan: 144 runs, 100 of them with Q >= 1 and a root.
+* Rank correlation with the nonlinear flux: 0.86 over all runs.
+* Scatter: a factor ~5 rms; 58 % of runs within a factor 3, 93 % within a factor 10.
+* Above the nonlinear cliff (Q > 50) the rule is unbiased (factor ~3 rms).
+* Below the cliff it is a factor ~4 too high, because the zonal-flow-regulated state is not in
+  a quasilinear rule.
+* 97 % of the quiet runs (Q < 1) get Q < 10.
+
+The optional `rule="ml_threshold"` multiplies the flux by 0.126 below q^2 beta_e = 0.29 (C = 450).
+That is the fitted position of the cliff, and it brings the scatter to a factor ~4, with 72 % of
+runs within a factor 3. It is an empirical patch, valid for this STEP surface only. Use the rule
+for trends and orders of magnitude, not for absolute fluxes near the threshold. The calibration is
+in the analysis note QL_FLUX.md.
+
+`parallel=N` splits the k_y list into N chains in N worker processes. Command line:
 `hkbm-solve run_dir/ --fluxes [--ky 0.1 0.2 ...] [--nproc N]` prints the table and writes
 `ql_fluxes.json`.
 

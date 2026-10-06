@@ -127,4 +127,6 @@ k_y^2 g^yy -> k_y^2 (g^yy + 2 kappa g^xy + kappa^2 g^xx), with kappa = k_x/k_y =
 the k_perp minimum near theta0. Because of STEP's reversed local shear at the outboard midplane,
 the minimum sits on the other side of theta = 0 for small theta0. The twisting parity is lost,
 so the basis gets the odd Hermite functions too (16 per field). gamma(theta0) = gamma(-theta0)
-holds to 1e-3 for up-down symmetric geometry. theta0 != 0 has not been compared with GENE.
+holds to 1e-3 for up-down symmetric geometry. GENE's radial modes connect every 2 pi kappa k_y,
+so a GENE run with kx_center has theta0 = kx_center/(kappa k_y). Against such GENE runs (STEP,
+k_y rho_s 0.2/0.3, theta0 0.07-1) gamma agrees within ~20 % up to theta0 ~ 0.3 (README).

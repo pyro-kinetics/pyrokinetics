@@ -299,6 +299,7 @@ class Deck:
         timeout=None,
         maxit=60,
         wmax=None,
+        seeds=(),
     ):
         """Solve at one k_y (deck units).  omega0: seed (deck units, GENE sign omega + i gamma).
 
@@ -313,7 +314,8 @@ class Deck:
         so the basis then has the odd Hermite functions too (16 instead of 8 per field).
         timeout: seconds; the search raises TimeoutError when it runs longer.  maxit: secant
         iterations per seed; wmax: abandon a seed whose iteration leaves |omega| < wmax (solver
-        units, c_s/L_ref)."""
+        units, c_s/L_ref).  seeds: further seeds (deck units, GENE sign) tried after omega0,
+        before the STEP seed."""
         rs, cs = self.units["rho_s_over_rho_ref"], self.units["c_s_over_c_ref"]
         ky = ky_ref * rs
         kw = dict(self.solver_kw)
@@ -328,8 +330,9 @@ class Deck:
         if timeout is not None:
             Sv.deadline = time.time() + timeout
         first = []
-        if omega0 is not None:
-            first.append(complex(omega0) / cs)
+        for sd in ([omega0] if omega0 is not None else []) + list(seeds):
+            if sd is not None and np.isfinite(complex(sd)):
+                first.append(complex(sd) / cs)
         k = min(S.GENE_SEEDS, key=lambda x: abs(np.log(x / ky)))
         g = S.GENE_SEEDS[k]
         first.append(complex(g[0] * ky / k, g[1]))

@@ -38,10 +38,15 @@ _M = np.array([Gamma(k + 1.5) / Gamma(1.5) for k in range(6)])
 # <(v_perp/v_T)^2 E^k> = (2/3) <E^(k+1)>
 _N = np.array([2.0 / 3.0 * _M[k + 1] for k in range(5)])
 
-# Mixing-length calibration (fluxes(): rule='mixing_length'), fitted to the stella STEP
-# nonlinear (q, beta_e) scan; see QL_FLUX.md in the analysis folder.  Total heat flux
-# Q_i + Q_e = C_ML int dk_y [Q_i + Q_e]/<|phi|^2> (gamma/<k_perp^2>)^2, GENE gyro-Bohm units.
-C_ML = 1.0
+# Mixing-length calibration (fluxes(): rule='mixing_length'), fitted (least squares in log Q) to
+# the total heat flux of 100 stella STEP nonlinear runs of the (q, beta_e) scan with Q >= 1 and a
+# QL root (analysis note QL_FLUX.md): Q_i + Q_e = C_ML int dk_y rho_s [Q_i + Q_e]/<|phi|^2>
+# (gamma/<k_perp^2>)^2 on KY_DEFAULT, GENE gyro-Bohm units.  Scatter: factor ~5 rms (0.70 in
+# log10); unbiased above the nonlinear cliff (Q > 50), a factor ~4 too high below it.
+C_ML = 300.0
+# rule='ml_threshold': the same times F_SUB below the nonlinear threshold q^2 beta_e < X_C (the
+# zonal-flow-regulated side of the cliff), constants fitted together on the same runs (rms 0.59).
+C_THR, X_C, F_SUB = 450.0, 0.29, 0.126
 KY_DEFAULT = (0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6)
 # k_y rho_s range over which the solver's hKBM was validated against GENE (STEP)
 HKBM_KY_RANGE = (0.05, 0.6)
@@ -276,6 +281,38 @@ def _flags(r, ky_s):
     return f, all(f.values())
 
 
+def _giacomin(Sv, r, w):
+    """The quantities of the quasilinear model of Giacomin et al. (J. Plasma Phys. 2025, eqs.
+    3.2-3.8; T3D's GS2-QL) for one mode, in rho_s, c_s/L_ref and T_e units with the fields
+    chi = (e phi/T_e, A_par/(rho_s B_ref), dB_par/B_ref):
+      kperp2[f] = int k_perp^2 J |chi_f|^2 dtheta / int J |chi_f|^2 dtheta (k_x = shat theta0 k_y,
+                  theta0 the ballooning angle),
+      amplitude[f] = max |chi_f| / max |chi_phi|,
+      Lambda_hat = gamma sum_f amplitude[f]/kperp2[f]   (eq. 3.3),
+      Q_i_over_Q, Q_e_over_Q, Gamma_over_Q: the weights Q_l,s/Q_l and Gamma_l,s/Q_l (T_e units).
+    """
+    geo = Sv.geo
+    omega = complex(r["omega"])
+    kp2 = Sv.ky**2 * geo.gyy
+    flds = dict(phi=r["phi"], apar=_apar_theta(geo, r["psi"], omega), bpar=r["bpar"])
+    a0 = np.abs(flds["phi"]).max()
+    kp, amp = {}, {}
+    for f, v in flds.items():
+        a2 = np.abs(v) ** 2 * geo.J
+        amp[f] = float(np.abs(v).max() / a0)
+        kp[f] = float(np.sum(kp2 * a2) / np.sum(a2)) if a2.sum() > 0 else np.inf
+    gam = float(r["gamma"])
+    qt = w["Q_i"]["total"] + w["Q_e"]["total"]
+    return dict(
+        kperp2=kp,
+        amplitude=amp,
+        Lambda_hat=gam * sum(amp[f] / kp[f] for f in flds if amp[f] > 0),
+        Q_i_over_Q=w["Q_i"]["total"] / qt,
+        Q_e_over_Q=w["Q_e"]["total"] / qt,
+        Gamma_over_Q=w["Gamma_i"]["total"] / qt,
+    )
+
+
 def _record(deck, r, ky_ref, theta0, n=None, fields=True):
     """One mode in the deck's GENE normalisation (see run_linear)."""
     u = deck.units
@@ -331,6 +368,7 @@ def _record(deck, r, ky_ref, theta0, n=None, fields=True):
     wd["ambipolarity"] = w["ambipolarity"]
     rec["weights"] = wd
     rec["kperp2_avg"] = wd["kperp2"]
+    rec["giacomin"] = _giacomin(Sv, r, w)
     if fields:
         omega = complex(r["omega"])
         phi, bpar = r["phi"], r["bpar"]
@@ -351,6 +389,23 @@ def _record(deck, r, ky_ref, theta0, n=None, fields=True):
     return rec
 
 
+def _warm_seed(warm, ky, theta0):
+    """Root of a previous run_linear result at (ky, theta0), scaled from the nearest k_y."""
+    if not warm:
+        return None
+    c = [
+        m
+        for m in warm
+        if m.get("converged") and abs(m.get("theta0", 0.0) - theta0) < 1e-9
+    ]
+    if not c:
+        return None
+    m = min(c, key=lambda m: abs(np.log(m["ky"] / ky)))
+    if abs(np.log(m["ky"] / ky)) > 0.5:
+        return None
+    return complex(m["omega"], m["gamma"]) * ky / m["ky"]
+
+
 def run_linear(
     source,
     ky=None,
@@ -364,6 +419,7 @@ def run_linear(
     verbose=False,
     maxit=30,
     wmax=1.0,
+    warm=None,
 ):
     """Linear hKBM modes on a (k_y, theta0) grid in one process: the raw input of a
     quasilinear transport model (e.g. T3D's GS2-QL machinery).
@@ -388,6 +444,9 @@ def run_linear(
              has |omega| < 0.5 there; this stops searches drifting to shear-Alfven roots).
     omega0   seed for the first root (GENE sign omega + i gamma, deck units).  Roots are followed
              in k_y outward from k_y rho_s ~ 0.2 and in theta0 from the previous theta0.
+    warm     a previous run_linear result (e.g. the last Newton iterate or time step of a
+             transport solver, same flux tube): its root at the same (k_y, theta0), or the
+             nearest k_y at that theta0, is tried first (warm start).
 
     Returns a list (theta0 outer, k_y inner, in the order given) of dicts, deck units (GENE
     normalisation, sign: omega > 0 = ion diamagnetic direction):
@@ -433,6 +492,7 @@ def run_linear(
         for j in walk:
             kyj = kys[j]
             seed = None
+            wseed = _warm_seed(warm, kyj, th0)
             if it > 0 and out[(it - 1, j)]["converged"]:
                 o = out[(it - 1, j)]
                 seed = complex(o["omega"], o["gamma"])
@@ -451,7 +511,8 @@ def run_linear(
                     warnings.simplefilter("ignore")
                     r = deck.solve(
                         kyj,
-                        omega0=seed,
+                        omega0=wseed if wseed is not None else seed,
+                        seeds=[seed] if wseed is not None else [],
                         scan=scan,
                         theta0=th0,
                         timeout=tmo,
@@ -491,13 +552,19 @@ def run_linear(
 
 
 # ---------------------------------------------------------------------------- saturation
-def saturate(modes, C=None, rule="mixing_length"):
+def saturate(modes, C=None, rule="mixing_length", q2beta=None):
     """Saturated fluxes (solver units) from run_linear modes at one theta0.  rule
     'mixing_length': <|phi|^2>(k_y) = C (gamma/<k_perp^2>)^2 (solver units: rho_s, c_s/L_ref),
-    trapezoid integral over k_y rho_s; modes without a growing root contribute 0."""
-    if rule != "mixing_length":
+    trapezoid integral over k_y rho_s; modes without a growing root contribute 0.
+    'ml_threshold': the same with C_THR, times F_SUB when q2beta = q^2 beta_e < X_C."""
+    if rule == "mixing_length":
+        C = C_ML if C is None else C
+    elif rule == "ml_threshold":
+        if q2beta is None:
+            raise ValueError("rule 'ml_threshold' needs q2beta = q^2 beta_e")
+        C = (C_THR if C is None else C) * (1.0 if q2beta >= X_C else F_SUB)
+    else:
         raise ValueError("unknown saturation rule %r" % rule)
-    C = C_ML if C is None else C
     ky = np.array([m["ky_rho_s"] for m in modes], float)
     keys = [
         (s, ch)
@@ -550,7 +617,8 @@ def fluxes(
     comparison line for transport models that apply their own rule to run_linear output).
 
     source, ky, timeout, omega0, scan: as run_linear (theta0 = 0).  C: saturation constant
-    (default C_ML, calibrated on the stella STEP (q, beta_e) scan).  parallel: number of worker
+    (default C_ML, calibrated on the stella STEP (q, beta_e) scan with the default k_y grid).
+    rule: 'mixing_length' (default) or 'ml_threshold' (suppressed by F_SUB below q^2 beta_e = X_C).  parallel: number of worker
     processes; the k_y list is cut into this many contiguous chains, each followed by
     continuation (1 = in this process, best root following).
 
@@ -590,7 +658,8 @@ def fluxes(
                     for c in chains
                 ]
                 modes = [m for f in futs for m in f.result()]
-    sat = saturate(modes, C=C, rule=rule)
+    q2beta = deck.params["q0"] ** 2 * deck.params["beta"]
+    sat = saturate(modes, C=C, rule=rule, q2beta=q2beta)
     u = deck.units
     fQ = u["n_e"] * u["T_e"] ** 2.5 * u["m_i"] ** 0.5
     fG = u["n_e"] * u["T_e"] ** 1.5 * u["m_i"] ** 0.5
@@ -608,7 +677,8 @@ def fluxes(
         hkbm_like=np.array([m["hkbm_like"] for m in modes]),
         modes=modes,
         phi2=sat["phi2"],
-        C=C_ML if C is None else C,
+        C=(C_ML if rule == "mixing_length" else C_THR) if C is None else C,
+        q2beta=q2beta,
         rule=rule,
         seconds=time.time() - t0,
     )

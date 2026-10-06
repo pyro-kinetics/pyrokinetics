@@ -93,6 +93,26 @@ def test_saturate_mixing_length():
     assert out["Q_i_total"] == pytest.approx(1.5 * amp * 0.2 + 0.5 * 1.5 * amp * 0.2)
 
 
+def test_saturate_threshold_rule():
+    m = dict(
+        converged=True,
+        ky_rho_s=0.2,
+        gamma_solver=0.1,
+        weights_solver=dict(
+            kperp2=0.5,
+            **{
+                s: dict(phi=1.0, apar=0.0, bpar=0.5, es=1.0, em=0.5, total=1.5)
+                for s in ("Q_i", "Q_e", "Gamma_i", "Gamma_e")
+            },
+        ),
+    )
+    ms = [m, dict(m, ky_rho_s=0.4)]
+    hi = QL.saturate(ms, rule="ml_threshold", q2beta=QL.X_C * 1.01)["Q_i_total"]
+    lo = QL.saturate(ms, rule="ml_threshold", q2beta=QL.X_C * 0.99)["Q_i_total"]
+    assert lo == pytest.approx(QL.F_SUB * hi)
+    assert QL.saturate(ms)["Q_i_total"] == pytest.approx(hi * QL.C_ML / QL.C_THR)
+
+
 @pytest.mark.slow
 def test_run_linear_pyro_theta0():
     from pyrokinetics import Pyro
@@ -114,6 +134,17 @@ def test_run_linear_pyro_theta0():
     for k in ("phi", "apar", "bpar", "kperp2", "jacobian", "theta"):
         assert m0[k].shape == m0["theta"].shape
     assert np.isclose(np.abs(m0["phi"]).max(), 1.0)
+    g = m0["giacomin"]
+    assert g["Q_i_over_Q"] + g["Q_e_over_Q"] == pytest.approx(1.0)
+    assert g["amplitude"]["phi"] == 1.0 and g["Lambda_hat"] > 0
+    # warm start from the previous result: the same roots
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ms2 = QL.run_linear(
+            pyro, n=[40], theta0=[0.0, 0.1, -0.1], rho_star=0.0026, warm=ms
+        )
+    for a, b in zip(ms, ms2):
+        assert b["gamma"] == pytest.approx(a["gamma"], rel=1e-6)
 
 
 @pytest.mark.slow
