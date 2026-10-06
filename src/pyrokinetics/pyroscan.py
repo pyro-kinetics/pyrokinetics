@@ -1026,6 +1026,7 @@ class PyroScan:
         time_mode="average",
         netcdf_file=None,
         load_fields=True,
+        eigenvalues_from_fields=False,
         load_fluxes=True,
         load_moments=False,
         sum_ky=False,
@@ -1062,6 +1063,12 @@ class PyroScan:
         netcdf_file: PathLike default None
             If supplied then load PyroScanGKOutput from existing netCDF
         load_fields (bool, default True) – Flag to load fields or not
+        eigenvalues_from_fields (bool, default False) – With ``load_fields=False``,
+            still read each run's fields to derive growth_rate, mode_frequency and
+            growth_rate_tolerance from them (the smooth path ``load_fields=True``
+            takes; otherwise a code such as GS2 reports its own, noisier
+            eigenvalue output), then discard the fields run by run so only the
+            scalars are stored. Has no effect when ``load_fields=True``.
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
         sum_ky (bool, default False) – If True, sum fluxes, fields and eigenfunctions
@@ -1173,7 +1180,7 @@ class PyroScan:
             try:
                 pyro.load_gk_output(
                     output_convention=output_convention,
-                    load_fields=load_fields,
+                    load_fields=load_fields or eigenvalues_from_fields,
                     load_fluxes=load_fluxes,
                     load_moments=load_moments,
                     drop_nan=drop_nan,
