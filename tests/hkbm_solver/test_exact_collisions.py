@@ -1,7 +1,7 @@
 """Independent checks of the optional legacy reduced collision projection."""
 
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest

@@ -22,7 +22,8 @@ The old H=0 passing-boundary closure is not a validated MTM collision model.
 import numpy as np
 
 from .geometry import Geometry
-from .solver import Solver as ReducedSolver, nuD_e, nuD_i, nu_ei_gene
+from .solver import Solver as ReducedSolver
+from .solver import nu_ei_gene, nuD_e, nuD_i
 
 
 def periodic_probes(x, dt, rows, cols, interpolation):
