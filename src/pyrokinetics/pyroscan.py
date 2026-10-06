@@ -1273,7 +1273,8 @@ class PyroScan:
                             tolerance_time_range=tolerance_time_range,
                         )
                 for name, value in run_buffers.items():
-                    buffers[name].append(value)
+                    # copy: a reduced array can be a view of the run's full fields
+                    buffers[name].append(None if value is None else value.copy())
 
             except (
                 FileNotFoundError,
