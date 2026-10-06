@@ -22,10 +22,18 @@ published T3D record contract. No fabricated MTM flux shares or Bpar field.
 The geometric-mean width is exposed only with passing distribution/potential
 edge checks; otherwise the record explicitly requests caller-owned fallback.
 All model/A-shape/resolution warnings remain; this is NOT calibrated transport.
-The first 35 MTM/operator+adapter tests passed (2607948,2.08 s), including
-independent full-domain integrals, units, normalization invariance, dispatch,
-warm separation and unsupported/failure records. A further nonunity-frequency
-test and isolated full-suite validation are being prepared before publication.
+Implementation **8575d4c1** passes **122 tests in an isolated checkout**
+(Pitagora 2607960,206.40 s; one expected legacy collision warning), including
+18 adapter tests: independent full-domain integrals, units/sign conversion,
+normalization invariance, dispatch, warm separation and unsupported/failure
+records. No inherited dirty numerical files were included. Black/flake8 pass.
+Actual isolated API smoke **2607962** reproduces the full-grid MTM at beta=.15,
+ky=.2848826: gamma=.01169345345, omega_GENE=-.52677606404. Cold both-branch
+call32.34 s, warm MTM-only13.36 s. The fresh hKBM search there is unresolved,
+not a reproduction of the cached hKBM branch. MTM domain checks pass; its
+A-shape warning and validated=False remain. In rho_s^-2 the phi/A widths
+are356.64593/.03021609, geometric mean3.28275. A layer-width fallback cannot
+repair a domain-truncated eigenvalue: callers should reject or retry such roots.
 No T3D checkout is available on Pitagora; CSD3 must pull and wire/confirm the
 explicit backend in its worker. Do not claim remote deployment from this API.
 
