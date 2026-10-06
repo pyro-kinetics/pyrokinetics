@@ -3,7 +3,8 @@ Exact linear electromagnetic gyrokinetic eigenvalue solver in ballooning space (
 ordering): every species kinetic (electrons with their real mass), fields phi, A_par and delta B_par
 from quasineutrality, parallel Ampere's law and perpendicular pressure balance, exact Bessel
 gyroaverages, GENE's full_drift magnetic drift (with the K_x / secular part on the extended line),
-both parities, theta0 free.  Collisionless (Stage 1).
+both parities, theta0 free. Collisionless by default; optional legacy reduced
+collisions for twisting parity (not a full gyrokinetic collision operator).
 
 Method (frequency domain).  For a trial omega (Im omega > 0) the gyrokinetic equation of each
 species, written for G = T h/(q F0) (h the non-adiabatic part, exp(-i omega t)),
@@ -225,7 +226,7 @@ def _phis(x):
 
 
 class ExactSolver:
-    """Exact collisionless linear EM gyrokinetics at one (k_y, theta0).
+    """Full linear EM gyrokinetics at one (k_y, theta0).
 
     geo        geometry.Geo;  species: list of Species;  ky: k_y rho_s;  beta: beta_e at B_ref
     nturns     ballooning turns each side of the central one (domain |theta| <= pi (2 nturns + 1))
@@ -238,6 +239,10 @@ class ExactSolver:
     fields     subset of ("phi", "apar", "bpar")
     bp         1: dpdx in the grad-B drift (full_drift); 0: gradB_eq_curv
     drift_sign multiplies omega_d (diagnostic)
+    collision_model 'none' (default) or 'legacy': bounce-averaged trapped-electron
+        Lorentz scattering and trapped-ion Krook detrapping; twisting only.
+    coll       collision strength in the reduced solver's normalisation;
+        from_deck uses the deck's converted value when collision_model='legacy'.
     """
 
     def __init__(
@@ -260,9 +265,22 @@ class ExactSolver:
         block=None,
         species_on=None,
         nbs=4,
+        collision_model="none",
+        coll=0.0,
+        coll_ee=True,
+        coll_i=True,
+        coll_eps=None,
     ):
         if npt % 2:
             raise ValueError("npt must be even")
+        if collision_model not in ("none", "legacy"):
+            raise ValueError("collision_model must be 'none' or 'legacy'")
+        if not np.isfinite(coll) or coll < 0:
+            raise ValueError("coll must be finite and nonnegative")
+        if collision_model == "none" and coll != 0:
+            raise ValueError("nonzero coll requires collision_model='legacy'")
+        self.collision_model, self.coll = collision_model, float(coll)
+        self.legacy = None
         self.geo, self.species, self.ky, self.beta = (
             geo,
             list(species),
@@ -300,6 +318,11 @@ class ExactSolver:
             self._trapped(nq)
         self.t_setup = time.time() - t0
         self.symmetric = self._is_symmetric()
+        if self.collision_model == "legacy" and self.coll > 0:
+            from .exact_collisions import LegacyCollisions
+
+            self.legacy = LegacyCollisions(self, self.coll, coll_ee, coll_i, coll_eps)
+            self.t_setup = time.time() - t0
 
     # ------------------------------------------------------------------ setup
     def _cells(self, nq):
@@ -520,6 +543,7 @@ class ExactSolver:
                 self.trp.append(
                     dict(
                         il=il,
+                        turns=js.copy(),
                         lam=lam,
                         k1=k1 + self.npt * js,
                         Mc=Mc,
@@ -605,7 +629,12 @@ class ExactSolver:
                 continue
             self._add_passing(M, sp, isp, omega, rpos)
             if self.trapped:
+                legacy = getattr(self, "legacy", None)
+                if legacy is not None and sp.Z < 0:
+                    legacy.begin()
                 self._add_trapped(M, sp, isp, omega, rpos)
+                if legacy is not None and sp.Z < 0:
+                    legacy.apply(M)
         return M
 
     def _end_map(self, f, nodes_a, nodes_b, cells):
@@ -745,6 +774,10 @@ class ExactSolver:
             tau, dK = T["tau"][keep], T["dK"][keep]
             a1, a2, a3 = [g[:, keep] for g in T["gyro"][isp]]  # (nE, nW, Mc)
             x, dt, c = self._omega_factors(sp, omega, tau, dK)
+            legacy = getattr(self, "legacy", None)
+            if legacy is not None and sp.Z > 0:
+                # Shift only the orbit propagator, never the diamagnetic source.
+                x = x - legacy.ion_rate(sp)[:, None, None] * dt
             wv = (self.wE * self.wlt[T["il"]])[:, None, None]
             n2 = 2 * T["ns"]
             X = np.concatenate([x, x[..., ::-1]], -1)
@@ -838,6 +871,8 @@ class ExactSolver:
             Wc[1, m, cellp] = 1.0
             W = [Wn if self.ftype[f] == "node" else Wc for f in self.fields]
             gk = [g[keep] for g in gl]
+            if legacy is not None and sp.Z < 0:
+                legacy.collect(T, keep, X, DT, Rr, Cc, W, Wn, gk, rpos, omega, sp)
             for fr in range(nf):
                 Wr = W[fr].reshape(2 * n2, -1)
                 pr = rpos[gk[fr]]  # (nW, nr)
@@ -907,6 +942,11 @@ class ExactSolver:
         return np.concatenate(rows), Em, rnorm
 
     def matrix(self, omega, parity=None):
+        if getattr(self, "legacy", None) is not None and parity != "twisting":
+            raise ValueError(
+                "legacy collisions currently support twisting parity only; "
+                "keep MTM collisionless or use a separately validated collision model"
+            )
         rows, Em, r = self._parity_maps(parity)
         Mf = self.assemble(omega, rows)
         if Em is None:
@@ -1015,7 +1055,8 @@ class ExactSolver:
         )
         r["relative_residual"] = self._last_residual
         r["status"] = "growing_root" if conv else "unresolved"
-        r["collision_model"] = "none"
+        r["collision_model"] = getattr(self, "collision_model", "none")
+        r["collision_parameter"] = getattr(self, "coll", 0.0)
         if "phi" in f:
             ph = f["phi"]
             pairs = np.stack([ph[:-1], ph[1:]], axis=1)
@@ -1034,7 +1075,16 @@ class ExactSolver:
     @classmethod
     def from_deck(cls, deck, ky_ref, **kw):
         """From a gene_io.Deck at k_y rho_ref (deck units); beta, species, dpdx_term from the deck."""
-        if float(deck.nml["general"].get("coll", 0.0)) != 0:
+        model = kw.get("collision_model", "none")
+        if model == "legacy":
+            kw.setdefault("coll", deck.solver_kw["coll"])
+            warnings.warn(
+                "Legacy reduced collisions: trapped-electron Lorentz and trapped-ion "
+                "detrapping only; passing particles collisionless. Not GENE's full collision operator.",
+                UserWarning,
+                stacklevel=2,
+            )
+        elif float(deck.nml["general"].get("coll", 0.0)) != 0:
             warnings.warn(
                 "ExactSolver is collisionless: the deck's collision operator is not included.",
                 UserWarning,

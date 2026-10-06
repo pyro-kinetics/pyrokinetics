@@ -12,6 +12,10 @@ Bessel gyroaverages. phi and b use continuous linear elements; A_parallel is
 constant per cell. Trapped-pitch intervals split where bounce points cross cell
 edges. Both parities are available for theta0=0 on symmetric geometry.
 
+An explicit `collision_model="legacy"` option now adds the old hKBM reduced
+collisions to **twisting parity only**. Defaults remain collisionless. This is
+not a full collisional GK or Sugama operator, and is not validated for MTM.
+
 ```python
 from pyrokinetics.hkbm_solver.gene_io import Deck
 from pyrokinetics.hkbm_solver.exact import ExactSolver
@@ -36,8 +40,53 @@ Convergence requires a small frequency step and a componentwise field-equation
 residual below tolerance. A failed or timed-out search is **unresolved**, not
 evidence of stability. Only Im(omega)>0 is supported. Timeouts are checked between
 matrix evaluations; one expensive evaluation can overrun the requested limit.
-No collisions, Landau continuation into damped modes or GENE numerical damping
-are implemented. Collisional decks produce an explicit warning.
+No full gyrokinetic collision operator, Landau continuation into damped modes
+or GENE numerical damping is implemented. Nonzero-collision decks warn if the
+default collisionless mode is used. Selecting legacy collisions warns about the
+reduced operator's mismatch with GENE.
+
+## Optional legacy reduced collisions
+
+```python
+solver = ExactSolver.from_deck(deck, 0.3, collision_model="legacy",
+                               npt=32, nturns=2, nE=12, nlp=12)
+root = solver.find_root(-0.19 + 0.10j, parity="twisting", timeout=120)
+```
+
+The deck's converted coll parameter is used. Direct construction also accepts
+`coll`, `coll_ee`, `coll_i`, `coll_eps`. Nonzero coll with collision_model='none'
+is rejected. Passing particles remain collisionless. Trapped ions receive the
+old energy-dependent Krook detrapping in the orbit propagator, leaving the
+diamagnetic source frequency unchanged.
+
+For electrons, the old bounce-averaged Lorentz matrix and deflection rates are
+reused on the full solver's trapped-pitch grid. It acts on
+`H = <G - (1 - omega_star/omega) psi>`, with `d_l psi = i omega A_parallel` and
+psi zero at the left boundary. It must NOT be applied blindly to <G>. A
+self-consistent low-rank resolvent correction couples pitches within each well;
+the finite-transit collisionless response is retained. The operator is therefore
+a **projected legacy closure**, not a pointwise velocity-space collision operator.
+Only symmetric one-well geometry and twisting parity are currently supported;
+tearing and unrestricted-parity root searches with this option are rejected.
+
+Eight new tests independently check the orbit probes against solve_ivp, the
+pitch coupling against direct dense solves (including the psi subtraction),
+the exact zero-collision identity and small-rate limit, metadata and input guards.
+Together with non-slow exact tests, 26 tests pass. Full isolated suite is being
+rerun for this milestone; do not reuse the older 78-test count as its evidence.
+
+Three preliminary STEP pilots at ky=.2848826, npt32/nE=nlp12/nturns2:
+
+| beta | new collisionless gamma | new legacy-collisional gamma | old legacy gamma |
+| --- | ---: | ---: | ---: |
+| .09 | .1487301 | .1024053 | .0914296 |
+| .13 | .0770207 | .0129221 | .0195469 |
+| .15 | .0450957 | .0105435 | .0020880 |
+
+These restore substantial collisional suppression but do not establish
+resolution convergence or agreement with GENE. The beta=.13 collisionless seed
+did not converge; the old collisional seed found the reported root. Not an
+exhaustive spectrum search. Collisionless results and their warnings remain valid.
 
 ## Current evidence
 
@@ -68,7 +117,7 @@ required before defining a production resolution; field-equation residuals alone
 do not establish discretisation convergence.
 
 All **78 hKBM solver tests pass**, including 19 exact tests (205.40 s on one CPU).
-This was checked in an isolated worktree containing only this milestone over
+This is the earlier collisionless milestone, checked in an isolated worktree over
 the prior commit, excluding the separate unpublished reduced-solver speed work.
 The one warning documents the existing reduced model's collision-operator mismatch.
 This does not validate collisional MTMs, long current layers or an entire beta-ky map.
@@ -89,6 +138,11 @@ search for the dominant instability. `--parity reference` uses Ctear>0.5 to choo
 tearing parity; `--parity both` tries both sectors. A nominal-collisional template
 is explicitly run with collisions off, and `collision_physics_match=false` is
 recorded. Frequencies returned by the CLI are in deck units and GENE's sign.
+
+For the legacy twisting comparison, replace `--collisionless` with
+`--collision-model legacy --parity twisting`. This preserves nominal coll in
+the deck but still marks collision_physics_match=false for a nonzero-collision
+GENE reference: the reduced model is not Sugama. Save to a NEW output path.
 
 The CSV's rectangular domain has 36 beta x 22 ky = 792 cells, but the source
 contains **791 measured rows**: beta=0.146, ky=0.009496086 is missing. The driver
@@ -111,8 +165,9 @@ resume; use a new output for a changed search or refinement.
 ## Remaining milestones
 
 1. Finish collisionless field/velocity/domain convergence and GENE reference checks.
-2. Implement and independently test a pitch-angle collision operator. A Krook shift
-   is not that operator. Benchmark actual collisional MTM growth, frequency and
+2. Extend beyond the projected legacy hKBM collision closure to a validated full
+   pitch-angle collision operator. A Krook shift is not that operator.
+   Benchmark actual collisional MTM growth, frequency and
    current-layer structure against GENE/GS2, including collisionality scans.
    The supplied GENE deck uses Sugama collisions with conservation/FLR options;
    pitch-angle scattering alone is not identical physics. First compare like

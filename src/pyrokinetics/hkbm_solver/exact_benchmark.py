@@ -65,7 +65,9 @@ def read_reference(path):
     return result
 
 
-def configuration(template, reference, resolution, maxit, timeout):
+def configuration(
+    template, reference, resolution, maxit, timeout, collision_model="none"
+):
     """Hash numerical settings and all solver sources, including local modifications."""
     sources = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
@@ -78,7 +80,7 @@ def configuration(template, reference, resolution, maxit, timeout):
         resolution=resolution,
         maxit=maxit,
         timeout=timeout,
-        collision_model="none",
+        collision_model=collision_model,
         seed_method="GENE eigenvalue",
     )
     config["id"] = hashlib.sha256(
@@ -111,8 +113,14 @@ def solve_case(reference, parity, template, config):
     started = time.monotonic()
     nml = f90nml.reads(template)
     nominal_coll = float(nml["general"].get("coll", 0.0))
+    collision_model = config.get("collision_model", "none")
+    if collision_model not in ("none", "legacy"):
+        raise ValueError("unsupported collision_model")
+    if collision_model == "legacy" and parity != "twisting":
+        raise ValueError("legacy collisions require twisting parity")
     nml["general"]["beta"] = reference["beta"]
-    nml["general"]["coll"] = 0.0
+    if collision_model == "none":
+        nml["general"]["coll"] = 0.0
     nml["box"]["kymin"] = reference["ky"]
     record = dict(
         reference=reference,
@@ -120,6 +128,7 @@ def solve_case(reference, parity, template, config):
         configuration=config,
         reference_coll=nominal_coll,
         collision_physics_match=nominal_coll == 0,
+        collision_model=collision_model,
         status="unresolved",
         converged=False,
     )
@@ -130,10 +139,13 @@ def solve_case(reference, parity, template, config):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 deck = Deck(deck_path)
+                solver = ExactSolver.from_deck(
+                    deck,
+                    reference["ky"],
+                    collision_model=collision_model,
+                    **config["resolution"],
+                )
             record["input_warnings"] = [str(w.message) for w in caught]
-            solver = ExactSolver.from_deck(
-                deck, reference["ky"], **config["resolution"]
-            )
             cs = deck.units["c_s_over_c_ref"]
             seed = (
                 complex(
@@ -157,6 +169,7 @@ def solve_case(reference, parity, template, config):
                 iterations=result["iters"],
                 setup_seconds=solver.t_setup,
                 root_seconds=result["seconds"],
+                collision_parameter=result["collision_parameter"],
             )
             for key in (
                 "omega",
@@ -188,6 +201,7 @@ def main(argv=None):
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--collisionless", action="store_true")
+    parser.add_argument("--collision-model", choices=("none", "legacy"), default="none")
     parser.add_argument(
         "--indices", help="comma-separated zero-based CSV row indices (default all)"
     )
@@ -210,9 +224,15 @@ def main(argv=None):
     ):
         parser.add_argument(f"--{name}", type=int, default=default)
     args = parser.parse_args(argv)
-    if not args.collisionless:
+    if not args.collisionless and args.collision_model == "none":
         parser.error(
             "the current exact solver is collisionless; pass --collisionless explicitly"
+        )
+    if args.collision_model == "legacy" and (
+        args.collisionless or args.parity != "twisting"
+    ):
+        parser.error(
+            "--collision-model legacy requires --parity twisting and no --collisionless"
         )
     if args.workers < 1 or args.maxit < 1 or args.timeout <= 0:
         parser.error("workers, maxit and timeout must be positive")
@@ -230,7 +250,12 @@ def main(argv=None):
         for key in ("npt", "nturns", "nE", "nlp", "nlt", "nq", "nbs")
     }
     config = configuration(
-        template, args.reference, resolution, args.maxit, args.timeout
+        template,
+        args.reference,
+        resolution,
+        args.maxit,
+        args.timeout,
+        args.collision_model,
     )
     done = completed_records(args.output, config["id"])
     jobs = []
@@ -246,7 +271,7 @@ def main(argv=None):
         jobs.extend((ref, par) for par in parities if (ref["index"], par) not in done)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     print(
-        f"{len(rows)} reference cells; {len(jobs)} pending solves; collisionless diagnostic",
+        f"{len(rows)} reference cells; {len(jobs)} pending solves; collision model={args.collision_model}",
         flush=True,
     )
     with (
