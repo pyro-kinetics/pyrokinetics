@@ -261,6 +261,7 @@ def test_collisionless_step_root_and_field_refinement():
     from the imperfectly matched GENE numerical operator.
     """
     from pathlib import Path
+
     from pyrokinetics.hkbm_solver.gene_io import Deck
 
     with warnings.catch_warnings():
