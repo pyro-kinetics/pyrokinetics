@@ -72,8 +72,10 @@ tearing and unrestricted-parity root searches with this option are rejected.
 Eight new tests independently check the orbit probes against solve_ivp, the
 pitch coupling against direct dense solves (including the psi subtraction),
 the exact zero-collision identity and small-rate limit, metadata and input guards.
-Together with non-slow exact tests, 26 tests pass. Full isolated suite is being
-rerun for this milestone; do not reuse the older 78-test count as its evidence.
+Together with non-slow exact tests, 26 tests pass. The **full isolated suite
+passes: 86 tests, one expected collision-operator warning, 207.10 s** (Pitagora
+job 2606419). Numerical sources were a clean 7f78cbdf checkout, excluding all
+unpublished speed edits; only generated test-build version metadata was added.
 
 Three preliminary STEP pilots at ky=.2848826, npt32/nE=nlp12/nturns2:
 
@@ -87,6 +89,15 @@ These restore substantial collisional suppression but do not establish
 resolution convergence or agreement with GENE. The beta=.13 collisionless seed
 did not converge; the old collisional seed found the reported root. Not an
 exhaustive spectrum search. Collisionless results and their warnings remain valid.
+
+The full 791-cell legacy-twisting first pass completed (job 2606408, 241.7 s
+scan wall time on 256 cores): 389 roots, 304 timeouts, 98 unresolved searches;
+32 roots have edge_phi>=.01. The plotted comparison retains the separate
+collisionless tearing pass: 103 roots, 688 unresolved, 98 endpoint flags.
+Low-ky twisting outliers remain (76 above the GENE maximum growth, largest
+gamma=7.39642), so neither numerical convergence nor reliable MTM identification
+is claimed. Failed searches are not stable points. These full-grid runs include
+hashed local speed edits; the isolated test result above does not.
 
 ## Current evidence
 
