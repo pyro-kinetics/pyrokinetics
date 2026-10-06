@@ -79,9 +79,46 @@ and its `.provenance.json` sidecar. This is observational benchmark evidence,
 not a test that blesses every point as physically correct. Raw records and
 research drivers remain on Pitagora in `analysis/solver/mtm/`.
 
-This is an experimental milestone, not the completed791-cell collisional STEP
-scan. Next: develop the rough reduced-pair map and investigate missed/masked
-branches; retain uncertainty flags. Production T3D defaults remain unchanged.
+### Full reduced-pair first pass: 791 searches in 106 seconds (6 October)
+
+Dan challenged the initial 1-2 hour estimate and noted GENE uses one parallel
+domain. The estimate unnecessarily extrapolated an uncapped 1/ky domain with
+only 12 workers on a 256-core allocation. A new 128-worker run, **2607886**,
+completed all **791 searches in 106.0 s**, allocation 110 s, no errors/timeouts.
+Median MTM search 14.74 s. Old collisional hKBM results were reused, not retimed.
+Numerical implementation remains the source-path-verified clean 817dcef2;
+all source hashes stayed unchanged. The existing 104-test evidence still applies.
+
+Profile: npt24/nE12/nxi16, third-order, fixed A, physical drift sign, theory
+seeds; nturns=min(32,max(8,ceil(32*.2848826/ky))). This caps 251 cells and uses
+at most 65 total ballooning periods. It is an exploratory truncation, NOT an
+exact match to GENE boundary conditions or a convergence certificate.
+
+Local GENE template/output: nx0=64, nz0=128, nexc=1, n_pol default1. Its one
+parallel period connects different kx harmonics; it is not one isolated
+ballooning period with zero incoming g. See [GENE parallel boundary condition,
+Eq.3.32](https://genecode.org/PAPERS_1/lapillonne.pdf). Domain check 2607880:
+at beta=.14/ky=.2848826, one isolated period takes .59 s but gamma=.0007526,
+versus .0114589 at nturns32 (16.05 s). Simply cutting to one period loses the
+growth by a factor 15.2 in this model. nturns16 gives .0114650 in 8.18 s but
+still has edge_g=.061. Low-ky results remain particularly domain sensitive.
+
+New MTM searches: **480 growing roots, 311 unresolved**, no timeouts/errors.
+Pair selects **371 old hKBM, 183 MTM, 237 unresolved**. Of **597 GENE-growing
+cells** (gamma>.001), 498 have candidates and **378 are within a factor two**
+(378/597 overall, 378/498 recovered); median recovered growth ratio 1.081.
+There are also 56 pair candidates where GENE gamma<=.001, so this is not a
+validated stability boundary. **143 MTM roots have domain flags**, including
+65 selected MTMs. Field-shape/resolution limitations and old-hKBM outliers remain.
+
+Published full table: `tests/hkbm_solver/data/mtm_collisional_pair_full.csv`
+and `.provenance.json`. Complete raw SHA256:
+`d2770a92a73bff2ff93cca1e9193dbea510012a7ea29d5ac5877fa67a8691b91`.
+Pitagora output stem `analysis/solver/mtm/rough_pair_full_20261006` contains
+JSONL, summary, PNG and PDF. The plot uses GENE colour limits, grey unresolved,
+MTM-selection circles, orange MTM-domain flags and crosses for clipped values.
+This completes grid coverage, NOT physical/model validation. Next improve
+missing/masked branches and low-ky truncation/outliers. T3D defaults unchanged.
 
 ### Full-orbit solver and legacy hKBM collisions
 
