@@ -19,6 +19,11 @@ pyro.gk_output["growth_rate"], pyro.gk_output["mode_frequency"], pyro.gk_output[
 
 ## Install
 
+The experimental full collisionless GK solver is `exact.ExactSolver`, separate
+from the reduced hKBM model described below. Its API, numerical validation and
+unfinished collision/MTM work are documented in [EXACT_STATUS.md](EXACT_STATUS.md).
+It is not yet validated for collisional MTM calculations.
+
 From a checkout of this branch:
 
 ```bash
