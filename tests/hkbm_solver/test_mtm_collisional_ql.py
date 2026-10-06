@@ -1,14 +1,16 @@
 """T3D contract, units and warning propagation; not MTM transport validation."""
 
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
-import warnings
 
 import f90nml
 import numpy as np
 import pytest
 
-from pyrokinetics.hkbm_solver import mtm, mtm_collisional_ql as Q, quasilinear as QL
+from pyrokinetics.hkbm_solver import mtm
+from pyrokinetics.hkbm_solver import mtm_collisional_ql as Q
+from pyrokinetics.hkbm_solver import quasilinear as QL
 from pyrokinetics.hkbm_solver.gene_io import Deck
 
 DATA = Path(__file__).parent / "data/step_ky0.2/parameters"
