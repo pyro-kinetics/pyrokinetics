@@ -420,9 +420,14 @@ def run_linear(
     maxit=30,
     wmax=1.0,
     warm=None,
+    modes=("hkbm",),
+    mtm_kw=None,
 ):
     """Linear hKBM modes on a (k_y, theta0) grid in one process: the raw input of a
     quasilinear transport model (e.g. T3D's GS2-QL machinery).
+
+    modes    branches to solve: ("hkbm",) (default), ("mtm",) or ("hkbm", "mtm"); see
+             mtm.run_linear_modes (records tagged 'branch' and 'parity'; mtm_kw: MTM options).
 
     source   pyrokinetics Pyro object (local Miller/MXH, electrons + one ion species; any code,
              written as a GENE deck by pyrokinetics), a GENE parameters file or its run directory.
@@ -460,6 +465,13 @@ def run_linear(
       Gamma_i, Gamma_e (= Gamma_i) per <|phi|^2> (GENE nrg definitions, channels phi, apar,
       bpar, es, em, total), shares (Q_i, Q_e, Gamma over Q_i + Q_e), ambipolarity;
       weights_solver: the same in the solver's units (T_e, n_e, m_i, rho_s)."""
+    if tuple(modes) != ("hkbm",):
+        from .mtm import run_linear_modes
+
+        kw = dict(ky=ky, n=n, theta0=theta0, rho_star=rho_star, timeout=timeout)
+        kw.update(omega0=omega0, scan=scan, fields=fields, verbose=verbose)
+        kw.update(maxit=maxit, wmax=wmax, warm=warm)
+        return run_linear_modes(source, modes=modes, mtm_kw=mtm_kw, **kw)
     import tempfile
 
     from .gene_io import Deck

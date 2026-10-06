@@ -130,3 +130,85 @@ so the basis gets the odd Hermite functions too (16 per field). gamma(theta0) = 
 holds to 1e-3 for up-down symmetric geometry. GENE's radial modes connect every 2 pi kappa k_y,
 so a GENE run with kx_center has theta0 = kx_center/(kappa k_y). Against such GENE runs (STEP,
 k_y rho_s 0.2/0.3, theta0 0.07-1) gamma agrees within ~20 % up to theta0 ~ 0.3 (README).
+
+## Microtearing branch (`mtm.py`)
+
+`mtm.py` solves the collisionless gyrokinetic microtearing dispersion relation of Chandran &
+Schekochihin (J. Plasma Phys. 2024, arXiv:2211.02103). It is used as the tearing-parity branch in
+`run_linear(..., modes=("hkbm", "mtm"))`.
+
+**Model.**
+
+- Ampere's law at theta ~ 1 fixes A_par = C B/k_perp^2. A_par enters the rest of the problem only
+  through its line integral psi_inf.
+- The dispersion relation (C&S 2.39) is
+
+      omega - omega_*e (1 + eta_e/2) + i sqrt(pi) [v_Te/L + omega^2 B_max/(2 v_Te) int J Gamma dPhi] = 0.
+
+- dPhi comes from quasineutrality at |theta| >> 1 (C&S 2.46). This is an integral equation along the
+  extended ballooning angle, out to |theta| ~ 1/(k_perp rho_e). The ions are Boltzmann
+  (tau = T_i/T_e), and W_p is the passing-electron kernel. The equation is solved by GMRES. The W_p
+  product uses a blocked propagator recursion.
+- The trapped-electron kernel (C&S A8) is an option and is off in production. Its bounce-averaged
+  precession resonance is not resolved near the real axis.
+- Krook collisions on the passing electrons (omega -> omega + i nu_D^e(E)) are also an option. They
+  can only damp: a Krook does not change the layer-integrated current, so it cannot give the
+  classical collisional drive.
+
+**Geometry.** This is GENE's Miller/MXH geometry. Turn j of the extended angle is the central turn
+of a mode with ballooning angle theta0 - 2 pi j, the same shift as `Geo.shifted`. The magnetic drift
+is GENE's full_drift form with the electron charge.
+
+**Root finding.** A low-resolution secant search gives the no-root verdict in 0.1-2.5 s; the cost
+grows with the number of turns, that is, at low k_y. A production-resolution secant search follows
+(0.2-3 s per root).
+
+**Tests against the paper** (Patel et al. 2022 Table 2 surface, `tests/hkbm_solver/test_mtm.py`).
+
+These agree with the paper:
+
+- B range, the averaged beta_e, the omega_0 line of Fig. 3, and the amplitudes of Fig. 5;
+- the exact limits: eta_e = 0, the dPhi term off, and the cold-ion closed form.
+
+The growth rates of C&S Fig. 3 are reproduced quantitatively (omega_r within 7 %, gamma within
+5-40 %, the collapse near k rho_e ~ beta_e included), and the sign structure of Fig. 5 with them,
+**only with the electron magnetic drift reversed** relative to GENE's convention (`drift_sign=-1`,
+a diagnostic). Removing any of the following does not reproduce them:
+
+- the pressure term from the drift;
+- beta' altogether;
+- the radial (K_x) part of the drift.
+
+A possible cause on the paper's side is an electron drift built from ion-normalised geometry
+coefficients without the charge sign: for example, GS2-style gbdrift/cvdrift used for electrons as
+for ions. This is a hypothesis, not a confirmed fact.
+
+The reversed-drift tests therefore check that the implementation solves the paper's equations; the
+physical sign is the default. Two checks support it:
+
+- omega_De(theta = 0)/omega_*e > 0, which is bad curvature at the outboard midplane, holds on a
+  circular deck and on the Patel surface. The formula is the same as the solver's validated
+  electron precession.
+- On a circular deck the extended drift follows the s-alpha form cos theta + s theta sin theta.
+
+On the Patel surface the transit-averaged passing-electron drift is opposite to omega_*e (shaping:
+kappa 3, delta 0.45, R/a 1.79), with or without beta'.
+
+**Collisionless result with GENE's (physical) drift sign.**
+
+- On the Patel surface, on STEP (Fig. 16 of Kennedy et al. 2023) and on a CBC-like circular deck
+  (k_y rho_s 0.1-0.5) there is **no growing collisionless MTM**.
+- omega_r stays within a few per cent of omega_*e(1 + eta_e/2). GENE's STEP MTMs sit at this
+  frequency to <1 %, so it agrees.
+- GENE's weak STEP MTMs (gamma ~ 0.005-0.01 c_s/a) are therefore not given by this branch. They
+  need a collisional (Lorentz) passing-electron model, which is not implemented.
+- On STEP the reversed sign gives omega 9 % off GENE's and gamma 10x too high.
+
+**Flags.** The MTM records carry `checks`:
+
+- converged and growing;
+- electron_direction;
+- ordering: k_perp rho_e/beta_e < 0.3;
+- phi_decays.
+
+`no_root_verdict` is True when the low-resolution search finds no growing root.
