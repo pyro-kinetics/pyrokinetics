@@ -151,9 +151,10 @@ Schekochihin (J. Plasma Phys. 2024, arXiv:2211.02103). It is used as the tearing
   product uses a blocked propagator recursion.
 - The trapped-electron kernel (C&S A8) is an option and is off in production. Its bounce-averaged
   precession resonance is not resolved near the real axis.
-- Krook collisions on the passing electrons (omega -> omega + i nu_D^e(E)) are also an option. They
-  can only damp: a Krook does not change the layer-integrated current, so it cannot give the
-  classical collisional drive.
+- Krook collisions on the passing electrons (omega -> omega + i nu_D^e(E)) are also an option.
+  This propagator-only modification is not a derived collisional extension of the complete
+  dispersion relation. In the tested STEP cases it damps the mode and does not recover the
+  nominal-collisional GENE growth. Do not infer that every possible Krook closure only damps.
 
 **Geometry.** This is GENE's Miller/MXH geometry. Turn j of the extended angle is the central turn
 of a mode with ballooning angle theta0 - 2 pi j, the same shift as `Geo.shifted`. The magnetic drift
@@ -196,12 +197,14 @@ kappa 3, delta 0.45, R/a 1.79), with or without beta'.
 
 **Collisionless result with GENE's (physical) drift sign.**
 
-- On the Patel surface, on STEP (Fig. 16 of Kennedy et al. 2023) and on a CBC-like circular deck
-  (k_y rho_s 0.1-0.5) there is **no growing collisionless MTM**.
+- On the tested Patel, STEP and CBC-like grids, this reduced model's physical-sign searches
+  found no growing collisionless MTM. Failed searches do not prove spectral stability or
+  rule out full-GK tearing-parity roots.
 - omega_r stays within a few per cent of omega_*e(1 + eta_e/2). GENE's STEP MTMs sit at this
   frequency to <1 %, so it agrees.
-- GENE's weak STEP MTMs (gamma ~ 0.005-0.01 c_s/a) are therefore not given by this branch. They
-  need a collisional (Lorentz) passing-electron model, which is not implemented.
+- GENE's weak STEP MTMs (gamma ~ 0.005-0.01 c_s/a) are not reproduced by those searches.
+  An experimental collisional electron response is now implemented separately below;
+  it is not selected automatically by the existing MTM/T3D interface.
 - On STEP the reversed sign gives omega 9 % off GENE's and gamma 10x too high.
 
 **Flags.** The MTM records carry `checks`:
@@ -212,3 +215,68 @@ kappa 3, delta 0.45, R/a 1.79), with or without beta'.
 - phi_decays.
 
 `no_root_verdict` is True when the low-resolution search finds no growing root.
+
+## Experimental collisional C&S-shaped extension (`mtm_collisional.py`)
+
+This starts from C&S equation (2.25), before the collisionless orbit integrals
+and the small-theta current reduction leading to (2.39). It keeps their
+Boltzmann-ion approximation and initial A_parallel shape B/kperp^2 but replaces
+independent collisionless orbits with a coupled local pitch-angle response.
+It is **not** their scalar dispersion with omega replaced by omega+i*nu.
+
+Let g=-h_e/F0e, E=v^2/vte^2, xi=vpar/v, vte=sqrt(2/me), and
+a0=kperp*v/abs(Omega_e), so a0^2=2*me*E*kperp^2/B^2. The implemented equations are
+
+```text
+[S - i(omega-omega_de) - C_ei] g = -i(omega-omega_star_e) J0 (phi-vpar A),
+S = v/(JB) [xi*d_theta - (1-xi^2)/2 * d_theta(ln B) * d_xi],
+C_ei = nu_D(E)/2 * d_xi[(1-xi^2)*d_xi] - nu_D(E)*a0^2*(1+xi^2)/4,
+nu_D(E) = nu_ei/E^(3/2),  nu_ei = 4*coll/sqrt(me),
+(1+1/tau)*phi = <J0*g>,
+int J*A_test*[kperp^2*A - beta/2*<vpar*J0*g>] dtheta = 0.
+```
+
+The velocity average uses (2/sqrt(pi))*sqrt(E)*exp(-E) dE times dxi/2.
+The gyroaveraged Lorentz FLR term follows from averaging the angular Laplacian
+of exp(-i*k.rho)*g: the cross terms vanish and the squared angular phase
+gradient averages to a0^2*(1+xi^2)/2. The Lorentz operator scatters passing as
+well as trapped electrons; no artificial H=0 trapped-passing boundary is used.
+At kperp=0 it conserves the angular density, while damping harmonic l at
+nu_D*l*(l+1)/2. Electron-ion momentum transfer is to stationary ions. This is
+not an electron-electron conserving collision operator or GENE's Sugama model.
+
+Numerics: Gauss-Legendre xi collocation, generalised Gauss-Laguerre E,
+second- or third-order upwind theta differences. The mirror term is retained.
+Incoming g vanishes at each end; phi is odd and A even, so currently theta0=0
+and up-down symmetry are required. Sparse per-energy LU solves give a linear
+density/current response; GMRES eliminates quasineutrality, then a complex
+secant search enforces the remaining Ampere projection. Only the growing half
+plane is supported. Search failure is unresolved, not stable.
+
+With nA=1 the A shape is exactly B/kperp^2. Optional nA>1 adds even rational
+Chebyshev functions times that shape, orthogonalised in the J*kperp^2 metric.
+All their Ampere projections are enforced through a small Schur complement.
+This tests whether the prescribed C&S shape is adequate at finite collisions;
+it is a broader reduced field model, not an exact C&S equivalence. Pointwise
+Ampere residuals, theta/pitch/energy refinement and domain convergence remain
+essential even if projected equations have tiny residuals.
+
+Independent tests cover Lorentz conservation/dissipation/eigenvalues, the
+uniform-plasma density and inductive-current response, zero-collision identity,
+mirror orbit invariants, parity and additional Ampere projections. In the
+uniform test, g_l=(omega-omega_star)/(omega+i*nu_D*l*(l+1)/2)*chi_l: the density
+is not Krook damped, but the current is. This verifies a property missing from
+the earlier Krook modification. These tests are not a STEP MTM validation.
+
+Limits: no ee energy diffusion or field-particle terms, kinetic-ion response,
+Bpar, equilibrium flows or damped-mode Landau continuation. The zero-collision
+limit is the pre-asymptotic electron problem with the selected A basis, not a
+bitwise recovery of C&S (2.39). Full collisionless matching and nominal GENE
+benchmark agreement are outstanding. Retain physical drift_sign=+1; -1 is
+diagnostic only. Constant collision frequency and disabling collision FLR are
+also labelled diagnostics, not fitted parameters for reproducing GENE.
+
+Sources: [Chandran & Schekochihin (2024)](https://arxiv.org/abs/2211.02103),
+especially (2.25), (2.33), (2.37), (2.44); collision-model sensitivity and the
+importance of velocity dependence are discussed by
+[Yagyu & Numata (2023)](https://arxiv.org/abs/2212.09283).

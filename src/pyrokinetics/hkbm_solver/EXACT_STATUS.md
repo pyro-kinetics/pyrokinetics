@@ -6,6 +6,49 @@ still requires field, velocity and ballooning-domain convergence tests.
 
 ## Implemented
 
+### Separate collisional MTM experiment (6 October, in validation)
+
+`mtm_collisional.CollisionalMTMSolver` now implements a coupled electron-ion
+Lorentz response on theta/local pitch/energy. It starts from C&S's electron
+equation, retains hot ions and no Bpar, and initially uses A=B/kperp^2. Optional
+`nA>1` tests a broader even-A basis. It is not a new collision option in
+`ExactSolver`, not the old `mtm.py` Krook shift, not Sugama, and not automatically
+selected by `run_linear` or T3D. Equations and limitations are in PHYSICS.md.
+
+```python
+from pyrokinetics.hkbm_solver.mtm_collisional import CollisionalMTMSolver
+
+# deck must contain the intended beta/pressure gradients and collision strength.
+solver = CollisionalMTMSolver.from_deck(
+    deck, 0.2848826, npt=32, nturns=16, nE=16, nxi=24, theta_order=3
+)
+root = solver.solve(0.52 + 0.01j, timeout=240)
+```
+
+Seed/internal frequencies use c_s/L_ref and electron-direction positive real
+part; `omega_gene_deck` and `gamma_deck` are converted to deck units. `status`
+distinguishes growing_root, unresolved and timeout. `validated=False` and
+`collision_physics_match=False` are deliberately retained for every result.
+Inspect QN/kinetic/projected residuals, `edge_phi`, `edge_g`, and
+`ampere_core_residual`, not just `converged`. The prescribed/basis-projected
+Ampere equations need not satisfy pointwise Ampere's law.
+
+**18 independent tests pass** (Pitagora 2607421, 1.56 s), including a deliberately
+short-domain root regression which must expose its large edge amplitude.
+Numerical roots with physical drift sign and energy-dependent collisions have
+been obtained at beta=.14, ky=.2848826, but **a converged GENE benchmark is not
+yet established**. The tempting coarse pilot gamma=.0059737 versus GENE .0065721
+does not survive refinement unchanged. Third-order npt64/nE16/nxi24/domain
++/-65pi gives gamma=.0161021 with the fixed A shape; doubling pitch resolution
+changes it substantially. Allowing five A basis functions reduces local
+Ampere mismatch but does not remove the model/resolution questions. Zero-rate
+and constant-rate control searches are unresolved, not certified stable.
+
+This is an experimental milestone, not a completed collisional STEP beta-ky
+scan. No full-grid launch or T3D default change is justified by these pilots.
+
+### Full-orbit solver and legacy hKBM collisions
+
 `exact.ExactSolver` integrates collisionless passing and trapped particle
 responses, with phi, A_parallel and delta-B_parallel, finite electron mass and
 Bessel gyroaverages. phi and b use continuous linear elements; A_parallel is

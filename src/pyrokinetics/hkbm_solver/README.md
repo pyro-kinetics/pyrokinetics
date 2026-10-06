@@ -24,6 +24,15 @@ from the reduced hKBM model described below. Its API, numerical validation and
 unfinished collision/MTM work are documented in [EXACT_STATUS.md](EXACT_STATUS.md).
 It is not yet validated for collisional MTM calculations.
 
+An experimental collisional alternative is
+`mtm_collisional.CollisionalMTMSolver.from_deck(deck, ky_ref, ...)` followed by
+`.solve(seed_in_internal_units)`. It solves a coupled Lorentz electron-ion
+response with hot ions, initially using Chandran & Schekochihin's prescribed
+A_parallel shape; optional `nA>1` relaxes that shape. It is separate from
+`mtm.solve_deck` and is **not** enabled in T3D or `modes=("mtm",)`.
+See the collisional section in [PHYSICS.md](PHYSICS.md) for equations, tests
+and restrictions. Small equation residuals do not establish MTM convergence.
+
 From a checkout of this branch:
 
 ```bash
