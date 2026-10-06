@@ -1,0 +1,40 @@
+{
+  "cells": 24,
+  "gene_growing": 21,
+  "pair_growing": 18,
+  "within_factor_two": 16,
+  "median_gamma_ratio": 1.2257332301651231,
+  "median_mtm_seconds": 13.956319438409992,
+  "statuses": {
+    "growing_root": 18,
+    "unresolved": 6,
+    "timeout": 0
+  },
+  "input_sha256": "ca42a15da0aa6ad399d42adb1c36202c7cc9e7712cbff5090a1fe075a53be5cb",
+  "source_sha256": {
+    "mtm_collisional.py": "3249d5ea469c7f20e1fd02385f7833f886c7588bce5820cb701b7e05b509a2f3",
+    "gene_io.py": "70779a45f3a216fc6c806d9e463b834910818f856dbd055b1c1d555fd0135836",
+    "mtm.py": "2e9f68a62f8cd95085adb6ed40facb8df253074d77aaa9f85669c59d0a6e39db",
+    "solver.py": "b81bee429fa5f844b92099210c16ecd8823a5d69fb3775be54b7ae3d7976c485",
+    "exact.py": "3eece36dfdc6b25774d5395299666c1dff912b0d5efe02f3d891db125f7f1a6d",
+    "geometry.py": "d4c5d250cda647b71e490c73dd2c6fcb4b32a7f411a52a363f47f58e5778a8fb",
+    "exact_benchmark.py": "f9b5778dd864633076983da1d99264681f43e7506639b8e98d0459796b10eb39",
+    "quasilinear.py": "f9d04d1e51194b180321fa7414f3c1e329b7c5fa2f6acb172de1c8aeb3bb08a4",
+    "cli.py": "26abf0af368f473f77aff415837ce4d7b27a0053f0887735a77aab691636513b",
+    "exact_collisions.py": "768b4467df7e49d10a5821fcb4e829dcfac7e19fac98c0d7f20917e4ce55470d",
+    "__init__.py": "5ae1cfe4c744253182e5cf79f36f827a24e854c56a0c9afc3edd10231392797e",
+    "kernels.py": "99f60b6c290ebd0d25f854c55461cc3cccdaf171bb7a531a0cfcef49a938674a",
+    "__main__.py": "13a1a5b340cdcfc1902b62be90e508c7c71886000d5bf087e7854aadf09fb35e",
+    "ion_stream.py": "275fb9b83b5ccd31ae9cc1f094a54029c154c613cd44fb450563ecd0d336341e",
+    "miller.py": "9f6d86d7c1cd8a65814d0468d111d650feb8b2602d903696453bb8ea1d766d85"
+  },
+  "pair_provenance": {
+    "old_hkbm_path": "/pitagora_scratch/userexternal/dkennedy/hKBM/analysis/solver/step_qbeta/results/fig16_points.jsonl",
+    "old_hkbm_sha256": "a78ac41d2ce6f9ed0bab6008574c83ecffc12bdfbef74aecac9e9d77fb1110c4",
+    "imported_module": "/pitagora_scratch/userexternal/dkennedy/hKBM/analysis/solver/mtm/isolated-dk3csy9m/src/pyrokinetics/hkbm_solver/mtm_collisional.py",
+    "driver_sha256": "1c98c43df1a83e31ccf95dc2b98941c439e37c89d76363cdcdb6e8b588b9ae20",
+    "pilot_driver_sha256": "43450eecc6d94df3ba381fb7e59a4b2ee90c2d17bd257c6b7d8385abe34b874d",
+    "profile": "provisional: npt24,nE12,nxi16,third-order,fixed-A; no convergence claim"
+  },
+  "caveat": "Provisional sampled pair; reused old hKBM roots; no stability, A-shape or resolution-convergence certification"
+}

@@ -6,7 +6,12 @@ still requires field, velocity and ballooning-domain convergence tests.
 
 ## Implemented
 
-### Separate collisional MTM experiment (6 October, in validation)
+### Separate collisional MTM experiment (6 October, tested experimental release)
+
+Dan clarified the target: a **quick reduced hKBM + reduced MTM pair that very
+roughly reproduces GENE beta-ky trends**, with full GK as a diagnostic rather
+than the default production route. Prioritise approximate growth/branch maps,
+coverage and cost, while keeping unresolved/numerically uncertain cells visible.
 
 `mtm_collisional.CollisionalMTMSolver` now implements a coupled electron-ion
 Lorentz response on theta/local pitch/energy. It starts from C&S's electron
@@ -33,7 +38,8 @@ Inspect QN/kinetic/projected residuals, `edge_phi`, `edge_g`, and
 `ampere_core_residual`, not just `converged`. The prescribed/basis-projected
 Ampere equations need not satisfy pointwise Ampere's law.
 
-**18 independent tests pass** (Pitagora 2607421, 1.56 s), including a deliberately
+**104 tests pass in an isolated 817dcef2 checkout** (Pitagora 2607439, 210.80 s,
+one expected warning), including 18 new MTM tests and a deliberately
 short-domain root regression which must expose its large edge amplitude.
 Numerical roots with physical drift sign and energy-dependent collisions have
 been obtained at beta=.14, ky=.2848826, but **a converged GENE benchmark is not
@@ -44,8 +50,38 @@ changes it substantially. Allowing five A basis functions reduces local
 Ampere mismatch but does not remove the model/resolution questions. Zero-rate
 and constant-rate control searches are unresolved, not certified stable.
 
-This is an experimental milestone, not a completed collisional STEP beta-ky
-scan. No full-grid launch or T3D default change is justified by these pilots.
+The two higher-pitch retries also converged: at beta=.14/ky=.2848826,
+npt64/nturns32/nE16/nxi48 gives gamma=.01146579, omega_GENE=-.52751696;
+nA5 at nturns16 gives .01309776/-.52402484. npt32/nturns16/nE16/nxi64
+gives .00914844/-.52832485. These are not a jointly converged sequence.
+
+**24-cell rough-pair pilot:** four betas (.09,.11,.13,.15), six ky values
+(nearest .14,.237,.285,.38,.57,.95). Reuse saved old collisional hKBM roots;
+solve MTM from the theoretical diamagnetic seed, not GENE eigenvalues. Profile:
+npt24/nE12/nxi16, third-order theta, nA1, nturns=ceil(32*.2848826/ky), at least8.
+Pitagora 2607451 took48.0 s on12 workers, median MTM search13.8 s. A pristine
+817dcef2 repeat (2607476), with an asserted shared-filesystem import path,
+reproduces the numerical results. All source hashes are recorded/unchanged.
+An intervening attempt using a node-local /tmp PYTHONPATH fell back to the
+editable worktree; it is explicitly excluded as isolation evidence.
+
+Of21 GENE-growing sampled cells,18 have a growing pair candidate;16/18 are
+within a factor of2 (median ratio1.226). Three GENE-growing higher-ky cells
+remain unresolved. At beta=.13/ky=.2848826, the old twisting root wins over
+MTM and overpredicts GENE growth3.71x: the branch transition is not yet right.
+At beta=.15/ky=.2848826 the selected MTM gives .011693 versus GENE .007917.
+No accepted MTM root fails the pilot domain criterion, but A-shape warnings
+remain, and this profile is not resolution-converged. The other3 sampled
+GENE-damped cells are unresolved, not demonstrated stable.
+
+Published numerical sample: `tests/hkbm_solver/data/mtm_collisional_pair_pilot.csv`
+and its `.provenance.json` sidecar. This is observational benchmark evidence,
+not a test that blesses every point as physically correct. Raw records and
+research drivers remain on Pitagora in `analysis/solver/mtm/`.
+
+This is an experimental milestone, not the completed791-cell collisional STEP
+scan. Next: develop the rough reduced-pair map and investigate missed/masked
+branches; retain uncertainty flags. Production T3D defaults remain unchanged.
 
 ### Full-orbit solver and legacy hKBM collisions
 
