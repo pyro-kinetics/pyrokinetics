@@ -1269,7 +1269,12 @@ class PyroScan:
                             field,
                             sum_ky=sum_ky,
                             sum_kx=sum_kx,
-                            time_mode=time_mode,
+                            # fields were read only to derive the eigenvalues: keep the final eigenfunction, not its history
+                            time_mode=(
+                                "last"
+                                if eigenvalues_from_fields and not load_fields
+                                else time_mode
+                            ),
                             tolerance_time_range=tolerance_time_range,
                         )
                 for name, value in run_buffers.items():
