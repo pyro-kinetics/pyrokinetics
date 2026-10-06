@@ -6,6 +6,29 @@ still requires field, velocity and ballooning-domain convergence tests.
 
 ## Implemented
 
+### Experimental T3D linear-mode adapter (6 October)
+
+The collisional model is now explicitly selectable with
+`quasilinear.run_linear(..., modes=("hkbm","mtm"),
+mtm_kw={"backend":"lorentz_ei"})`; the existing default is unchanged.
+`mtm_collisional_ql.solve_deck` provides the direct GENE-sign/deck-unit entry.
+Both branches are independent; no hKBM work for MTM-only calls, no automatic
+dominant-root suppression, no hidden process pool. Warm starts are backend
+separated; nonzero MTM theta0 is explicitly unsupported. Failed searches have
+NaN predicted frequencies and are not classified stable.
+
+Full-domain fields and independently weighted phi/A widths now satisfy the
+published T3D record contract. No fabricated MTM flux shares or Bpar field.
+The geometric-mean width is exposed only with passing distribution/potential
+edge checks; otherwise the record explicitly requests caller-owned fallback.
+All model/A-shape/resolution warnings remain; this is NOT calibrated transport.
+The first 35 MTM/operator+adapter tests passed (2607948,2.08 s), including
+independent full-domain integrals, units, normalization invariance, dispatch,
+warm separation and unsupported/failure records. A further nonunity-frequency
+test and isolated full-suite validation are being prepared before publication.
+No T3D checkout is available on Pitagora; CSD3 must pull and wire/confirm the
+explicit backend in its worker. Do not claim remote deployment from this API.
+
 ### Separate collisional MTM experiment (6 October, tested experimental release)
 
 Dan clarified the target: a **quick reduced hKBM + reduced MTM pair that very

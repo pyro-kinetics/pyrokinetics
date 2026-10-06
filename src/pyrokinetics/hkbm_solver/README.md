@@ -29,7 +29,40 @@ An experimental collisional alternative is
 `.solve(seed_in_internal_units)`. It solves a coupled Lorentz electron-ion
 response with hot ions, initially using Chandran & Schekochihin's prescribed
 A_parallel shape; optional `nA>1` relaxes that shape. It is separate from
-`mtm.solve_deck` and is **not** enabled in T3D or `modes=("mtm",)`.
+`mtm.solve_deck`. It is now selectable explicitly through the linear-mode
+interface; existing defaults remain collisionless C&S. T3D must opt in:
+
+```python
+from pyrokinetics.hkbm_solver.quasilinear import run_linear
+
+modes = run_linear(
+    pyro_or_parameters, ky=[0.15, 0.2, 0.3, 0.4], theta0=[0.0],
+    modes=("hkbm", "mtm"), mtm_kw={"backend": "lorentz_ei"},
+    warm=previous_modes, fields=True,
+)
+```
+
+Both branches are returned independently, not reduced to the plot's largest
+root. `modes=("mtm",)` does no hKBM solve. The direct GENE-sign/deck-unit API
+is `mtm_collisional_ql.solve_deck(deck, ky, omega0=-omega_e + 1j*gamma)`;
+this differs from the low-level class's internal electron-positive seed.
+Default MTM profile: npt24/nE12/nxi16/order3, nominal deck collisions,
+nturns=min(32,max(8,ceil(32*.2848826/(ky*rho_s_over_rho_ref)))). Override
+options through `mtm_kw`. Only theta0=0 is supported by this MTM model.
+
+MTM fields `phi`, `apar`, `theta`, `kperp2`, `jacobian`, `bmag` share the full
+domain. `giacomin.kperp2` and `transport` widths use rho_s^-2;
+`kperp2_ref` and array `kperp2` use rho_ref^-2. The caller owns saturation.
+For the requested geometric-mean layer/A rule, `transport.kr2_geometric`
+is sqrt(<kperp2>_phi <kperp2>_A) only when the distribution and potential
+pass the domain check; otherwise None and `layer_fallback_required=True`.
+Retain `validity.edge_phi`, `validity.edge_g`, A-shape and resolution flags.
+`mtm_like` is a provisional growing/electron-direction/domain check, not
+validation; all records keep `validated=False`. No MTM species flux shares
+are fabricated (`weights=None`, Giacomin shares None); Bpar is omitted, not
+returned as a computed zero field. T3D's existing MTM saturation/fallback
+policy must handle those distinctions. This does not modify a T3D run/config.
+
 See the collisional section in [PHYSICS.md](PHYSICS.md) for equations, tests
 and restrictions. Small equation residuals do not establish MTM convergence.
 

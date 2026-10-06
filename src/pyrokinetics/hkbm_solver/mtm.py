@@ -801,9 +801,22 @@ def run_linear_modes(source, modes=("hkbm", "mtm"), mtm_kw=None, **kw):
     bad = set(modes) - {"hkbm", "mtm"}
     if bad:
         raise ValueError(f"unknown modes {sorted(bad)} (use 'hkbm', 'mtm')")
+    mtm_options = dict(mtm_kw or {})
+    backend = mtm_options.pop("backend", "cs")
+    if backend == "lorentz_ei":
+        from .mtm_collisional_ql import run_linear_mtm as mtm_runner
+    elif backend == "cs":
+        mtm_runner = run_linear_mtm
+    else:
+        raise ValueError("MTM backend must be 'cs' or experimental 'lorentz_ei'")
     out = []
     if "hkbm" in modes:
-        for m in run_linear(source, modes=("hkbm",), **kw):
+        hkbm_kw = dict(kw)
+        if backend == "lorentz_ei" and hkbm_kw.get("warm"):
+            hkbm_kw["warm"] = [
+                m for m in hkbm_kw["warm"] if m.get("branch", "hkbm") == "hkbm"
+            ]
+        for m in run_linear(source, modes=("hkbm",), **hkbm_kw):
             m.setdefault("branch", "hkbm")
             m.setdefault("parity", "twisting")
             out.append(m)
@@ -822,5 +835,5 @@ def run_linear_modes(source, modes=("hkbm", "mtm"), mtm_kw=None, **kw):
             )
             if k in kw
         }
-        out += run_linear_mtm(source, mtm_kw=mtm_kw, **mk)
+        out += mtm_runner(source, mtm_kw=mtm_options, **mk)
     return out
