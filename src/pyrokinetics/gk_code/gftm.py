@@ -1025,8 +1025,8 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
             species = gk_input.get_local_species().names
 
             run = raw_data["run"].splitlines()
-            ky = _last_floats([line for line in run if "ky" in line][0], 1)[0]
-            ky /= bunit_over_b0
+            ky_gftm = _last_floats([line for line in run if "ky" in line][0], 1)[0]
+            ky = ky_gftm / bunit_over_b0
 
             local_geometry = gk_input.get_local_geometry()
             metric_ntheta = gk_input.data["nxgrid"]
@@ -1040,14 +1040,15 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
             )
 
             # GFTM's B_par field is sigma = dB_par / (B_unit k_perp rho_unit)
-            # (gftm_eigensolver.f90). k_perp rho_unit = ky * k_perp/ky, with this
-            # ky and pyro's k_perp/ky (the same product the MG saturation rule uses)
+            # (gftm_eigensolver.f90). local_geometry is in GFTM's B_unit units, so
+            # the metric's ky is GFTM's KY = (nq/r) rho_unit: k_perp rho_unit =
+            # KY * k_perp/ky (= KY sqrt(b0x) in GFTM's notation)
             nperiod = int(np.ceil((np.max(np.abs(theta)) / pi + 1) / 2))
             theta_long, k_perp_long = metric_terms.k_perp(
                 ky=1.0, theta0=gk_input.get_numerics().theta0, nperiod=nperiod
             )
             k_perp_long = getattr(k_perp_long, "m", k_perp_long)
-            k_perp = ky * np.interp(theta, theta_long, k_perp_long)
+            k_perp = ky_gftm * np.interp(theta, theta_long, k_perp_long)
 
             # Store grid data as Dict
             return {
