@@ -43,7 +43,9 @@ def test_gftm_bpar_is_sigma_times_kperp(tmp_path):
 
     ok = np.abs(phi) > 1e-6 * np.abs(phi).max()
     np.testing.assert_allclose(apar[ok] / phi[ok], 1.0, rtol=1e-10)
-    np.testing.assert_allclose(bpar[ok] / phi[ok], k_perp[ok], rtol=3e-2)  # reader metric: 4*NXGRID points
+    np.testing.assert_allclose(
+        bpar[ok] / phi[ok], k_perp[ok], rtol=3e-2
+    )  # reader metric: 4*NXGRID points
     # k_perp grows away from the outboard midplane through magnetic shear
     assert k_perp[np.argmax(np.abs(theta))] > k_perp[np.argmin(np.abs(theta))]
 
