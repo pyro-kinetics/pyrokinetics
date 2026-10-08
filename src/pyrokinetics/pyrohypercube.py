@@ -353,6 +353,7 @@ class PyroHypercube(PyroScan):
         params: Union[Sequence[str], Mapping[str, Sequence], None] = None,
         gk_code: Optional[str] = None,
         file_name: Optional[str] = None,
+        exclude: Optional[Iterable[str]] = None,
         **kwargs,
     ) -> "PyroHypercube":
         """
@@ -382,6 +383,9 @@ class PyroHypercube(PyroScan):
             Name of the input file within each run directory. If unset, the
             code's default name is used if present, otherwise the first
             readable input file in the directory.
+        exclude: iterable of str, default None
+            Run names (as in ``sample_names``, the run directory relative to
+            ``root``) to leave out. A name matching no run raises ``ValueError``.
         **kwargs
             Passed to :class:`PyroHypercube`.
 
@@ -410,7 +414,9 @@ class PyroHypercube(PyroScan):
             param_names = [str(name) for name in params]
             extra_map = {}
 
-        names, input_files = cls._discover_runs(root, pattern, file_name, gk_code)
+        names, input_files = cls._discover_runs(
+            root, pattern, file_name, gk_code, exclude
+        )
 
         pyros = [Pyro(gk_file=path, gk_code=gk_code) for path in input_files]
         cls._check_reference_values(names, pyros)
@@ -439,6 +445,7 @@ class PyroHypercube(PyroScan):
         pattern: str,
         file_name: Optional[str],
         gk_code: Optional[str],
+        exclude: Optional[Iterable[str]] = None,
     ) -> Tuple[List[str], List[pathlib.Path]]:
         """Find run directories under ``root``, and the input file in each."""
         names: List[str] = []
@@ -464,6 +471,18 @@ class PyroHypercube(PyroScan):
 
             names.append(str(run_directory.relative_to(root)))
             input_files.append(input_file)
+
+        if exclude is not None:
+            exclude = {str(name) for name in exclude}
+            unknown = sorted(exclude - set(names))
+            if unknown:
+                raise ValueError(
+                    f"PyroHypercube.from_directory: exclude names match no run "
+                    f"under {root}: {unknown}"
+                )
+            kept = [i for i, name in enumerate(names) if name not in exclude]
+            names = [names[i] for i in kept]
+            input_files = [input_files[i] for i in kept]
 
         if not input_files:
             raise FileNotFoundError(
