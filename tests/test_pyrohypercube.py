@@ -571,3 +571,42 @@ def test_unnamed_parameter_func_is_not_saved_and_warns(tmp_path):
     scan.add_parameter_func("ky", lambda pyro: None, {})
     with pytest.warns(UserWarning, match="not saved"):
         scan.write(base_directory=tmp_path)
+
+
+def test_from_directory_exclude(gs2_run_tree):
+    cube = PyroHypercube.from_directory(
+        gs2_run_tree,
+        pattern="iteration_*",
+        params=["ky"],
+        gk_code="GS2",
+        exclude=["iteration_1"],
+    )
+    assert cube.sample_names == ["iteration_0", "iteration_2"]
+    assert cube.n_samples == 2
+    assert list(cube.pyro_dict) == cube.sample_names
+    assert np.allclose(
+        cube.parameter_dict["ky"].magnitude, [FOREIGN_KY[0], FOREIGN_KY[2]]
+    )
+
+
+def test_from_directory_exclude_unknown_raises(gs2_run_tree):
+    with pytest.raises(ValueError, match="iteration_9"):
+        PyroHypercube.from_directory(
+            gs2_run_tree,
+            pattern="iteration_*",
+            params=["ky"],
+            gk_code="GS2",
+            exclude=["iteration_9"],
+        )
+
+
+@pytest.mark.parametrize("exclude", [None, []])
+def test_from_directory_exclude_empty_is_noop(gs2_run_tree, exclude):
+    cube = PyroHypercube.from_directory(
+        gs2_run_tree,
+        pattern="iteration_*",
+        params=["ky"],
+        gk_code="GS2",
+        exclude=exclude,
+    )
+    assert cube.n_samples == len(FOREIGN_KY)
