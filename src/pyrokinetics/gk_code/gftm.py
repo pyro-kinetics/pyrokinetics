@@ -1025,8 +1025,8 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
             species = gk_input.get_local_species().names
 
             run = raw_data["run"].splitlines()
-            ky = _last_floats([line for line in run if "ky" in line][0], 1)[0]
-            ky /= bunit_over_b0
+            ky_gftm = _last_floats([line for line in run if "ky" in line][0], 1)[0]
+            ky = ky_gftm / bunit_over_b0
 
             local_geometry = gk_input.get_local_geometry()
             metric_ntheta = gk_input.data["nxgrid"]
@@ -1038,6 +1038,17 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
                 metric_terms.Jacobian,
                 period=2 * np.pi,
             )
+
+            # GFTM's B_par field is sigma = dB_par / (B_unit k_perp rho_unit)
+            # (gftm_eigensolver.f90). local_geometry is in GFTM's B_unit units, so
+            # the metric's ky is GFTM's KY = (nq/r) rho_unit: k_perp rho_unit =
+            # KY * k_perp/ky (= KY sqrt(b0x) in GFTM's notation)
+            nperiod = int(np.ceil((np.max(np.abs(theta)) / pi + 1) / 2))
+            theta_long, k_perp_long = metric_terms.k_perp(
+                ky=1.0, theta0=gk_input.get_numerics().theta0, nperiod=nperiod
+            )
+            k_perp_long = getattr(k_perp_long, "m", k_perp_long)
+            k_perp = ky_gftm * np.interp(theta, theta_long, k_perp_long)
 
             # Store grid data as Dict
             return {
@@ -1052,6 +1063,7 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
                 "jacobian": Jacobian,
+                "k_perp": k_perp,
             }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
@@ -1260,6 +1272,11 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
         eigenfunctions[:, :nmode_data, :] = (
             reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
         )
+
+        # sigma -> dB_par / B_unit, before the joint phase/amplitude normalisation
+        if "bpar" in coords["field"]:
+            ibpar = list(coords["field"]).index("bpar")
+            eigenfunctions[:, :, ibpar] *= coords["k_perp"][:, np.newaxis]
 
         phase_amplitude = np.empty((ntheta, nmode, nfield), dtype="complex")
         for i_mode in range(nmode):
