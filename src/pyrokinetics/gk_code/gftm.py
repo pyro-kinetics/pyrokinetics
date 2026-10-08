@@ -1039,6 +1039,16 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
                 period=2 * np.pi,
             )
 
+            # GFTM's B_par field is sigma = dB_par / (B_unit k_perp rho_unit)
+            # (gftm_eigensolver.f90). k_perp rho_unit = ky * k_perp/ky, with this
+            # ky and pyro's k_perp/ky (the same product the MG saturation rule uses)
+            nperiod = int(np.ceil((np.max(np.abs(theta)) / pi + 1) / 2))
+            theta_long, k_perp_long = metric_terms.k_perp(
+                ky=1.0, theta0=gk_input.get_numerics().theta0, nperiod=nperiod
+            )
+            k_perp_long = getattr(k_perp_long, "m", k_perp_long)
+            k_perp = ky * np.interp(theta, theta_long, k_perp_long)
+
             # Store grid data as Dict
             return {
                 "flux": None,
@@ -1052,6 +1062,7 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
                 "jacobian": Jacobian,
+                "k_perp": k_perp,
             }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
@@ -1260,6 +1271,11 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
         eigenfunctions[:, :nmode_data, :] = (
             reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
         )
+
+        # sigma -> dB_par / B_unit, before the joint phase/amplitude normalisation
+        if "bpar" in coords["field"]:
+            ibpar = list(coords["field"]).index("bpar")
+            eigenfunctions[:, :, ibpar] *= coords["k_perp"][:, np.newaxis]
 
         phase_amplitude = np.empty((ntheta, nmode, nfield), dtype="complex")
         for i_mode in range(nmode):
