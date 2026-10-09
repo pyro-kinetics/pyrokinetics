@@ -47,6 +47,9 @@ class GKInput(AbstractFileReader, ReadableFromFile):
     norm_convention: str = "pyrokinetics"
     """`Convention` used for normalising this code's quantities"""
 
+    equilibrium = None
+    """Global `Equilibrium`, for inputs whose geometry references an equilibrium file"""
+
     def __init__(self, filename: Optional[PathLike] = None):
         self.data: Optional[f90nml.Namelist] = None
         self._convention_dict = {}
@@ -472,7 +475,9 @@ def supported_gk_input_types() -> List[str]:
     return GKInput.supported_file_types()
 
 
-def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> GKInput:
+def read_gk_input(
+    path: PathLike, file_type: Optional[str] = None, equilibrium=None, **kwargs
+) -> GKInput:
     r"""
     Create and instantiate a `GKInput` subclass.
 
@@ -480,7 +485,11 @@ def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> 
     `read_gk_output`, as `GKInput` is both a reader and readable. This means we
     shouldn't discard the reader class. As a result, this function does not use
     `GKInput.from_file`.
+
+    ``equilibrium`` is made available to inputs whose geometry is defined by a
+    global equilibrium file, such as GENE ``magn_geometry = 'tracer_efit'``.
     """
     gk_input = GKInput._factory(file_type if file_type is not None else path)
+    gk_input.equilibrium = equilibrium
     gk_input.read_from_file(path, **kwargs)
     return gk_input

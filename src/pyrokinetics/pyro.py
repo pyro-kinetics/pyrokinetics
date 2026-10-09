@@ -170,6 +170,14 @@ class Pyro:
         if gk_code is not None and gk_file is None:
             gk_file = gk_templates[gk_code]
 
+        # Load global equilibrium file if it exists. This comes before reading
+        # gk_file, as some gk_file geometries are defined by the equilibrium.
+        if eq_kwargs is None:
+            eq_kwargs = {}
+
+        if eq_file is not None:
+            self.load_global_eq(eq_file, eq_type, **eq_kwargs)
+
         # Read gk_file if it exists
         # This will set the current context using self.gk_code, and fill in records for
         # gk_file, file_name, run_directory, local_geometry, local_species, and
@@ -190,13 +198,6 @@ class Pyro:
         # and this may cause unexpected behaviour.
         if self.gk_output_file is not None:
             self.read_gk_output_file(self.gk_output_file, gk_code)
-
-        # Load global equilibrium file if it exists
-        if eq_kwargs is None:
-            eq_kwargs = {}
-
-        if eq_file is not None:
-            self.load_global_eq(eq_file, eq_type, **eq_kwargs)
 
         # Load global kinetics file if it exists
         if kinetics_kwargs is None:
@@ -923,7 +924,9 @@ class Pyro:
         # from gk_file.
         # GKInput classes are both 'reader' and 'readable'. Must hold on to instance of
         # the reader.
-        gk_input = read_gk_input(gk_file, file_type=gk_code)
+        gk_input = read_gk_input(
+            gk_file, file_type=gk_code, equilibrium=getattr(self, "eq", None)
+        )
 
         # Switch to new context by setting self._gk_code.
         # Here we bypass property setter, as this function may be called by it, and this
@@ -1024,6 +1027,7 @@ class Pyro:
 
         # Get the appropriate GKInput type.
         gk_input = GKInput._factory(gk_code)
+        gk_input.equilibrium = getattr(self, "eq", None)
 
         # Read the file before setting any attributes. If an exception is raised here,
         # the Pyro object will be left in a usable state, and the context will not be
@@ -2266,7 +2270,7 @@ class Pyro:
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():
-            setattr(new_pyro, key, copy.deepcopy(value))
+            setattr(new_pyro, key, copy.deepcopy(value, memodict))
 
         return new_pyro
 
