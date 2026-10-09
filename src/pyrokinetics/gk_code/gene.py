@@ -200,7 +200,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "dcNdr": ["geometry", "cndr_m"],
         "dsNdr": ["geometry", "sndr_m"],
         "ip_ccw": ["geometry", "sign_ip_cw"],
-        "bt_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_fourier_default = {
