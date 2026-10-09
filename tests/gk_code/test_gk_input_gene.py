@@ -5,9 +5,10 @@ import f90nml
 import numpy as np
 import pytest
 
-from pyrokinetics import template_dir
+from pyrokinetics import Pyro, read_equilibrium, template_dir
 from pyrokinetics.gk_code import GKInputGENE
 from pyrokinetics.gk_code.gene import read_gene_geometry_data
+from pyrokinetics.gk_code.gk_input import read_gk_input
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
@@ -217,3 +218,94 @@ def test_read_gene_geometry_data_no_header(tmp_path):
 
     with pytest.raises(ValueError, match="namelist"):
         read_gene_geometry_data(path)
+
+
+eq_file = template_dir / "transp_eq.geqdsk"
+tracer_psi_n = 0.7145650753687218
+
+
+@pytest.fixture(scope="module")
+def tracer_efit_file(tmp_path_factory):
+    """GENE tracer_efit input that references transp_eq.geqdsk, with no GENE geometry
+    file beside it and no local geometry in it. Reference values are arbitrary, as
+    physical results shouldn't depend on them."""
+    eq = read_equilibrium(eq_file)
+    nml = f90nml.read(template_file)
+    nml["geometry"] = f90nml.Namelist(
+        magn_geometry="tracer_efit", geomfile=eq_file.name, minor_r=1.0, dpdx_pm=-2
+    )
+    nml["box"]["x0"] = float(eq.rho_tor(tracer_psi_n).m)
+    nml["units"] = f90nml.Namelist(Lref=1.0, Bref=2.0, Tref=1.0, nref=1.0, mref=2.0)
+    path = tmp_path_factory.mktemp("tracer_efit") / "input.gene"
+    nml.write(path)
+    return path
+
+
+def test_tracer_efit_requires_equilibrium(tracer_efit_file):
+    with pytest.raises(FileNotFoundError, match="eq_file"):
+        GKInputGENE(tracer_efit_file)
+
+
+def _si(quantity, pyro, unit):
+    return quantity.to(pyro.norms.pyrokinetics, pyro.norms.context).to(unit).m
+
+
+def test_tracer_efit_geometry_from_equilibrium(tracer_efit_file):
+    """Geometry from the equilibrium at x0 should match a local geometry fitted to the
+    same flux surface, compared in SI units."""
+    pyro = Pyro(eq_file=eq_file, gk_file=tracer_efit_file, gk_code="GENE")
+    reference = Pyro(eq_file=eq_file)
+    reference.load_local_geometry(tracer_psi_n, "MXH")
+
+    geometry, expected = pyro.local_geometry, reference.local_geometry
+    assert np.isclose(geometry.psi_n, tracer_psi_n)
+    for key, unit in [("rho", "meter"), ("Rmaj", "meter"), ("dpsidr", "weber/meter")]:
+        assert np.isclose(
+            _si(geometry[key], pyro, unit),
+            _si(expected[key], reference, unit),
+            rtol=1e-3,
+        )
+    for key in ["q", "shat"]:
+        assert np.isclose(abs(geometry[key].m), abs(expected[key].m), rtol=1e-3)
+
+    # Bunit = (q / r) dpsi/dr exactly, which fitted local geometries only approximate
+    fs = pyro.eq.flux_surface(tracer_psi_n)
+    bunit = abs(fs.q) * fs.psi_gradient / (2 * np.pi * fs.r_minor)
+    b0 = abs(fs.F) / fs.R_major
+    assert np.isclose(geometry.bunit_over_b0.m, (bunit / b0).to("").m, rtol=1e-3)
+
+
+def test_tracer_efit_gradients(tracer_efit_file):
+    """GENE gradients are with respect to x = rho_tor, so 1/Ln = omn drho_tor/dr"""
+    pyro = Pyro(eq_file=eq_file, gk_file=tracer_efit_file, gk_code="GENE")
+    eq = pyro.eq
+    dpsi_n = np.array([-1e-4, 1e-4]) + tracer_psi_n
+    drhotor_dr = np.diff(eq.rho_tor(dpsi_n).m) / np.diff(eq.r_minor(dpsi_n).m)
+
+    omn = pyro.gk_input.data["species"][0]["omn"]
+    inverse_ln = _si(pyro.local_species.ion1.inverse_ln, pyro, "1 / meter")
+    assert np.isclose(inverse_ln, omn * drhotor_dr[0], rtol=1e-3)
+
+
+def test_tracer_efit_x0_change(tracer_efit_file):
+    gene = read_gk_input(
+        tracer_efit_file, "GENE", equilibrium=read_equilibrium(eq_file)
+    )
+    rho = gene.get_gene_geometry()["rho"]
+    gene.add_flags({"box": {"x0": 0.5}})
+    assert gene.get_gene_geometry()["rho"] < rho
+
+
+def test_gene_geometry_file_without_suffix(tmp_path):
+    """GENE parameters files may have no suffix, with the geometry file at .dat"""
+    gene = GKInputGENE()
+    gene.data = f90nml.Namelist({"geometry": {"magn_geometry": "tracer_efit"}})
+    gene.original_filename = tmp_path / "parameters"
+    (tmp_path / "tracer_efit.dat").touch()
+    assert gene._gene_geometry_filename() == tmp_path / "tracer_efit.dat"
+
+
+def test_tracer_efit_write_warns(tracer_efit_file, tmp_path):
+    pyro = Pyro(eq_file=eq_file, gk_file=tracer_efit_file, gk_code="GENE")
+    with pytest.warns(UserWarning, match="magn_geometry = 'tracer_efit'"):
+        pyro.write_gk_file(tmp_path / "input.gene", gk_code="GENE")
