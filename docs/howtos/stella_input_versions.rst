@@ -38,6 +38,7 @@ Writing
 The format of a written file is determined by the **template** that was used
 to initialise the :py:class:`Pyro` object for stella. Two templates ship with
 pyrokinetics:
+
 +-------------------------------------------+--------------+
 | Template                                  | Format       |
 +===========================================+==============+

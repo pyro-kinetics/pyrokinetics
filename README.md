@@ -147,7 +147,7 @@ that you will need to `import` Pyrokinetics before it can be used.
 
 ## Code structure 
 
-Pyro object comprised of 
+The Pyro object is comprised of 
 
 * Equilibrium
    * LocalGeometry
@@ -167,10 +167,10 @@ Pyro object comprised of
       * Eigenfunctions (field, ky, theta, time)
       * Eigenvalues - growth rate and mode freq (ky, time)
 
-There also exists the PyroScan object which allows you to make a N-D parameter scan of Pyro objects
+There also exists the PyroScan object which allows you to make an N-D parameter scan of Pyro objects
 
 
-## Supports sources of Equilibrium data
+## Supported sources of Equilibrium data
 pyrokinetics currently supports
 * [GEQDSK](https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf)
 * [TRANSP](https://w3.pppl.gov/~pshare/help/body_transp_hlp.html#outfile56.html)
@@ -192,8 +192,9 @@ Sources of kinetic profile data currently supported are
 * PFILE
 * IMAS
 * ELITEINP
+* ITERDB
 
-Future codes to be add 
+Future codes to be added
 * SimDB
 * OMFIT
 
@@ -211,7 +212,7 @@ The following gk codes are supported in pyrokinetics
 
 ## Note on units
 
-The pyro object uses standardised reference values to normalise the results. It will automatically handle converting to a GK codes standard units.
+The pyro object uses standardised reference values to normalise the results. It will automatically handle converting to a GK code's standard units.
 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 

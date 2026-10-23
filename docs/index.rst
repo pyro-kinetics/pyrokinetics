@@ -35,8 +35,8 @@ are supported:
 - `GENE <http://www.genecode.org>`_
 - `STELLA <https://stellagk.github.io/stella/index.html>`_
 - `TGLF <http://gafusion.github.io/doc/tglf.html>`_
-- `GKW <http://https://bitbucket.org/gkw/gkw/src>`_
-- `GX <http://https://bitbucket.org/gyrokinetics/gx/src>`_
+- `GKW <https://bitbucket.org/gkw/gkw/src>`_
+- `GX <https://bitbucket.org/gyrokinetics/gx/src>`_
 
 It is also possible to load in global data from the following codes, from which
 local parameters can be calculated.

@@ -46,7 +46,7 @@ package, or by cloning the repo:
 
    $ # Use PyPI package
    $ pip install pyrokinetics
-   $ # Use Github repo
+   $ # Use GitHub repo
    $ module load Git
    $ git clone https://github.com/pyro-kinetics/pyrokinetics ~/pyrokinetics
    $ cd ~/pyrokinetics
@@ -430,7 +430,7 @@ Before submitting any jobs, you'll also need to log in to create a 'master sessi
    $ ssh -o ServerAliveInterval=30 -fN username@hpc.machine.com
 
 Including ``-fN`` will result in your session sitting idle in the background, while
-``-o ServerAliveInternal=30`` will ping the server every 30 seconds to ensure your
+``-o ServerAliveInterval=30`` will ping the server every 30 seconds to ensure your
 connection stays alive. If you aren't using multi-factor authentication, it should be
 sufficient to just provide a password or private key file, and there's no need to create
 a master session beforehand.
@@ -449,5 +449,5 @@ removed from the remote server. File paths can be specified using globs. Note th
 must set ``continue_if_job_fails`` to ``true`` if we want the job to collect and clean
 even if the job fails.
 
-If we omit the `--watch` flag from our run, HPC Rocket will not wait until the job has
+If we omit the ``--watch`` flag from our run, HPC Rocket will not wait until the job has
 completed, and also will not perform the collect and clean steps afterwards.
