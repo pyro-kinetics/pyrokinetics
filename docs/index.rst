@@ -51,6 +51,9 @@ local parameters can be calculated.
 - `GEQDSK <https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf>`_
 - PFILE
 
+Questions are welcome on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_
+or the `pyrokinetics Slack <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_.
+
 
 .. toctree::
    :maxdepth: 2

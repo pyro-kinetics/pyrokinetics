@@ -4,6 +4,7 @@
 [![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 [![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.05866/status.svg)](https://doi.org/10.21105/joss.05866)
+[![Slack](https://img.shields.io/badge/Slack-join%20chat-4A154B?logo=slack)](https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ)
 
 
 # Pyrokinetics
@@ -27,6 +28,14 @@ At a minimum pyrokinetics needs the local geometry and species data. Example scr
 ## Documentation
 
 Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/en/latest/).
+
+## Getting help and community
+
+Questions, bug reports and ideas are welcome:
+
+* [GitHub Discussions](https://github.com/pyro-kinetics/pyrokinetics/discussions) for general questions
+* [GitHub Issues](https://github.com/pyro-kinetics/pyrokinetics/issues) for bugs and feature requests
+* The [pyrokinetics Slack workspace](https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ) for chatting with users and developers
 
 ## Installation 
 

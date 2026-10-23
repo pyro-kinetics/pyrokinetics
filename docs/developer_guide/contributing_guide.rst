@@ -20,9 +20,9 @@ All contributions, including bug reports, bug fixes, documentation improvements,
 and other ideas are welcome.
 
 If you have any questions on the process or how to fix something feel free to ask us!
-The recommended place to ask a question is on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_
-There is also a slack channel that you are welcome to join here
-`Pyrokinetics slack Stack Overflow <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_ which we monitor for questions.
+The recommended place to ask a question is on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_.
+You are also welcome to join the `pyrokinetics Slack workspace <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_,
+which we also monitor for questions.
 
 
 This project is a community effort, and everyone is welcome to contribute. 
