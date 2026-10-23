@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from pint.errors import DimensionalityError
 from scipy.integrate import cumulative_trapezoid, simpson
@@ -1056,16 +1058,6 @@ class Sauter1999(BootstrapModel):
             )
         )
 
-        # Maybe L31 term should be partitioned?
-        # self.JbsdotB = self.Ipsi * (
-        #     self.ptot * self.L31 * self.dlnne_dpsi
-        #     + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
-        #     + np.sum(
-        #         self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
-        #         axis=0,
-        #     )
-        # )
-
         self.Jbs = self.JbsdotB / np.sqrt(self.B2_fsa)
 
 
@@ -1121,6 +1113,9 @@ def integrate_toroidal_current(
         Radial label the effective current densities are built on, passed to
         ``model``. See ``BootstrapModel._get_radial_label``. The integration is
         performed over whichever label is chosen, so ``Ip`` is unchanged by it.
+    ion_collisionality : str, default ``"neo"``
+        How the ion collisionality treats several ion species, passed to
+        ``model``. See ``BootstrapModel._get_collisionality_ion``.
     **kwargs
         Additional keyword arguments passed to ``pyro.load_local``, for example
         ``local_geometry="MXH"``
@@ -1150,7 +1145,11 @@ def integrate_toroidal_current(
     for psi in psi_n:
         try:
             pyro.load_local(psi_n=psi, **kwargs)
-        except Exception:
+        except Exception as exc:
+            warnings.warn(
+                f"Skipping psi_n = {psi}: could not load local data "
+                f"({type(exc).__name__}: {exc})"
+            )
             continue
 
         bootstrap = model(

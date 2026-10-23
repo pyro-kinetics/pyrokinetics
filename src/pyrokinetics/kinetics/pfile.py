@@ -197,10 +197,14 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         ion_temp_data = profiles["ti"]["data"] * 1e3 * units.eV
         ion_temp_func = UnitSpline(ti_psi_n, ion_temp_data)
 
+        # Main ion density. Read before the loop, since the main ion is the last
+        # thermal species but an impurity without an nz profile falls back to its
+        # psi grid
+        ni_psi_n = profiles["ni"]["psinorm"] * units.dimensionless
+        ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter**-3
+
         for ion_it in np.arange(num_thermal_ions):
             if ion_it == num_thermal_ions - 1:
-                ni_psi_n = profiles["ni"]["psinorm"] * units.dimensionless
-                ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter**-3
                 ion_dens_func = UnitSpline(ni_psi_n, ion_dens_data)
 
                 ion_charge = species[ion_it]["Z"] * units.elementary_charge
@@ -229,6 +233,13 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                         profiles[f"nz{ion_it+1}"]["data"] * 1e20 * units.meter**-3
                     )
                 except KeyError:
+                    warnings.warn(
+                        f"pFile lists an ion species with Z = {species[ion_it]['Z']:g}, "
+                        f"A = {species[ion_it]['A']:g} but has no 'nz{ion_it+1}' "
+                        "density profile. Reading it with zero density, so it "
+                        "contributes nothing to quasineutrality or Zeff.",
+                        UserWarning,
+                    )
                     nz_psi_n = ni_psi_n
                     impurity_dens_data = ion_dens_data * 0.0
 

@@ -80,11 +80,11 @@ much because each surface is only fitted once.
 How much the merge changes the answer is equilibrium dependent. It enters through
 Z_eff and hence through <Jbs.B>; since the external current is the residual
 <J.B> - <Jbs.B>, the bootstrap and external parts move by nearly equal and
-opposite amounts and the total is barely affected. On the jun1126 case the
-integrated bootstrap moves by 1%, the remainder by -3%, and the total by 0.08%,
-while the Ampere law column does not move at all, being built from geometry
-alone. Local shifts can be much larger -- on an SPR68 case <Jbs.B> moves by -17%
-at psi_n = 0.3 and +5.6% at 0.85 -- so do not rely on the cancellation.
+opposite amounts and the total is barely affected. In one test case the
+integrated bootstrap moved by 1%, the remainder by -3%, and the total by 0.08%,
+while the Ampere law column did not move at all, being built from geometry
+alone. Local shifts can be much larger -- in another, <Jbs.B> moved by -17% at
+psi_n = 0.3 and +5.6% at 0.85 -- so do not rely on the cancellation.
 
 Point ``BASE_DIR`` at a JETTO run directory holding ``jetto.jsp`` and
 ``jetto.eqdsk_out``. It falls back to the shipped templates so the script runs

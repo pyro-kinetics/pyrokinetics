@@ -120,8 +120,17 @@ class Species:
 
     def get_pressure(self, psi_n=None):
         """
-        Species pressure p(psi) computed as n(psi) * T(psi), returned in pascals.
+        Species pressure :math:`p = n T`
 
+        Parameters
+        ----------
+        psi_n : ArrayLike
+            Normalised poloidal flux at which to evaluate the pressure
+
+        Returns
+        -------
+        pint.Quantity
+            Pressure in pascals
         """
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
@@ -132,8 +141,22 @@ class Species:
         return p.to("pascal")
 
     def get_norm_pressure_gradient(self, psi_n=None):
-        """
-        - 1/p dp/drho
+        r"""
+        Normalised pressure gradient,
+        :math:`-\frac{1}{p} \frac{\partial p}{\partial \rho}`
+
+        Since :math:`p = n T`, this is the sum of the normalised density and
+        temperature gradients.
+
+        Parameters
+        ----------
+        psi_n : ArrayLike
+            Normalised poloidal flux at which to evaluate the gradient
+
+        Returns
+        -------
+        pint.Quantity
+            Normalised pressure gradient, in the inverse units of ``rho``
         """
 
         return self.get_norm_dens_gradient(psi_n) + self.get_norm_temp_gradient(psi_n)

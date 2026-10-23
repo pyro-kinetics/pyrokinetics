@@ -7,7 +7,7 @@ from cleverdict import CleverDict
 
 from ..file_utils import ReadableFromFile
 from ..typing import PathLike
-from ..units import UnitSpline  # local import to avoid changing top-level imports
+from ..units import UnitSpline
 from ..units import ureg as units
 
 if TYPE_CHECKING:
@@ -85,6 +85,45 @@ class Kinetics(ReadableFromFile):
         """Names of each species"""
         return self.species_data.keys()
 
+    # Species names treated as fast ions by ``exclude_fast``, in addition to any
+    # name ending in ``"_fast"``
+    _FAST_SPECIES_NAMES = ("alpha", "beam", "fast", "nbi")
+
+    def _included_species(self, exclude_species=None, exclude_fast=False):
+        """
+        Species remaining once ``exclude_species`` and, optionally, fast species
+        are left out.
+
+        Fast species are identified by name only: any name ending in ``"_fast"``,
+        or one of ``_FAST_SPECIES_NAMES``. This is deliberately narrower than
+        ``BootstrapModel._is_fast`` in ``diagnostics.neoclassical``, which also
+        treats any species more than ten times hotter than the electrons as fast.
+
+        Parameters
+        ----------
+        exclude_species : Iterable[str], optional
+            Names of species to leave out
+        exclude_fast : bool, default False
+            Whether to also leave out species identified as fast by name
+
+        Returns
+        -------
+        dict
+            Names mapped to ``Species`` for the species that remain, in
+            ``species_data`` order
+        """
+        excluded = set() if exclude_species is None else set(exclude_species)
+
+        return {
+            name: species
+            for name, species in self.species_data.items()
+            if name not in excluded
+            and not (
+                exclude_fast
+                and (name.endswith("_fast") or name in self._FAST_SPECIES_NAMES)
+            )
+        }
+
     def get_total_pressure(
         self,
         psi_n=None,
@@ -92,56 +131,76 @@ class Kinetics(ReadableFromFile):
         exclude_species=None,
         exclude_fast: bool = False,
     ):
-        """
-        Total pressure-like quantity p_tot(psi_n) = sum_s p_s(psi_n),
-        with optional exclusion of selected species.
-        """
+        r"""
+        Total pressure :math:`p = \sum_s n_s T_s`, summed over species.
 
-        if not hasattr(psi_n, "units"):
-            psi_n *= units.dimensionless
-
-        if exclude_species is None:
-            exclude_species = set()
-        else:
-            exclude_species = set(exclude_species)
-
-        if exclude_fast:
-            # conservative heuristic: anything with '_fast' or common fast-ion labels
-            for name in self.species_data.keys():
-                if name.endswith("_fast") or name in ("alpha", "beam", "fast", "nbi"):
-                    exclude_species.add(name)
-
-        total = 0.0
-        for name, s in self.species_data.items():
-            if name in exclude_species:
-                continue
-            total = total + s.get_pressure(psi_n)
-
-        return total
-
-    def get_norm_total_pressure_gradient(self, psi_n=None):
-        """
-        Total normalised pressure gradient.
+        Parameters
+        ----------
+        psi_n : ArrayLike
+            Normalised poloidal flux at which to evaluate the pressure
+        exclude_species : Iterable[str], optional
+            Names of species to leave out of the sum
+        exclude_fast : bool, default False
+            Whether to also leave out fast species, identified by name. See
+            ``_included_species``.
 
         Returns
         -------
-        -1 / p_total * dp_total / drho
+        pint.Quantity
+            Total pressure in pascals
+        """
+
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
+        species = self._included_species(exclude_species, exclude_fast)
+
+        return sum(s.get_pressure(psi_n) for s in species.values())
+
+    def get_norm_total_pressure_gradient(
+        self,
+        psi_n=None,
+        *,
+        exclude_species=None,
+        exclude_fast: bool = False,
+    ):
+        r"""
+        Normalised gradient of the total pressure,
+        :math:`-\frac{1}{p} \frac{\partial p}{\partial \rho}`.
+
+        Built as the pressure-weighted sum of each species' normalised pressure
+        gradient, so it is consistent with ``LocalSpecies.inverse_lp``.
+
+        Parameters
+        ----------
+        psi_n : ArrayLike
+            Normalised poloidal flux at which to evaluate the gradient
+        exclude_species : Iterable[str], optional
+            Names of species to leave out of both the pressure and its gradient
+        exclude_fast : bool, default False
+            Whether to also leave out fast species, identified by name. See
+            ``_included_species``.
+
+        Returns
+        -------
+        pint.Quantity
+            Normalised pressure gradient, units [1 / lref_minor_radius]. Zero if the
+            total pressure vanishes.
         """
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
 
-        total_pressure = self.get_total_pressure(psi_n)
+        species = self._included_species(exclude_species, exclude_fast)
+
+        total_pressure = sum(s.get_pressure(psi_n) for s in species.values())
 
         if np.isclose(total_pressure.magnitude, 0.0):
             return 0.0 / units.lref_minor_radius
 
         numerator = 0.0 * total_pressure / units.lref_minor_radius
 
-        for species in self.species_data.values():
-            species_pressure = species.get_pressure(psi_n)
-            species_inverse_lp = species.get_norm_pressure_gradient(psi_n)
-
-            numerator += species_pressure * species_inverse_lp
+        for s in species.values():
+            numerator += s.get_pressure(psi_n) * s.get_norm_pressure_gradient(psi_n)
 
         return numerator / total_pressure
 
@@ -153,31 +212,43 @@ class Kinetics(ReadableFromFile):
         exclude_species=None,
         exclude_fast: bool = False,
     ):
-        """
-        Return dp/dpsi (physical poloidal flux), consistent with Equilibrium.p_prime.
-
-        Notes
-        -----
-        - Requires an Equilibrium object to map psi_n -> psi via eq.psi(...), which is affine:
-            psi(psi_n) = psi_axis + psi_n * (psi_lcfs - psi_axis)
-          so dpsi/dpsi_n = (psi_lcfs - psi_axis).
-        - If no eq is supplied,  error is raised.
+        r"""
+        Derivative of the total pressure with respect to the poloidal flux,
+        :math:`\partial p / \partial \psi`, consistent with ``Equilibrium.p_prime``.
 
         Parameters
         ----------
-        psi_n : array-like or pint quantity (required)
-            Normalised poloidal flux coordinate(s).
-        eq : Equilibrium (required)
-            Equilibrium used to define psi(psi_n) and dpsi/dpsi_n.
-        exclude_species : list[str] (optional)
-            List of species to be excluded form the total pressure calculation.
-        exclude_fast : bool
-            If true excludes species that have 'alpha' or '_fast' in their name.
+        psi_n : ArrayLike
+            Normalised poloidal flux at which to evaluate the derivative
+        eq : Equilibrium, optional
+            Equilibrium defining :math:`\psi(\psi_N)`. Defaults to ``self.eq``,
+            which ``Pyro`` sets when both a global equilibrium and kinetics are
+            loaded.
+        exclude_species : Iterable[str], optional
+            Names of species to leave out of the total pressure
+        exclude_fast : bool, default False
+            Whether to also leave out fast species, identified by name. See
+            ``_included_species``.
 
         Returns
         -------
-        pint quantity array
-            dp/dpsi with units of Pa / Wb (or Pa / psi_unit used by Equilibrium internally).
+        pint.Quantity
+            :math:`\partial p / \partial \psi`, in pascals per unit of the
+            equilibrium's :math:`\psi`
+
+        Raises
+        ------
+        ValueError
+            If ``psi_n`` is not given, or no equilibrium is given or attached.
+
+        Notes
+        -----
+        The derivative is taken with the product rule,
+        :math:`\partial p / \partial \psi_N = \sum_s (n_s' T_s + n_s T_s')`, directly
+        from each species' own density and temperature splines, so no resampling
+        is involved. :math:`\psi` is affine in :math:`\psi_N`,
+        :math:`\psi = \psi_{axis} + \psi_N (\psi_{LCFS} - \psi_{axis})`, so the
+        conversion to :math:`\psi` is a constant factor.
         """
 
         if eq is None:
@@ -196,22 +267,39 @@ class Kinetics(ReadableFromFile):
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
 
-        # Build psi_n with units
-        psi_n_array = np.linspace(0.0, 1.0, 100) * units.dimensionless
+        species = self._included_species(exclude_species, exclude_fast)
 
-        # Total pressure p(psi_n)
-        p = self.get_total_pressure(
-            psi_n_array, exclude_species=exclude_species, exclude_fast=exclude_fast
+        dp_dpsin = sum(
+            (
+                s.dens(psi_n, derivative=1) * s.temp(psi_n)
+                + s.dens(psi_n) * s.temp(psi_n, derivative=1)
+            ).to("pascal")
+            for s in species.values()
         )
-
-        sp = UnitSpline(psi_n_array, p)
-        dp_dpsin = sp(psi_n, derivative=1)
 
         dpsi_dpsin = eq.psi_lcfs - eq.psi_axis
         return dp_dpsin / dpsi_dpsin
 
     @staticmethod
-    def Z_profile(species, round_charge, psi_q):
+    def _z_profile(species, round_charge, psi_q):
+        r"""
+        Charge number :math:`Z(\psi_N) = q(\psi_N) / e` of a species.
+
+        Parameters
+        ----------
+        species : Species
+            Species whose charge to evaluate
+        round_charge : bool
+            Whether to round to the nearest integer, to remove floating point
+            noise from charge profiles that should be integer
+        psi_q : pint.Quantity
+            Normalised poloidal flux, dimensionless
+
+        Returns
+        -------
+        np.ndarray
+            Signed charge number as a plain float array, so electrons give -1
+        """
         z = species.get_charge(psi_q).to("elementary_charge").m
         if round_charge:
             z = np.rint(z)
@@ -257,15 +345,15 @@ class Kinetics(ReadableFromFile):
         ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
 
         charge_sum_other = np.zeros_like(ne)
-        for name in list(sp.keys()):  # species_names is derived from dict keys
+        for name in list(sp.keys()):
             if name in ("electron", adjust_species):
                 continue
             s = sp[name]
-            Zi = self.Z_profile(s, round_charge, psi_q)
+            Zi = self._z_profile(s, round_charge, psi_q)
             ni = s.get_dens(psi_q).to("meter**-3").m
             charge_sum_other += Zi * ni
 
-        Z_adj = self.Z_profile(sp[adjust_species], round_charge, psi_q)
+        Z_adj = self._z_profile(sp[adjust_species], round_charge, psi_q)
         if np.any(Z_adj == 0.0):
             raise ValueError(
                 f"Adjusted species '{adjust_species}' has Z=0 at some psi points."
@@ -386,7 +474,7 @@ class Kinetics(ReadableFromFile):
                 s = sp[name]
                 zeff += (
                     s.get_dens(psi_q).to("meter**-3").m
-                    * self.Z_profile(s, round_charge, psi_q) ** 2
+                    * self._z_profile(s, round_charge, psi_q) ** 2
                 )
             zeff /= np.maximum(ne, 1e-300)
             self.zeff_profile = UnitSpline(psi_q, zeff * units.elementary_charge)
@@ -399,7 +487,7 @@ class Kinetics(ReadableFromFile):
         for name in merge_set:
             s = sp[name]
             dens_arr.append(s.get_dens(psi_q).to("meter**-3").m)
-            Z_arr.append(self.Z_profile(s, round_charge, psi_q))
+            Z_arr.append(self._z_profile(s, round_charge, psi_q))
             m_list.append(_mass_kg(s))  # scalar mass, in kg
 
         dens_arr = np.stack(dens_arr, axis=0)  # (ns, npsi)
@@ -410,7 +498,7 @@ class Kinetics(ReadableFromFile):
 
         # --- Merge density & charge ---
         if keep_base_species_z:
-            Zb = self.Z_profile(base, round_charge, psi_q)  # profile Z_base(psi)
+            Zb = self._z_profile(base, round_charge, psi_q)  # profile Z_base(psi)
             if np.any(Zb == 0.0):
                 raise ValueError(
                     f"Base species '{base_species}' has Z=0 at some psi points."
@@ -435,7 +523,7 @@ class Kinetics(ReadableFromFile):
         if dens_floor is not None:
             n_new = np.maximum(n_new, float(dens_floor))
 
-        # Write back density spline (same pattern you already use)
+        # Write back density spline
         base.dens = base.dens.__class__(psi_q, n_new * units("meter**-3"))
 
         # --- Mass merge ---

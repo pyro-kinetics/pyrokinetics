@@ -763,6 +763,77 @@ def test_kinetics_total_pressure_prime_finite_difference(scene_file, equilibrium
     )
 
 
+def test_kinetics_exclude_fast_matches_exclude_species(transp_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(transp_file, "TRANSP")
+    assert "deuterium_fast" in kinetics.species_names
+
+    by_name = {"exclude_species": ["deuterium_fast"]}
+    by_flag = {"exclude_fast": True}
+
+    np.testing.assert_allclose(
+        kinetics.get_total_pressure(psi_n, **by_flag).magnitude,
+        kinetics.get_total_pressure(psi_n, **by_name).magnitude,
+    )
+    np.testing.assert_allclose(
+        kinetics.get_norm_total_pressure_gradient(psi_n, **by_flag).magnitude,
+        kinetics.get_norm_total_pressure_gradient(psi_n, **by_name).magnitude,
+    )
+    assert kinetics.get_total_pressure(psi_n, **by_flag) < kinetics.get_total_pressure(
+        psi_n
+    )
+
+
+def test_kinetics_norm_total_pressure_gradient_exclude_species(transp_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(transp_file, "TRANSP")
+    excluded = "deuterium_fast"
+
+    remaining = [
+        kinetics.species_data[name]
+        for name in kinetics.species_names
+        if name != excluded
+    ]
+    pressure = sum(s.get_pressure(psi_n) for s in remaining)
+    expected = (
+        sum(
+            s.get_pressure(psi_n) * s.get_norm_pressure_gradient(psi_n)
+            for s in remaining
+        )
+        / pressure
+    )
+
+    actual = kinetics.get_norm_total_pressure_gradient(
+        psi_n, exclude_species=[excluded]
+    )
+
+    np.testing.assert_allclose(actual.magnitude, expected.magnitude)
+    assert actual.units == expected.units
+
+
+def test_kinetics_total_pressure_prime_exclude_species(scene_file, equilibrium):
+    psi_n = 0.5
+    delta = 1.0e-4
+    kinetics = read_kinetics(scene_file, "SCENE")
+    excluded = ["electron"]
+
+    p_plus = kinetics.get_total_pressure(psi_n + delta, exclude_species=excluded)
+    p_minus = kinetics.get_total_pressure(psi_n - delta, exclude_species=excluded)
+    expected = (p_plus - p_minus) / (
+        equilibrium.psi(psi_n + delta) - equilibrium.psi(psi_n - delta)
+    )
+
+    actual = kinetics.get_total_pressure_prime(
+        psi_n, eq=equilibrium, exclude_species=excluded
+    )
+
+    np.testing.assert_allclose(
+        actual.to("pascal / weber").magnitude,
+        expected.to("pascal / weber").magnitude,
+        rtol=1e-3,
+    )
+
+
 def test_kinetics_total_pressure_prime_falls_back_to_kinetics_eq(
     scene_file, equilibrium
 ):
@@ -794,12 +865,12 @@ def _isolated_kinetics(kinetics):
     return new_kinetics
 
 
-def test_Z_profile_preserves_sign(scene_file):
+def test_z_profile_preserves_sign(scene_file):
     kinetics = read_kinetics(scene_file, "SCENE")
     psi_n = 0.5 * units.dimensionless
 
-    electron_z = kinetics.Z_profile(kinetics.species_data["electron"], False, psi_n)
-    deuterium_z = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_n)
+    electron_z = kinetics._z_profile(kinetics.species_data["electron"], False, psi_n)
+    deuterium_z = kinetics._z_profile(kinetics.species_data["deuterium"], False, psi_n)
 
     assert np.isclose(electron_z, -1.0)
     assert np.isclose(deuterium_z, 1.0)
@@ -823,8 +894,8 @@ def test_enforce_quasineutrality_preserves_quasineutrality(scene_file):
     ne = kinetics.species_data["electron"].get_dens(psi_q).to("meter**-3").m
     n_tritium = kinetics.species_data["tritium"].get_dens(psi_q).to("meter**-3").m
 
-    z_deuterium = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_q)
-    z_tritium = kinetics.Z_profile(kinetics.species_data["tritium"], False, psi_q)
+    z_deuterium = kinetics._z_profile(kinetics.species_data["deuterium"], False, psi_q)
+    z_tritium = kinetics._z_profile(kinetics.species_data["tritium"], False, psi_q)
 
     np.testing.assert_allclose(
         ne, z_deuterium * n_adj_new + z_tritium * n_tritium, rtol=1e-6
@@ -884,7 +955,7 @@ def _zeff_by_hand(kinetics, psi_q):
         species = kinetics.species_data[name]
         zeff += (
             species.get_dens(psi_q).to("meter**-3").m
-            * kinetics.Z_profile(species, False, psi_q) ** 2
+            * kinetics._z_profile(species, False, psi_q) ** 2
         )
     return zeff / ne
 
