@@ -37,6 +37,9 @@ Questions, bug reports and ideas are welcome:
 * [GitHub Issues](https://github.com/pyro-kinetics/pyrokinetics/issues) for bugs and feature requests
 * The [pyrokinetics Slack workspace](https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ) for chatting with users and developers
 
+We also hold monthly meetings to discuss any issues people are having and share updates
+on pyrokinetics. The link to join the meeting can be found in the Slack workspace.
+
 ## Installation 
 
 Pyrokinetics requires a minimum Python version of 3.9. It may be necessary to upgrade
