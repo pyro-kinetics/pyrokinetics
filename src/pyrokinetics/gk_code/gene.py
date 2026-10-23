@@ -304,13 +304,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     def is_nonlinear(self) -> bool:
         return bool(self.data["general"].get("nonlinear", False))
 
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to GENE input file
-        Uses default, which assumes a Fortan90 namelist
-        """
-        super().add_flags(flags)
-
     def get_local_geometry(self) -> LocalGeometry:
         """
         Returns local geometry. Delegates to more specific functions

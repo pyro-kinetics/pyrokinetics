@@ -168,12 +168,6 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         is_nonlin = self.data["control"]["non_linear"]
         return is_box and is_nonlin
 
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to GKW input file
-        """
-        super().add_flags(flags)
-
     def get_local_geometry(self) -> LocalGeometry:
         """
         Returns local geometry. Delegates to more specific functions
