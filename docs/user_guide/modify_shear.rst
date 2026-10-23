@@ -2,7 +2,7 @@ Semi-Consistent Modification of Grad–Shafranov Equilibria Using Pyrokinetics
 ============================================================================
 
 This script demonstrates how to **semi-consistently modify a Grad–Shafranov equilibrium**
-within the `Pyrokinetics <https://github.com/pyrokinetics/pyrokinetics>`_ framework
+within the `Pyrokinetics <https://github.com/pyro-kinetics/pyrokinetics>`_ framework
 while maintaining a physically meaningful balance between **bootstrap current**, **external current**, and **pressure gradients**.
 
 The approach enables **parameter scans** (e.g. increasing β or temperature gradients)
@@ -27,7 +27,7 @@ without regenerating the full Grad–Shafranov equilibrium from scratch.
 Workflow Summary
 ----------------
 
-1. Choose input data source (Kinetics/Equilibrium, or GKInput )
+1. Choose input data source (Kinetics/Equilibrium, or GKInput)
 2. Initialize a :class:`Pyro` object from equilibrium and kinetic profiles
 3. Load local geometry and numerical parameters
 4. Enforce β′ consistency
@@ -95,7 +95,7 @@ Alternatively if loading a local GK input file then one can do
 3. Enforce Consistent β′
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The magnetic equilibrium should made consistent with the pressure and magnetic gradients by enforcing:
+The magnetic equilibrium should be made consistent with the pressure and magnetic gradients by enforcing:
 
 .. code-block:: python
 
@@ -253,7 +253,7 @@ Script Reference
 ----------------
 
 **Location:**
-   ``docs/example_modify_shear.py``
+   ``docs/examples/example_modify_shear.py``
 
 **Purpose:**
    Implements the above strategy for testing β and gradient scaling effects on equilibrium shear

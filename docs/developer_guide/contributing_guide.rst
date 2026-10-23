@@ -20,9 +20,9 @@ All contributions, including bug reports, bug fixes, documentation improvements,
 and other ideas are welcome.
 
 If you have any questions on the process or how to fix something feel free to ask us!
-The recommended place to ask a question is on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_
-There is also a slack channel that you are welcome to join here
-`Pyrokinetics slack Stack Overflow <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_ which we monitor for questions.
+The recommended place to ask a question is on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_.
+You are also welcome to join the `pyrokinetics Slack workspace <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_,
+which we also monitor for questions.
 
 
 This project is a community effort, and everyone is welcome to contribute. 
@@ -35,8 +35,8 @@ through the `GitHub "issues" tab <https://github.com/pyro-kinetics/pyrokinetics/
 to find issues (both open and closed) that interest you.
 
 
-Once you've found an interesting issue, you can return here to get your development environment setup.
-The pyrokinetics project does not assign issues. Issues are "assigned" by opening a Pull Request(PR).
+Once you've found an interesting issue, you can return here to get your development environment set up.
+The pyrokinetics project does not assign issues. Issues are "assigned" by opening a Pull Request (PR).
 
 .. _sec-contributing-guide.bug_reports:
 
@@ -44,7 +44,7 @@ Bug reports and enhancement requests
 ====================================
 
 Bug reports are an important part of making *pyrokinetics* more stable. Having a complete bug
-report will allow others to reproduce the bug and provide insight into fixing.
+report will allow others to reproduce the bug and provide insight into fixing it.
 
 Trying out the bug-producing code on the *main* branch is often a worthwhile exercise
 to confirm that the bug still exists. It is also worth searching existing bug reports and
@@ -61,7 +61,9 @@ If you are reporting a bug, please use the provided template which includes the 
 
 #. Include a short, self-contained Python snippet reproducing the problem.
    You can format the code nicely by using `GitHub Flavored Markdown
-   <http://github.github.com/github-flavored-markdown/>`_::
+   <https://github.github.com/gfm/>`_:
+
+   .. code-block:: markdown
 
       ```python
       from pyrokinetics import Pyro
@@ -74,7 +76,7 @@ If you are reporting a bug, please use the provided template which includes the 
 
 The issue will then show up to the *pyrokinetics* community and be open to comments/ideas from others.
 
-See this `stackoverflow article for tips on writing a good bug report <https://stackoverflow.com/help/mcve>`_ .
+See this `Stack Overflow article for tips on writing a good bug report <https://stackoverflow.com/help/mcve>`_.
 
 
 .. _sec-contributing-guide.github:
@@ -95,7 +97,7 @@ version control to allow many people to work together on the project.
 Some great resources for learning Git:
 
 * the `GitHub help pages <https://help.github.com/>`_.
-* the `NumPy's documentation <https://numpy.org/doc/stable/dev/index.html>`_.
+* `NumPy's documentation <https://numpy.org/doc/stable/dev/index.html>`_.
 * Matthew Brett's `Pydagogue <https://matthew-brett.github.io/pydagogue/>`_.
 
 Getting started with Git
@@ -107,15 +109,15 @@ you can work seamlessly between your local repository and GitHub.
 
 .. note::
 
-    The following instructions assume you want to learn how to interact with github via the git command-line utility,
+    The following instructions assume you want to learn how to interact with GitHub via the git command-line utility,
     but contributors who are new to git may find it easier to use other tools instead such as
-    `Github Desktop <https://desktop.github.com/>`_.
+    `GitHub Desktop <https://desktop.github.com/>`_.
 
 Development workflow
 ====================
 
 To keep your work well organized, with readable history, and in turn make it easier for project
-maintainers to see what you've done, and why you did it, we recommend you to follow workflow:
+maintainers to see what you've done, and why you did it, we recommend you follow this workflow:
 
 1. `Create an account <https://github.com/>`_ on GitHub if you do not already have one.
 
@@ -136,7 +138,7 @@ Creating a development environment
 ----------------------------------
 
 To test out code changes locally, you'll need to build *pyrokinetics* from source, which requires you to
-`create a local development environment <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#creating-a-development-environment>`_.
+:ref:`create a local development environment <sec-contributing-guide.dev_env>`.
 
 Update the ``main`` branch
 ------------------------------
@@ -157,7 +159,7 @@ Create a new feature branch
 ---------------------------
 
 Create a branch to save your changes, even before you start making changes. You want your
-``main branch`` to contain only production-ready code::
+``main`` branch to contain only production-ready code::
 
     git checkout -b shiny-new-feature
 
@@ -176,7 +178,7 @@ In git >= 1.7 you can ensure that the link is correctly set by using the ``--set
 
     git push --set-upstream origin shiny-new-feature
 
-From now on git will know that ``shiny-new-feature`` is related to the ``shiny-new-feature branch`` in the GitHub repo.
+From now on git will know that ``shiny-new-feature`` is related to the ``shiny-new-feature`` branch in the GitHub repo.
 
 The editing workflow
 --------------------
@@ -194,10 +196,8 @@ The editing workflow
 
 3. Check what the actual changes are with ``git diff``.
 
-4. Build the `documentation run <https://pyrokinetics.readthedocs.io/en/latest/developer_guide/writing_docs.html#getting-and-running-sphinx>`_
-for the documentation changes.
-
-`Run the test suite <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#running-the-test-suite>`_ for code changes.
+4. :ref:`Build the documentation <sec-install-sphinx>` for documentation changes, and
+   :ref:`run the test suite <sec-contributing-guide.running_tests>` for code changes.
 
 Commit and push your changes
 ----------------------------
@@ -219,7 +219,7 @@ Follow the PR template, which looks like this. ::
 
     [ ]Closes #xxxx
     [ ]Tests added
-    [ ]User visible changes (including notable bug fixes) are documented in whats-new.rst
+    [ ]User visible changes (including notable bug fixes) are documented in CHANGELOG.md
     [ ]New functions/methods are listed in api.rst
 
 Mention anything you'd like particular attention for - such as a complicated change or some code you are not happy with.
@@ -298,7 +298,7 @@ See the full `conda docs here <http://conda.pydata.org/docs>`__.
 Install pre-commit hooks
 ------------------------
 
-We highly recommend that you setup `pre-commit <https://pre-commit.com/>`_ hooks to automatically
+We highly recommend that you set up `pre-commit <https://pre-commit.com/>`_ hooks to automatically
 run all the above tools every time you make a git commit. To install the hooks::
 
     python -m pip install pre-commit
@@ -339,7 +339,7 @@ complex changes to the documentation as well.
 Some other important things to know about the docs:
 
 - The *pyrokinetics* documentation consists of two parts: the docstrings in the code
-  itself and the docs in this folder ``pyrokinetics/doc/``.
+  itself and the docs in this folder ``docs/``.
 
   The docstrings are meant to provide a clear explanation of the usage of the
   individual functions, while the documentation in this folder consists of
@@ -376,7 +376,7 @@ Some other important things to know about the docs:
   doc build. This approach means that code examples will always be up to date,
   but it does make building the docs a bit more complex.
 
-- Our API documentation in ``doc/api.rst`` houses the auto-generated
+- Our API documentation in ``docs/api.rst`` houses the auto-generated
   documentation from the docstrings. For classes, there are a few subtleties
   around controlling which methods and attributes have pages auto-generated.
 
@@ -387,7 +387,7 @@ Some other important things to know about the docs:
 How to build the *pyrokinetics* documentation
 ---------------------------------------------
 
-Information on writing documentation for pyrokinetics can be found here `writing_docs`
+Information on writing documentation for pyrokinetics can be found in :ref:`sec-writing-docs`.
 
 Contributing to the code base
 =============================
@@ -409,6 +409,8 @@ do not make sudden changes to the code that could have the potential to break
 a lot of user code as a result, that is, we need it to be as *backwards compatible*
 as possible to avoid mass breakages.
 
+.. _sec-contributing-guide.code_formatting:
+
 Code Formatting
 ~~~~~~~~~~~~~~~
 
@@ -418,9 +420,9 @@ pyrokinetics uses several tools to ensure a consistent code format throughout th
   code formatting,
 - `blackdoc <https://blackdoc.readthedocs.io/en/stable/>`_ for
   standardized code formatting in documentation,
-- `Flake8 <https://flake8.pycqa.org/en/latest/>`_ for style enforncement
+- `Flake8 <https://flake8.pycqa.org/en/latest/>`_ for style enforcement
 
-We highly recommend that you setup `pre-commit hooks <https://pre-commit.com/>`_
+We highly recommend that you set up `pre-commit hooks <https://pre-commit.com/>`_
 to automatically run all the above tools every time you make a git commit. This
 can be done by running::
 
@@ -449,7 +451,7 @@ a user passes ``old_arg``, we would instead catch it:
             from warnings import warn
 
             warn(
-                "`old_arg` has been deprecated, and in the future will raise an error."
+                "`old_arg` has been deprecated, and in the future will raise an error. "
                 "Please use `new_arg` from now on.",
                 DeprecationWarning,
             )
@@ -471,7 +473,7 @@ The *pyrokinetics* test suite runs automatically via the
 `GitHub Actions <https://docs.github.com/en/free-pro-team@latest/actions>`__,
 continuous integration service, once your pull request is submitted.
 
-A pull-request will be considered for merging when you have an all 'green' build. If any
+A pull request will be considered for merging when you have an all 'green' build. If any
 tests are failing, then you will get a red 'X', where you can click through to see the
 individual failed tests.
 
@@ -507,7 +509,7 @@ extensions in `numpy.testing
 Writing tests
 ~~~~~~~~~~~~~
 
-All tests should go into the ``tests`` subdirectory of the specific package.
+All tests should go into the top-level ``tests`` directory.
 This folder contains many current examples of tests, and we suggest looking to these for
 inspiration.
 
@@ -535,8 +537,8 @@ features that we like to use.
 - ``fixture``, code for object construction, on a per-test basis
 - using bare ``assert`` for scalars and truth-testing
 
-We would name this file ``test_cool_feature.py`` and put in an appropriate place in the
-``pyrokinetics/tests/`` structure.
+We would name this file ``test_cool_feature.py`` and put it in an appropriate place in the
+``tests/`` structure.
 
 .. code-block:: python
 
@@ -628,27 +630,29 @@ example we could run these with ``-k test_pyro_read_gk_file`` to sub-select
    ============================================================== 3 passed, 2 deselected in 4.57s ===============================================================
 
 
+.. _sec-contributing-guide.running_tests:
+
 Running the test suite
 ----------------------
 
 The tests can then be run directly inside your Git clone (without having to
 install *pyrokinetics*) by typing::
 
-    pytest pyrokinetics
+    pytest tests
 
-The tests suite is exhaustive and takes a few minutes.  Often it is
+The test suite is exhaustive and takes a few minutes.  Often it is
 worth running only a subset of tests first around your changes before running the
 entire suite.
 
 The easiest way to do this is with::
 
-    pytest pyrokinetics/path/to/test.py -k regex_matching_test_name
+    pytest tests/path/to/test.py -k regex_matching_test_name
 
 
 Using `pytest-xdist <https://pypi.python.org/pypi/pytest-xdist>`_, one can
-speed up local testing on multicore machines, by running pytest with the optional -n argument::
+speed up local testing on multicore machines, by running pytest with the optional ``-n`` argument::
 
-    pytest pyrok -n 4
+    pytest tests -n 4
 
 This can significantly reduce the time it takes to locally run tests before
 submitting a pull request.
@@ -656,14 +660,15 @@ submitting a pull request.
 For more, see the `pytest <http://doc.pytest.org/en/latest/>`_ documentation.
 
 
+.. _sec-contributing-guide.documenting_code:
+
 Documenting your code
 ---------------------
 
-Changes should be reflected in the release notes located in ``doc/whats-new.rst``.
-This file contains an ongoing change log for each release.  Add an entry to this file to
-document your fix, enhancement or (unavoidable) breaking change.  Make sure to include the
-GitHub issue number when adding your entry (using ``:issue:`1234```, where ``1234`` is the
-issue/pull request number).
+Changes should be reflected in the release notes in ``CHANGELOG.md`` at the root of the
+repository. This file contains an ongoing change log for each release. Add an entry to this
+file to document your fix, enhancement or (unavoidable) breaking change. Make sure to include
+the GitHub issue or pull request number when adding your entry.
 
 If your code is an enhancement, it is most likely necessary to add usage
 examples to the existing documentation.  This can be done by following the :ref:`guidelines for contributing to the documentation <sec-contributing-guide.documentation>`.
@@ -706,7 +711,7 @@ Please reference the relevant GitHub issues in your commit message using ``GH123
 
 Now you can commit your changes in your local repository::
 
-    git commit -m
+    git commit -m "A short description of your changes"
 
 
 .. _sec-contributing-guide.pushing:
@@ -728,9 +733,9 @@ If you added the upstream repository as described above you will see something
 like::
 
     origin  git@github.com:yourname/pyrokinetics.git (fetch)
-    origin  git@github.com:yourname/pyrokinetcs.git (push)
-    upstream        git://github.com/py-pyrokinetics/pyrokinetics.git (fetch)
-    upstream        git://github.com/pyro-kinetics/pyrokinetics.git (push)
+    origin  git@github.com:yourname/pyrokinetics.git (push)
+    upstream        https://github.com/pyro-kinetics/pyrokinetics.git (fetch)
+    upstream        https://github.com/pyro-kinetics/pyrokinetics.git (push)
 
 Now your code is on GitHub, but it is not yet a part of the *pyrokinetics* project.  For that to
 happen, a pull request needs to be submitted on GitHub.
@@ -803,7 +808,7 @@ Then you can do::
 
     git branch -D shiny-new-feature
 
-You need to use a upper-case ``-D`` because the branch was squashed into a
+You need to use an upper-case ``-D`` because the branch was squashed into a
 single commit before merging. Be careful with this because ``git`` won't warn
 you if you accidentally delete an unmerged branch.
 
@@ -818,15 +823,15 @@ GitHub. To delete it there do::
 PR checklist
 ------------
 
-- **Properly comment and document your code.** See `"Documenting your code" <.html#documenting-your-code>`_.
-- **Test that the documentation builds correctly** by typing ``make html`` in the ``doc`` directory. This is not strictly necessary, but this may be easier than waiting for CI to catch a mistake. See `"Contributing to the documentation" <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#contributing-to-the-documentation>`_.
+- **Properly comment and document your code.** See :ref:`"Documenting your code" <sec-contributing-guide.documenting_code>`.
+- **Test that the documentation builds correctly** by typing ``make html`` in the ``docs`` directory. This is not strictly necessary, but this may be easier than waiting for CI to catch a mistake. See :ref:`"Contributing to the documentation" <sec-contributing-guide.documentation>`.
 - **Test your code**.
 
-  - Write new tests if needed. See `"Test-driven development/code writing" <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#test-driven-development-code-writing>`_.
-  - Test the code using `Pytest <http://doc.pytest.org/en/latest/>`_. Running all tests (type ``pytest`` in the root directory) takes a while, so feel free to only run the tests you think are needed based on your PR (example: ``pytest pyrokinetics/tests/test_my_feature.py``). CI will catch any failing tests.
+  - Write new tests if needed. See :ref:`"Test-driven development/code writing" <sec-contributing-guide.tdd>`.
+  - Test the code using `Pytest <http://doc.pytest.org/en/latest/>`_. Running all tests (type ``pytest`` in the root directory) takes a while, so feel free to only run the tests you think are needed based on your PR (example: ``pytest tests/test_my_feature.py``). CI will catch any failing tests.
   - By default, the upstream dev CI is disabled on pull request and push events. You can override this behavior per commit by adding a ``[test-upstream]`` tag to the first line of the commit message. For documentation-only commits, you can skip the CI per commit by adding a ``[skip-ci]`` tag to the first line of the commit message.
 
-- **Properly format your code** and verify that it passes the formatting guidelines set by `Black <https://black.readthedocs.io/en/stable/>`_ and `Flake8 <https://flake8.pycqa.org/en/latest/>`_. See `"Code formatting" <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#code-formatting>`_. You can use `pre-commit <https://pre-commit.com/>`_ to run these automatically on each commit.
+- **Properly format your code** and verify that it passes the formatting guidelines set by `Black <https://black.readthedocs.io/en/stable/>`_ and `Flake8 <https://flake8.pycqa.org/en/latest/>`_. See :ref:`"Code formatting" <sec-contributing-guide.code_formatting>`. You can use `pre-commit <https://pre-commit.com/>`_ to run these automatically on each commit.
 
   - Run ``pre-commit run --all-files`` in the root directory. This may modify some files. Confirm and commit any formatting changes.
 

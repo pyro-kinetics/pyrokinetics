@@ -4,6 +4,7 @@
 [![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 [![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.05866/status.svg)](https://doi.org/10.21105/joss.05866)
+[![Slack](https://img.shields.io/badge/Slack-join%20chat-4A154B?logo=slack)](https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ)
 
 
 # Pyrokinetics
@@ -27,6 +28,17 @@ At a minimum pyrokinetics needs the local geometry and species data. Example scr
 ## Documentation
 
 Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/en/latest/).
+
+## Getting help and community
+
+Questions, bug reports and ideas are welcome:
+
+* [GitHub Discussions](https://github.com/pyro-kinetics/pyrokinetics/discussions) for general questions
+* [GitHub Issues](https://github.com/pyro-kinetics/pyrokinetics/issues) for bugs and feature requests
+* The [pyrokinetics Slack workspace](https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ) for chatting with users and developers
+
+We also hold monthly meetings to discuss any issues people are having and share updates
+on pyrokinetics. The link to join the meeting can be found in the Slack workspace.
 
 ## Installation 
 
@@ -138,7 +150,7 @@ that you will need to `import` Pyrokinetics before it can be used.
 
 ## Code structure 
 
-Pyro object comprised of 
+The Pyro object is comprised of 
 
 * Equilibrium
    * LocalGeometry
@@ -158,10 +170,10 @@ Pyro object comprised of
       * Eigenfunctions (field, ky, theta, time)
       * Eigenvalues - growth rate and mode freq (ky, time)
 
-There also exists the PyroScan object which allows you to make a N-D parameter scan of Pyro objects
+There also exists the PyroScan object which allows you to make an N-D parameter scan of Pyro objects
 
 
-## Supports sources of Equilibrium data
+## Supported sources of Equilibrium data
 pyrokinetics currently supports
 * [GEQDSK](https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf)
 * [TRANSP](https://w3.pppl.gov/~pshare/help/body_transp_hlp.html#outfile56.html)
@@ -183,8 +195,9 @@ Sources of kinetic profile data currently supported are
 * PFILE
 * IMAS
 * ELITEINP
+* ITERDB
 
-Future codes to be add 
+Future codes to be added
 * SimDB
 * OMFIT
 
@@ -202,7 +215,7 @@ The following gk codes are supported in pyrokinetics
 
 ## Note on units
 
-The pyro object uses standardised reference values to normalise the results. It will automatically handle converting to a GK codes standard units.
+The pyro object uses standardised reference values to normalise the results. It will automatically handle converting to a GK code's standard units.
 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 
