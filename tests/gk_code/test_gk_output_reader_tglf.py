@@ -169,3 +169,29 @@ def test_amplitude(load_fields):
 
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
+
+
+def test_gaussian_width():
+    # out.tglf.run reports the width the eigenvalue was solved at
+    pyro = Pyro(gk_file=template_dir / "outputs" / "TGLF_linear" / "input.tglf")
+    pyro.load_gk_output()
+    assert np.isclose(pyro.gk_output["gaussian_width"].data.m, 1.65)
+
+
+def test_pyroscan_stacks_gaussian_width(tmp_path):
+    import shutil
+
+    from pyrokinetics import PyroScan
+
+    path = template_dir / "outputs" / "TGLF_linear"
+    pyro = Pyro(gk_file=path / "input.tglf")
+    scan = PyroScan(pyro, {"ky": [pyro.numerics.ky.m]}, base_directory=tmp_path)
+    scan.write(file_name="input.tglf", base_directory=tmp_path)
+    for run in scan.pyro_dict:
+        for out in path.glob("out.tglf.*"):
+            shutil.copy(out, tmp_path / run / out.name)
+    scan.load_gk_output()
+    assert np.allclose(scan.gk_output["gaussian_width"].data.m, 1.65)
+    scan.gk_output.to_netcdf(tmp_path / "pyroscan.nc")
+    scan.load_gk_output(netcdf_file=tmp_path / "pyroscan.nc")
+    assert np.allclose(scan.gk_output["gaussian_width"].data.m, 1.65)

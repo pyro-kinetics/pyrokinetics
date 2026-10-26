@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
@@ -22,6 +23,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import ureg
 from .gk_input import GKInput, GKInputFlat
 from .gk_output import (
     Coords,
@@ -856,7 +858,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         moment_dims = ("field", "species", "ky")
         eigenvalues_dims = ("ky", "mode")
         eigenfunctions_dims = ("field", "theta", "mode")
-        return GKOutput(
+        gk_output = GKOutput(
             coords=Coords(
                 time=coords["time"],
                 kx=coords["kx"],
@@ -900,6 +902,16 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             output_convention=output_convention,
             jacobian=coords["jacobian"],
         )
+        # The Gaussian width the eigenvalue was solved at: WIDTH, or the one
+        # FIND_WIDTH selected. TGLF prints it to out.tglf.run, misspelled.
+        width = [
+            line for line in raw_data["run"].splitlines() if "uassian width" in line
+        ]
+        if coords["linear"] and width:
+            gk_output.data["gaussian_width"] = xr.DataArray(
+                float(width[0].split("=")[-1]) * ureg.dimensionless
+            )
+        return gk_output
 
     @staticmethod
     def _required_files(dirname: PathLike):

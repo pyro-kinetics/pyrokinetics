@@ -1144,6 +1144,8 @@ class PyroScan:
 
         if self.base_pyro.gk_code == "TGLF":
             load_specs["nonlinear"]["scalars"].extend(["growth_rate", "mode_frequency"])
+            # the width each run solved at, which FIND_WIDTH chooses per run
+            load_specs["linear"]["scalars"].append("gaussian_width")
             load_specs["nonlinear"]["extras"].extend(["growth_rate_tolerance"])
 
         if load_fluxes:
