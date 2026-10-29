@@ -99,9 +99,9 @@ denotes a poloidal average and :math:`G_0(r, \theta)` is a periodic
 function in :math:`\theta` which satisfies
 
 .. math::
+   :label: eq-G0-deriv
 
    \frac{\partial G_0}{\partial \theta} = \frac{B_{\zeta}}{\psi^{\prime}} \mathcal{J}_{r \theta \zeta} g^{\zeta \zeta} - q.
-   \label{eq:G0 deriv}
 
 The current density is
 
@@ -110,11 +110,11 @@ The current density is
 where, from the local Grad-Shafranov solution, we have
 
 .. math::
+   :label: eq-dBzetadr
 
    \begin{split}
        \frac{\mathrm{d} B_{\zeta}}{\mathrm{d} r} = \frac{B_{\zeta}}{H} \Bigg(\frac{q'}{q} \left \langle \mathcal{J}_{r \theta \zeta} g^{\zeta \zeta} \right \rangle & - \left \langle \mathcal{J}_{r \theta \zeta} \frac{\partial g^{\zeta \zeta}}{\partial r} \right \rangle - \left[ \frac{\mu_0}{\left( \psi^{\prime} \right)^2} \frac{\mathrm{d} P}{\mathrm{d} r} \right] \left \langle \frac{\left(\mathcal{J}_{r \theta \zeta}\right)^3 g^{\zeta \zeta}}{g_{\theta \theta}} \right \rangle \\ &  + \left \langle \frac{\mathcal{J}_{r \theta \zeta} g^{\zeta \zeta}}{g_{\theta \theta}} \left( \frac{\partial g_{r \theta}}{\partial \theta} - \frac{\partial g_{\theta \theta}}{\partial r} - \frac{g_{r \theta}}{\mathcal{J}_{r \theta \zeta}} \frac{\partial \mathcal{J}_{r \theta \zeta}}{\partial \theta} \right) \right \rangle \Bigg )
    \end{split}
-   \label{eq:dBzetadr}
 
 where :math:`P = P\left( r \right)` is the equilibrium plasma pressure,
 :math:`q^{\prime} = \mathrm{d}q/\mathrm{d} r` is the radial derivative
@@ -129,11 +129,11 @@ The Grad-Shafranov solution also constrains the radial derivative of the
 Jacobian to be
 
 .. math::
+   :label: eq-radial-deriv-jacobian
 
    \begin{split}
        \frac{\partial \mathcal{J}_{r \theta \zeta}}{\partial r} = \, & \mathcal{J}_{r \theta \zeta} \frac{\psi''}{\psi'} - \frac{\mathcal{J}_{r \theta \zeta}}{g_{\theta \theta}} \left( \frac{\partial g_{r \theta}}{\partial \theta} - \frac{\partial g_{\theta \theta}}{\partial r} - \frac{g_{r \theta}}{\mathcal{J}_{r \theta \zeta}} \frac{\partial \mathcal{J}_{r \theta \zeta}}{\partial \theta} \right) \\ & + \frac{\left(\mathcal{J}_{r \theta \zeta}\right)^3}{g_{\theta \theta}} \left[\frac{\mu_0}{\left( \psi^{\prime} \right)^2} \frac{\mathrm{d} P}{\mathrm{d} r} \right] + \frac{\left(\mathcal{J}_{r \theta \zeta}\right)^3 g^{\zeta \zeta}}{g_{\theta \theta}} \left[ \frac{B_{\zeta}}{\left(\psi' \right)^2} \frac{\mathrm{d} B_{\zeta}}{\mathrm{d} r} \right].
    \end{split}
-   \label{eq:Radial_Deriv_Jacobian}
 
 where :math:`\psi^{\prime \prime} = \mathrm{d}^2 \psi / \mathrm{d} r^2`
 is arbitrary, due to it always appearing as part of the combination
@@ -212,16 +212,16 @@ contravariant metric components are
 Evaluating :math:`\partial \alpha / \partial \theta`, we find
 
 .. math::
+   :label: eq-dalphadtheta
 
    \begin{split}
            \frac{\partial \alpha}{\partial \theta} & = \sigma_{\alpha} \left[ q + \frac{\partial G_0}{\partial \theta} \right] \\
            & = \sigma_{\alpha} \left [\frac{B_{\zeta}}{\psi^{\prime}} \mathcal{J}_{r \theta \zeta} g^{\zeta \zeta} \right].
    \end{split}
-   \label{eq:dalphadtheta}
 
-where we have used equation `[eq:G0 deriv] <#eq:G0 deriv>`__. To then
+where we have used equation :eq:`eq-G0-deriv`. To then
 calculate :math:`\partial \alpha / \partial r`, we differentiate
-equation `[eq:dalphadtheta] <#eq:dalphadtheta>`__ with respect to
+equation :eq:`eq-dalphadtheta` with respect to
 :math:`r` and integrate over :math:`\theta`. First differentiating, we
 get
 
@@ -233,8 +233,8 @@ get
 
 where the forms of :math:`\mathrm{d}B_{\zeta} / \mathrm{d} r` and
 :math:`\partial \mathcal{J}_{r \theta \zeta} / \partial r` are given by
-equations `[eq:dBzetadr] <#eq:dBzetadr>`__ and
-`[eq:Radial_Deriv_Jacobian] <#eq:Radial_Deriv_Jacobian>`__. Now
+equations :eq:`eq-dBzetadr` and
+:eq:`eq-radial-deriv-jacobian`. Now
 integrating over :math:`\theta`,
 
 .. math::

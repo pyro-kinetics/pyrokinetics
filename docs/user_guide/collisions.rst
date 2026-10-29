@@ -20,9 +20,10 @@ The frequency with which a species :math:`a`, characterized by its mass :math:`m
 The collision frequency as defined in various codes is written in the Pyrokinetics `normalization <https://github.com/pyro-kinetics/pyrokinetics#note-on-units>`_ convention.
 
 .. _cgyro:
+
 CGYRO
 -----
-CGYRO `defines <https://gafusion.github.io/doc/cgyro/cgyro_list.html#cgyro-nu-ee>`_ the normalized electron-electron collision frequency :math:`\nu_{ee}` in Gaussian units -- without the factor :math:`(4\pi\epsilon_0)^2`, i.e.
+CGYRO `defines <https://gafusion.github.io/doc/cgyro/cgyro_list.html#cgyro-nu-ee>`__ the normalized electron-electron collision frequency :math:`\nu_{ee}` in Gaussian units -- without the factor :math:`(4\pi\epsilon_0)^2`, i.e.
 
 .. math::
    \begin{split}
@@ -30,12 +31,13 @@ CGYRO `defines <https://gafusion.github.io/doc/cgyro/cgyro_list.html#cgyro-nu-ee
    \end{split}
    \label{eq:nu_cgyro}
 
-All other collision rates are self-consistently determined from this :math:`\nu_{ee}a/c_s`, which is equal to `NU_EE` in the input deck.
+All other collision rates are self-consistently determined from this :math:`\nu_{ee}a/c_s`, which is equal to ``NU_EE`` in the input deck.
 
 .. _gene:
+
 GENE
 ----
-In GENE, the parameter `coll` is defined as 
+In GENE, the parameter ``coll`` is defined as 
 
 .. math::
    \begin{split}
@@ -43,6 +45,7 @@ In GENE, the parameter `coll` is defined as
                         &= 2.3031\cdot 10^{-5} \frac{ L_\mathrm{ref} n^{19}_\mathrm{ref} } {(T^k_\mathrm{ref})^2} \ln \Lambda
    \end{split}
    \label{eq:nu_c}
+
 (note the division by :math:`(4\pi \epsilon_0)^2`) and where
 
 .. math::
@@ -50,7 +53,7 @@ In GENE, the parameter `coll` is defined as
            \ln \Lambda = 24 - \ln \left( \frac{\sqrt{n_e 10^{-6}}}{T_e}  \right)
    \end{split}
 
-Working with the assumptions that in the calculation of `coll` we have used
+Working with the assumptions that in the calculation of ``coll`` we have used
 
 .. math::
    \begin{split}
@@ -58,7 +61,8 @@ Working with the assumptions that in the calculation of `coll` we have used
         T_\mathrm{ref}&=T_e\\
         m_\mathrm{ref}&=m_D
    \end{split}
-i.e. :math:`c_s=\sqrt{T_e/m_D}`, \we arrive at
+
+i.e. :math:`c_s=\sqrt{T_e/m_D}`, we arrive at
 
 .. math::
    \begin{split}
@@ -66,9 +70,10 @@ i.e. :math:`c_s=\sqrt{T_e/m_D}`, \we arrive at
    \end{split}
 
 .. _gs2:
+
 GS2
 ---
-GS2 `defines <https://gyrokinetics.gitlab.io/gs2/page/namelists/index.html>`_ the normalized collision frequency `vnewk = nu_ss Lref/vref`, where from equation :eq:`nuab` it naturally follows that 
+GS2 `defines <https://gyrokinetics.gitlab.io/gs2/page/namelists/index.html>`__ the normalized collision frequency ``vnewk = nu_ss Lref/vref``, where from equation :eq:`nuab` it naturally follows that 
 
 .. math::
    \begin{split}
@@ -83,23 +88,27 @@ Expressed in terms of the electron-electron collisions:
            \nu_{ss} & = \frac{ \hat{n}_s Z_s^4 }{ \sqrt{\hat{m}_s} \hat{T}_s^{3/2} } \nu_{ee}
    \end{split}
    \label{eq:nu_ee}
+
 where we have assumed that the Coulomb logarithm is roughly invariant and hat refers to normalization by the corresponding electron parameters. 
 
 .. _gkw:
+
 GKW
 ---
-GKW `defines <https://bitbucket.org/gkw/gkw/src/develop/doc/manual/>`_ the normalized collision frequency :math:`\Gamma_N^{a/b} = \nu_{ab} R_\mathrm{ref}/v_\mathrm{tha}`, which yields 
+GKW `defines <https://bitbucket.org/gkw/gkw/src/develop/doc/manual/>`__ the normalized collision frequency :math:`\Gamma_N^{a/b} = \nu_{ab} R_\mathrm{ref}/v_\mathrm{tha}`, which yields 
 
 .. math::
    \begin{split}
-           \Gamma_{N}^{a/b} & = 6.5141.10^{-5} \frac{R_\mathrm{ref} n^{19}_b}{(T^k_a)^2} Z_a^2 Z_b^2 \ln \Lambda^{a/b}
+           \Gamma_{N}^{a/b} & = 6.5141 \cdot 10^{-5} \frac{R_\mathrm{ref} n^{19}_b}{(T^k_a)^2} Z_a^2 Z_b^2 \ln \Lambda^{a/b}
    \end{split}
-GKW can define all other collision frequencies in terms of the *singly charged* ion-ion collision frequency taken at some reference values, :math:`\Gamma_N^{i/i}` or `coll_freq`, by setting the switch `freq_override=.true.`
+
+GKW can define all other collision frequencies in terms of the *singly charged* ion-ion collision frequency taken at some reference values, :math:`\Gamma_N^{i/i}` or ``coll_freq``, by setting the switch ``freq_override=.true.``
 
 .. math::
    \begin{split}
            \Gamma_{N}^{i/i} = 6.5141 \cdot 10^{-5} \frac{R_\mathrm{ref} n^{19}_\mathrm{ref}}{(T^k_\mathrm{ref})^2} \ln \Lambda^{i/i}
    \end{split}
+
 Here :math:`R_\mathrm{ref},n^{19}_\mathrm{ref},T^k_\mathrm{ref}` are in :math:`\mathrm{m},10^{19}/\mathrm{m}^3,\mathrm{keV}` units respectively. In the Pyrokinetics convention, beginning with :eq:`nuab`, and noting that :math:`\Gamma_N^{i/i} = \nu_{ii} R_\mathrm{ref}/v_\mathrm{thi}`, where :math:`v_\mathrm{thi}=\sqrt{2T_i/m_i}`, we derive
 
 .. math::
@@ -109,9 +118,10 @@ Here :math:`R_\mathrm{ref},n^{19}_\mathrm{ref},T^k_\mathrm{ref}` are in :math:`\
 
 
 .. _tglf:
+
 TGLF
 ----
-In TGLF, we define the `electron-ion collision frequency <https://gafusion.github.io/doc/tglf/tglf_list.html#xnue>`_, `XNUE`, which equals :math:`\nu_{ei} a/c_s`
+In TGLF, we define the `electron-ion collision frequency <https://gafusion.github.io/doc/tglf/tglf_list.html#xnue>`_, ``XNUE``, which equals :math:`\nu_{ei} a/c_s`
 
 .. math::
    \begin{split}

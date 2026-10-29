@@ -5,7 +5,7 @@ Real-space reconstruction and 3D flux-tube plotting
 This guide demonstrates how to reconstruct nonlinear gyrokinetic field data
 from Fourier space :math:`(k_x, k_y, \theta)` into real space
 :math:`(x, y, \theta)` and subsequently map this data onto a 3D toroidal
-geometry :math:`(R, Z, \phi)` and thus cartesian :math:`(X, Y, Z)` using
+geometry :math:`(R, Z, \phi)` and thus Cartesian :math:`(X, Y, Z)` using
 ``pyrokinetics``.
 
 The workflow consists of four main steps:
@@ -18,10 +18,10 @@ The workflow consists of four main steps:
 The same procedure applies to any supported gyrokinetic code.
 
 Note this code does not yet account for radial variation of :math:`\alpha`,
-:math:`q`, which requires more careful mapping between :math:`(x, y, \theta)`
+:math:`q`, which requires more careful mapping from :math:`(x, y, \theta)`
 to :math:`(X, Y, Z)`.
 
-See the full example in `example_real_space_3d.py`
+See the full example in ``example_real_space_3d.py``.
 
 
 ----------------------------------------
@@ -110,8 +110,8 @@ You may now visualise slices in the perpendicular plane:
 
     >>> field = rs_phi.data
     >>> plt.contourf(rs_phi.x, rs_phi.y, field[:, :, len(rs_phi.theta)//2].T)
-    >>> plt.xlabel("y")
-    >>> plt.ylabel("x")
+    >>> plt.xlabel("x")
+    >>> plt.ylabel("y")
     >>> plt.title("Re(phi) at theta = 0")
     >>> plt.show()
 
@@ -256,7 +256,7 @@ We may then interpolate the real-space field:
 
 
 Note this code does not yet account for radial variation of :math:`\alpha`,
-:math:`q`, which requires more careful mapping between :math:`(x, y, \theta)`
+:math:`q`, which requires more careful mapping from :math:`(x, y, \theta)`
 to :math:`(X, Y, Z)`.
 
 
@@ -303,7 +303,7 @@ Building a 3D toroidal grid
 ----------------------------------------
 
 To create a toroidal volume, we extrude the flux surface in toroidal angle using
-:math:`\zeta = q\theta + \alpha`:
+:math:`\zeta = q\theta - \alpha`:
 
 
 .. code-block:: python

@@ -2,8 +2,8 @@
 Generate an input file from equilibrium and profiles
 ====================================================
 
-Here a step-by-step guide on how to generate an input file
-for any gyrokinetic codes supported in ``pyrokinetics``,
+Here is a step-by-step guide on how to generate an input file
+for any of the gyrokinetic codes supported in ``pyrokinetics``,
 starting from equilibrium and profile files.
 
 
@@ -26,12 +26,12 @@ We now load these files into ``pyrokinetics``:
 .. code-block:: python
 
    >>> pyro = Pyro(
-        eq_file=eq_file,
-        kinetics_file=kinetics_file,
-        kinetics_type="JETTO",
-        kinetics_kwargs={"time": 550},
-        gk_file=gk_file,
-    )
+   ...     eq_file=eq_file,
+   ...     kinetics_file=kinetics_file,
+   ...     kinetics_type="JETTO",
+   ...     kinetics_kwargs={"time": 550},
+   ...     gk_file=gk_file,
+   ... )
 
 
 During initialization, `Pyro` calls `read_equilibrium` from
@@ -61,7 +61,7 @@ We are now ready to write our input file:
 
    >>> pyro.write_gk_file(file_name="test_jetto.cgyro")
 
-Alternatively, ``gk_code`` can be pass as keyword argument to ``write_gk_file``,
+Alternatively, ``gk_code`` can be passed as a keyword argument to ``write_gk_file``,
 
 .. code-block:: python
 

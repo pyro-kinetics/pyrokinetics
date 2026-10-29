@@ -15,5 +15,4 @@ cases:
 
    *
 
-.. _reStructuredText Primer:
 .. _here: https://github.com/pyro-kinetics/pyrokinetics/tree/main/docs/examples

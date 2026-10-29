@@ -1,10 +1,12 @@
+.. _sec-read-nonlinear-data:
+
 ====================================================
 Reading and plotting nonlinear outputs
 ====================================================
 
 This is a step-by-step guide on how to use ``pyrokinetics`` to read the output of a nonlinear gyrokinetic simulation
 and create some simple plots. In this guide, we will use the example nonlinear output from CGYRO. The same ideas
-apply for any gyrokinetic codes supported in ``pyrokinetics``,
+apply to any of the gyrokinetic codes supported in ``pyrokinetics``.
 
 Let's first import ``pyrokinetics`` and define our nonlinear input file.  
 
@@ -20,7 +22,7 @@ Let's first import ``pyrokinetics`` and define our nonlinear input file.
 The gyrokinetic file ``input.cgyro`` is our input file template where we set all the extra flags that have been used
 in the simulation.
 
-We can then read the nonlinear simulation into a dataset using ``pyrokinetics`` which is stored as a `gk_output`
+We can then read the nonlinear simulation into a dataset using ``pyrokinetics`` which is stored as a ``gk_output``
 object
 
 .. code-block:: python 
@@ -69,15 +71,15 @@ This approach is strongly recommended when:
 * Running workflows on login nodes or laptops where I/O and memory are constrained
 
 
-In this we have decided to load in the fluxes and full 3D fields and the moments of the distribution function
-using the kwargs `load_fluxes`, `load_fields` and `load_moments` respectively, all of which are optional. Here we
+Here we have decided to load in the fluxes and full 3D fields and the moments of the distribution function
+using the keyword arguments ``load_fluxes``, ``load_fields`` and ``load_moments`` respectively, all of which are optional. Here we
 initialise the utility base dataclass `GKOutputArgs` which is used to pass quantities to
 ``GKOutput``. Derived classes include `Coords`, `Fields`, `Fluxes`, `Moments` etc. This class contains
 features such as automatic unit conversion and a dict-like interface to quantities. Derived classes should define an
 ``InitVar[Tuple[str, ...]]`` called ``dims``, which sets the dimensionality of each quantity, e.g.
 ``("kx", "ky", "time")``.
 
-It is helpful to view the  different data stored in the ``pyro`` object along with the dimensions of each quantity. 
+It is helpful to view the different data stored in the ``pyro`` object along with the dimensions of each quantity. 
 
 .. code-block:: python 
 
@@ -121,13 +123,13 @@ It is helpful to view the  different data stored in the ``pyro`` object along wi
         session_started:   2024-03-26 11:59:01.793200
         netcdf4_version:   1.6.4
 
-The outputs are stored as a `xarray Dataset`_ which allows for fast manipulation of data using the built-in methods
+The outputs are stored as an `xarray Dataset`_ which allows for fast manipulation of data using the built-in methods
 of xarray. Note that all the data variables have units. Whilst reading in outputs, all data is converted to the
 pyrokinetics normalisation convention. Details regarding normalisations and units can be found in
 `sec-normalisation-docs`.
 
 Let's suppose we want to plot the ky spectrum of the electron heat fluxes from our nonlinear simulation.
-First, we need to extract the relevant quantities from the dataset. After examining the data set, we see that the
+First, we need to extract the relevant quantities from the dataset. After examining the dataset, we see that the
 heat and particle fluxes are given as functions of ``("field", "species", "ky", "time")``. In order to plot the fluxes
 as a function of ky we must select out the relevant species, field and time.
 
@@ -135,26 +137,26 @@ as a function of ky we must select out the relevant species, field and time.
 
     >>> electron_heat_flux_ky = data["heat"].sel(field="phi", species="electron").isel(time=-1)
     >>> electron_heat_flux_ky.plot()
-    >>> plot.show()
+    >>> plt.show()
 
 .. image:: figures/CGYRO_ky_flux_spectrum.png
    :width: 600
 
 We could of course choose to average over the time dimension instead. Similarly if we want to plot the total heat flux
-as a function of time we would need to sum over the `field`, `species` and `ky` to obtain this.
+as a function of time we would need to sum over ``field``, ``species`` and ``ky`` to obtain this.
 
 .. code-block:: python
 
     >>> total_heat_flux_time = data["heat"].sum(dim=["field", "species", "ky"])
     >>> total_heat_flux_time.plot()
-    >>> plot.show()
+    >>> plt.show()
 
 .. image:: figures/CGYRO_total_heat_timetrace.png
    :width: 600
 
-We can also plot the field data. Below we plot the electrostatic potential `phi` as a function of `kx` and `ky` for at
-the final time slice when `theta` = 0.0. Note here we want to plot log(phi) but as phi currently has units we need to
-remove them using the `.pint.dequantify()` method
+We can also plot the field data. Below we plot the electrostatic potential ``phi`` as a function of ``kx`` and ``ky`` at
+the final time slice when ``theta = 0.0``. Note here we want to plot log(phi) but as phi currently has units we need to
+remove them using the ``.pint.dequantify()`` method.
 
 .. code-block:: python 
 

@@ -288,9 +288,8 @@ Additional diagnostics
 
 The ``FieldLine`` class also provides several additional diagnostics.
 
-====================================================
 Field line tearing parameter
-====================================================
+----------------------------
 
 For **linear gyrokinetic simulations**, the radial displacement of a
 magnetic field line over one poloidal turn can be used to identify
@@ -306,9 +305,8 @@ The returned quantity is a **dimensionless tearing parameter**
 defined as the ratio of the net displacement to the total excursion
 along the field line.
 
-----------------------------------------------------
 Field line distance element
-----------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In field-aligned coordinates the differential length along the
 magnetic field line is determined by the field-aligned covariant
@@ -326,9 +324,8 @@ The infinitesimal distance travelled along the field line is therefore
 
 where :math:`\theta` is the poloidal angle.
 
-----------------------------------------------------
 Weighted field-line displacement
-----------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The parallel vector potential :math:`A_{||}` determines the magnetic
 perturbation responsible for magnetic reconnection. To estimate the
@@ -374,9 +371,8 @@ This dimensionless quantity
 measures how coherent the magnetic perturbation is along the field
 line.
 
-----------------------------------------------------
 Physical interpretation
-----------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 - :math:`T \approx 0`
 
@@ -393,9 +389,8 @@ Physical interpretation
 Thus the tearing parameter provides a convenient way to identify
 microtearing activity in **linear gyrokinetic simulations**.
 
-----------------------------------------------------
 Implementation
-----------------------------------------------------
+~~~~~~~~~~~~~~
 
 The algorithm performs the following steps:
 
