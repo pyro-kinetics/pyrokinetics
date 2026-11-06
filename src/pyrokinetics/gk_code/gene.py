@@ -11,6 +11,7 @@ import f90nml
 import h5py
 import numpy as np
 from cleverdict import CleverDict
+from scipy.optimize import brentq
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
@@ -90,7 +91,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     default_file_name = "input.gene"
     norm_convention = "gene"
     _convention_dict = {}
-    _drhotor_dr = 1.0
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
@@ -200,7 +200,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "dcNdr": ["geometry", "cndr_m"],
         "dsNdr": ["geometry", "sndr_m"],
         "ip_ccw": ["geometry", "sign_ip_cw"],
-        "bt_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_fourier_default = {
@@ -424,6 +424,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["ip_ccw"] *= -1
         local_geometry_data["bt_ccw"] *= -1
 
+        if geometry_type in ["tracer_efit", "gene"]:
+            for key, value in geometry_dict.items():
+                local_geometry_data[key] = value
+
         # Assume ne * Tref*8pi*1e-7 = 1.0
         (
             ne,
@@ -462,10 +466,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 f"{amhd_beta_prime} - drifts may not behave as expected"
             )
 
-        if geometry_type in ["tracer_efit", "gene"]:
-            for key, value in geometry_dict.items():
-                local_geometry_data[key] = value
-
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
         if geometry_type == "miller_mxh":
@@ -497,9 +497,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry.Z0 = geometry_dict["Z0"] * lref
             local_geometry.rho = geometry_dict["rho"] * lref
             local_geometry.dpsidr = geometry_dict["dpsidr"] * bref * lref
-            local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
-
-            self._drhotor_dr = geometry_dict["drhotor_dr"]
+            if "beta_prime" in geometry_dict:
+                local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
 
             local_geometry._set_shape_coefficients(
                 local_geometry.R_eq,
@@ -555,37 +554,59 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         -------
         trpeps: trpeps from the input file
         """
-        geometry_type = self.data["geometry"]["magn_geometry"]
+        geometry_filename = self._gene_geometry_filename()
+        if geometry_filename is not None:
+            direct_geometry_nml = f90nml.read(geometry_filename)
+            trpeps = direct_geometry_nml["parameters"]["trpeps"]
 
-        if hasattr(self, "original_filename"):
-            original_filename = Path(self.original_filename)
-            prefix = original_filename.parent / geometry_type
-
-            if original_filename.suffix:
-                suffix = original_filename.suffix
-            else:
-                filename_split = original_filename.name.split("_")
-                if len(filename_split) > 1:
-                    suffix = f"_{filename_split[-1]}"
-                else:
-                    suffix = ""
-
-            geometry_filename = Path(f"{str(prefix)}{suffix}")
-            if geometry_filename.exists():
-                direct_geometry_nml = f90nml.read(geometry_filename)
-                trpeps = direct_geometry_nml["parameters"]["trpeps"]
-
-                if trpeps == 0.0:
-                    trpeps = (
-                        np.sqrt(direct_geometry_nml["parameters"]["s0"])
-                        / direct_geometry_nml["parameters"]["major_R"]
-                    )
-            else:
-                trpeps = self.data["geometry"].get("trpeps", 0.0)
+            if trpeps == 0.0:
+                trpeps = (
+                    np.sqrt(direct_geometry_nml["parameters"]["s0"])
+                    / direct_geometry_nml["parameters"]["major_R"]
+                )
+        elif self._uses_equilibrium():
+            trpeps = self.get_gene_geometry()["trpeps"]
         else:
             trpeps = self.data["geometry"].get("trpeps", 0.0)
 
         return trpeps
+
+    def _gene_geometry_filename(self) -> Optional[Path]:
+        """
+        Returns the geometry file GENE writes beside its parameters file, such as
+        ``tracer_efit_0001`` or ``tracer_efit.dat``, or ``None`` if it doesn't exist.
+        """
+        if not hasattr(self, "original_filename"):
+            return None
+
+        original_filename = Path(self.original_filename)
+        prefix = original_filename.parent / self.data["geometry"]["magn_geometry"]
+
+        if original_filename.suffix:
+            suffixes = [original_filename.suffix]
+        else:
+            filename_split = original_filename.name.split("_")
+            if len(filename_split) > 1:
+                suffixes = [f"_{filename_split[-1]}", ".dat"]
+            else:
+                suffixes = ["", ".dat"]
+
+        for suffix in suffixes:
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                return geometry_filename
+        return None
+
+    def _uses_equilibrium(self) -> bool:
+        """
+        True if the geometry is traced by GENE from an EFIT file and must be
+        computed from ``self.equilibrium``, as GENE's geometry file isn't available.
+        """
+        return (
+            self.data["geometry"]["magn_geometry"] == "tracer_efit"
+            and self.equilibrium is not None
+            and self._gene_geometry_filename() is None
+        )
 
     def get_gene_geometry(self):
         """
@@ -594,26 +615,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         -------
         trpeps: trpeps from the input file
         """
-        if hasattr(self, "_gene_geometry_dict"):
+        # Cached per x0 and equilibrium, as either may change after reading
+        cache_key = (self.data["box"].get("x0"), id(self.equilibrium))
+        if getattr(self, "_gene_geometry_key", None) == cache_key:
+            return self._gene_geometry_dict
+
+        if self._uses_equilibrium():
+            self._gene_geometry_dict = self._gene_geometry_from_equilibrium()
+            self._gene_geometry_key = cache_key
             return self._gene_geometry_dict
 
         geometry_type = self.data["geometry"]["magn_geometry"]
         geo_dict = {}
         if hasattr(self, "original_filename"):
-            original_filename = Path(self.original_filename)
-            prefix = original_filename.parent / geometry_type
-
-            if original_filename.suffix:
-                suffix = original_filename.suffix
-            else:
-                filename_split = original_filename.name.split("_")
-                if len(filename_split) > 1:
-                    suffix = f"_{filename_split[-1]}"
-                else:
-                    suffix = ""
-
-            geometry_filename = Path(f"{str(prefix)}{suffix}")
-            if geometry_filename.exists():
+            geometry_filename = self._gene_geometry_filename()
+            if geometry_filename is not None:
                 geometry_nml = f90nml.read(geometry_filename)
                 # GENE Lref is not magnetic axis so we need to shift it to that
                 geo_dict["Lref"] = (
@@ -737,14 +753,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gxz *= drhotor_dr**-1
                 Cxy *= drhotor_dr
 
-                # x0 = rho_tor
+                # x0 = rho_tor. Cxy already includes drhotor_dr
                 Cx_prime = 1.0
                 dpsidr = (
-                    Cxy
-                    * Cy
-                    * Cx_prime
-                    * drhotor_dr
-                    / geometry_nml["parameters"]["major_r"] ** 2
+                    Cxy * Cy * Cx_prime / geometry_nml["parameters"]["major_r"] ** 2
                 )
 
                 b_pol = np.sqrt(
@@ -791,15 +803,125 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["b_poloidal_eq"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
                 geo_dict["rgeo_rmaj"] = rgeo_rmaj
+                geo_dict["major_r"] = geometry_nml["parameters"]["major_r"]
 
                 self._gene_geometry_dict = geo_dict
+                self._gene_geometry_key = cache_key
                 return self._gene_geometry_dict
             else:
-                raise FileNotFoundError(
-                    f"Can't find geometry file: {geometry_filename} in get_gene_geometry"
+                message = (
+                    f"Can't find the GENE geometry file '{geometry_type}' beside "
+                    f"{self.original_filename}."
                 )
+                if geometry_type == "tracer_efit":
+                    message += (
+                        " Either place it there, or load the EFIT file named by "
+                        "'geomfile' first, e.g. Pyro(eq_file=..., gk_file=...)."
+                    )
+                raise FileNotFoundError(message)
         else:
             return {}
+
+    def _gene_geometry_from_equilibrium(self) -> Dict[str, Any]:
+        """
+        Returns the geometry that GENE's ``tracer_efit`` computes, derived from
+        ``self.equilibrium`` on the flux surface ``x0`` (normalised square root of
+        toroidal flux). Matches the output of ``get_gene_geometry`` when reading
+        GENE's geometry file: lengths are normalised to the magnetic axis major
+        radius, and magnetic fields to Bref.
+        """
+        eq = self.equilibrium
+        geometry = self.data["geometry"]
+        x0 = self.data["box"]["x0"]
+        # Bracket x0 on the equilibrium grid, then solve on the rho_tor spline
+        rho_tor_grid = eq["rho_tor"].data.m
+        i = np.clip(np.searchsorted(rho_tor_grid, x0), 1, len(rho_tor_grid) - 1)
+        psi_n_grid = eq["psi_n"].data.m
+        psi_n = brentq(
+            lambda psi_n: eq.rho_tor(psi_n).m - x0, psi_n_grid[i - 1], psi_n_grid[i]
+        )
+        fs = eq.flux_surface(psi_n)
+
+        # Use reference values from the input if set, else those GENE computes
+        R_axis = eq.R_axis.to("meter").m
+        reference_units = self.data.get("units", {})
+        bref = reference_units.get("bref", -1.0)
+        if bref <= 0.0:
+            bref = abs(eq["F"].data[0].to("meter * tesla").m) / R_axis
+        lref = reference_units.get("lref", -1.0)
+        if lref <= 0.0:
+            if not np.isclose(geometry.get("minor_r", 1.0), 1.0):
+                raise NotImplementedError(
+                    "GENE tracer_efit from an Equilibrium requires either &units Lref "
+                    "or minor_r = 1.0"
+                )
+            psi_tor = eq["psi_tor"].data.to("weber").m
+            lref = np.sqrt(abs(psi_tor[-1] - psi_tor[0]) / (pi * bref))
+
+        # Counter-clockwise without repeated endpoint, as LocalGeometry.from_global_eq
+        R = fs["R"].data[:0:-1].to("meter").m / R_axis
+        Z = fs["Z"].data[:0:-1].to("meter").m / R_axis
+        b_poloidal = fs["B_poloidal"].data[:0:-1].to("tesla").m / bref
+
+        Rmaj = fs.R_major.to("meter").m / R_axis
+        rho = fs.r_minor.to("meter").m / R_axis
+
+        # Start at the outboard midplane, level with the magnetic axis, as GENE's
+        # field line does. Z0 is set to that point, as in GENE's geometry file.
+        Z_axis = eq.Z_axis.to("meter").m / R_axis
+        start = np.argmin(np.where(R > Rmaj, abs(Z - Z_axis), np.inf))
+        R, Z, b_poloidal = (np.roll(x, -start) for x in (R, Z, b_poloidal))
+        Z0 = Z[0]
+
+        # d(rho_tor)/dr with r normalised to R_axis
+        dpsi_n = min(1e-4, psi_n, 1.0 - psi_n)
+        psi_n_pm = np.array([psi_n - dpsi_n, psi_n + dpsi_n])
+        drhotor_dr = R_axis * (
+            np.diff(eq.rho_tor(psi_n_pm).m)[0]
+            / np.diff(eq.r_minor(psi_n_pm).to("meter").m)[0]
+        )
+
+        geo_dict = {
+            "Lref": R_axis,
+            "Rmaj": Rmaj,
+            "Z0": Z0,
+            "rho": rho,
+            "theta_eq": np.arctan2(Z - Z0, R - Rmaj),
+            "R_eq": R,
+            "Z_eq": Z,
+            "dpsidr": abs(fs.psi_gradient.to("weber / meter").m)
+            / (2 * pi * bref * R_axis),
+            "shat": fs.magnetic_shear.m,
+            "q": abs(fs.q.m),
+            "b_poloidal_eq": b_poloidal,
+            "drhotor_dr": drhotor_dr,
+            "rgeo_rmaj": abs(fs.F.to("meter * tesla").m) / (bref * Rmaj * R_axis),
+            "major_r": R_axis / lref,
+            # As GENE defines it, x0 / major_r
+            "trpeps": x0 * lref / R_axis,
+            "psi_n": psi_n,
+            "aspect_ratio": (fs.R_major / fs.a_minor).to("dimensionless").m,
+        }
+
+        # dpdx_pm = -1 is set from the species in get_local_geometry
+        dpdx_pm = geometry.get("dpdx_pm", -2)
+        if dpdx_pm == -2:
+            geo_dict["beta_prime"] = (
+                (
+                    2
+                    * ureg.mu0
+                    * fs.pressure_gradient
+                    * R_axis
+                    * ureg.meter
+                    / (bref * ureg.tesla) ** 2
+                )
+                .to("dimensionless")
+                .m
+            )
+        elif dpdx_pm != -1:
+            geo_dict["beta_prime"] = -dpdx_pm * drhotor_dr
+
+        return geo_dict
 
     def get_local_species(self):
         """
@@ -830,13 +952,20 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         trpeps = self.get_trpeps()
 
-        rho = trpeps * self.data["geometry"].get("major_r", 1.0)
+        # GENE gradients are with respect to x = rho_tor for tracer_efit/gene
+        geometry_dict = {}
+        if self.data["geometry"].get("magn_geometry") in ["tracer_efit", "gene"]:
+            geometry_dict = self.get_gene_geometry()
+        drhotor_dr = geometry_dict.get("drhotor_dr", 1.0)
+
+        rho = trpeps * geometry_dict.get(
+            "major_r", self.data["geometry"].get("major_r", 1.0)
+        )
         if rho == 0.0:
             domega_drho = 0.0
         else:
-            domega_drho = (
-                -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
-            )
+            q = geometry_dict.get("q", self.data["geometry"].get("q0"))
+            domega_drho = -q / rho * external_contr.get("pfsrate", 0.0)
 
         names = self.get_local_species_names()
 
@@ -853,19 +982,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            # Always force to major_r norm and then re-normalise to pyro after
-            if self.data["geometry"].get("magn_geometry") in ["tracer_efit", "gene"]:
-                lref_scale = self.data["geometry"]["major_r"]
-            else:
-                lref_scale = 1.0
-            species_data["inverse_lt"] = (
-                gene_data["omt"] * self._drhotor_dr * lref_scale
-            )
-            species_data["inverse_ln"] = (
-                gene_data["omn"] * self._drhotor_dr * lref_scale
-            )
+            species_data["inverse_lt"] = gene_data["omt"] * drhotor_dr
+            species_data["inverse_ln"] = gene_data["omn"] * drhotor_dr
             species_data["omega0"] = external_contr.get("omega0_tor", 0.0)
-            species_data["domega_drho"] = domega_drho * self._drhotor_dr * lref_scale
+            species_data["domega_drho"] = domega_drho * drhotor_dr
 
             if species_data.z == -1:
                 species_data.nu = (
@@ -1172,7 +1292,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
-        major_radius = self.data["geometry"]["major_r"]
+        major_radius = self.data["geometry"].get("major_r", 1.0)
 
         trpeps = self.data["geometry"].get("trpeps", 0.0)
 
@@ -1226,7 +1346,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
 
     def _get_rgeo_rmaj(self):
-        if hasattr(self, "original_filename"):
+        if hasattr(self, "original_filename") or self.equilibrium is not None:
             geometry_type = self.data["geometry"].get("magn_geometry", "miller")
 
             # Only for Tracer EFIT
@@ -1294,6 +1414,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
+            )
+
+        if self.data["geometry"].get("magn_geometry") in ["tracer_efit", "gene"]:
+            warnings.warn(
+                f"Replacing GENE magn_geometry = "
+                f"'{self.data['geometry']['magn_geometry']}' with a local {eq_type} "
+                "fit of the flux surface. GENE will not trace the equilibrium.",
+                UserWarning,
             )
 
         if eq_type == "MXH":
