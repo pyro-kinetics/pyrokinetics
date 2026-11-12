@@ -38,6 +38,9 @@ def _resolve_path(path: str | pathlib.Path, base: pathlib.Path) -> pathlib.Path:
 
 
 # ---- time handling ----
+VALID_TIME_MODES = ("last", "average", "trace")
+
+
 def reduce_time(
     da,
     *,
@@ -50,6 +53,7 @@ def reduce_time(
     time_mode:
         "last"      → take final time
         "average"   → average over tolerance_time_range
+        "trace"     → preserve the full time series unchanged
     """
     if "time" not in da.dims:
         return da
@@ -71,20 +75,29 @@ def reduce_time(
             .drop_vars("time", errors="ignore")
         )
 
-    raise ValueError(f"Unknown time_mode={time_mode}")
+    if time_mode == "trace":
+        return da
+
+    raise ValueError(
+        f"Unknown time_mode={time_mode!r}; expected one of {VALID_TIME_MODES}"
+    )
 
 
 # ---- xarray selection ----
 def select_kx_ky_time(
     da,
     *,
-    kx_min,
+    kx_min=None,
     sum_ky=False,
+    sum_kx=False,
     time_mode,
     tolerance_time_range=None,
 ):
     if "kx" in da.dims:
-        da = da.sel(kx=kx_min)
+        if sum_kx:
+            da = da.sum(dim="kx")
+        elif kx_min is not None:
+            da = da.sel(kx=kx_min)
 
     da = reduce_time(
         da,
@@ -619,11 +632,13 @@ class PyroScan:
         self,
         output_convention="pyrokinetics",
         tolerance_time_range=0.8,
+        time_mode="average",
         netcdf_file=None,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
-        sum_ky=True,
+        sum_ky=False,
+        sum_kx=False,
         drop_nan=False,
         **kwargs,
     ):
@@ -635,18 +650,45 @@ class PyroScan:
         output_convention: str default 'pyrokinetics'
             ConventionNormalisation to convert output to
         tolerance_time_range: float default 0.8
-            Time window over which to calculate growth rate tolerance
+            Start fraction of the time axis used for time averages and the
+            growth rate tolerance (i.e. ``tolerance_time_range=0.8`` averages
+            over the last 20% of the simulation).
+        time_mode: str default 'average'
+            How to reduce the outputs along the time axis, whether the runs are
+            linear or nonlinear. One of:
+
+            * ``"average"`` – mean over ``[tolerance_time_range * t_max, t_max]``.
+              Fields and eigenfunctions are complex, and their time mean is
+              meaningless (linear fields are normalised to their final
+              amplitude; the phase of a nonlinear Fourier coefficient keeps
+              moving), so for them ``|field|**2`` is averaged instead, taken
+              before any kx/ky sum. It is stored as ``phi_squared``,
+              ``apar_squared``, ``bpar_squared`` and ``eigenfunctions_squared``
+              (with squared units), not under the field names.
+            * ``"last"``    – take the final time point.
+            * ``"trace"``   – preserve the full time trace, no reduction.
         netcdf_file: PathLike default None
             If supplied then load PyroScanGKOutput from existing netCDF
         load_fields (bool, default True) – Flag to load fields or not
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
+        sum_ky (bool, default False) – If True, sum fluxes, fields and eigenfunctions
+            over ky. If False, preserve the ky dimension.
+        sum_kx (bool, default False) – Applies to fields and eigenfunctions (fluxes
+            are already kx-integrated). If True, sum over kx; if False, preserve the
+            kx dimension.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
         None
         """
+        if time_mode not in VALID_TIME_MODES:
+            raise ValueError(
+                f"time_mode={time_mode!r} is not valid; "
+                f"expected one of {VALID_TIME_MODES}"
+            )
+
         # Load from netCDF is supplied
         if netcdf_file is not None:
             # Auto-detect a pyroscan_norms.json sitting alongside the scan
@@ -698,29 +740,17 @@ class PyroScan:
 
         load_specs = {
             "linear": {
-                "scalars": ["growth_rate", "mode_frequency", "eigenfunctions"],
+                "scalars": ["growth_rate", "mode_frequency"],
                 "extras": ["growth_rate_tolerance"],
                 "fluxes": [],
-                "fields": [],
+                # Eigenfunctions are selected exactly as the fields are
+                "fields": ["eigenfunctions"],
             },
             "nonlinear": {
                 "scalars": [],
                 "extras": [],
                 "fluxes": [],
                 "fields": [],
-            },
-        }
-
-        time_policy = {
-            "linear": {
-                "scalars": "last",
-                "fluxes": "last",
-                "fields": "last",
-            },
-            "nonlinear": {
-                "scalars": "last",
-                "fluxes": "average",
-                "fields": "average",
             },
         }
 
@@ -738,7 +768,6 @@ class PyroScan:
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
-        time_policy = time_policy[regime]
 
         buffers = {
             name: []
@@ -746,6 +775,8 @@ class PyroScan:
                 spec["scalars"] + spec["extras"] + spec["fluxes"] + spec["fields"]
             )
         }
+        # Fields averaged as |field|**2, which are renamed once stacked
+        squared = set()
 
         for i, pyro in enumerate(self.pyro_dict.values()):
             run_buffers = {name: None for name in buffers}
@@ -783,7 +814,8 @@ class PyroScan:
                         run_buffers[name] = select_kx_ky_time(
                             pyro.gk_output[name],
                             kx_min=kx_min,
-                            time_mode=time_policy["scalars"],
+                            time_mode=time_mode,
+                            tolerance_time_range=tolerance_time_range,
                         )
 
                 for name in spec["fluxes"]:
@@ -792,19 +824,25 @@ class PyroScan:
                             pyro.gk_output[name],
                             kx_min=kx_min,
                             sum_ky=sum_ky,
-                            time_mode=time_policy["fluxes"],
+                            time_mode=time_mode,
                             tolerance_time_range=tolerance_time_range,
                         )
 
-                data = data.isel(ky=[0]).squeeze()
-                pyro.gk_output.data = data
-
+                # Fields and eigenfunctions are reduced identically: kx and ky
+                # are kept unless summed with sum_kx / sum_ky
                 for name in spec["fields"]:
                     if name in pyro.gk_output:
+                        field = pyro.gk_output[name]
+                        # A time mean of a complex field is meaningless, so
+                        # "average" averages |field|**2 instead
+                        if time_mode == "average" and "time" in field.dims:
+                            field = abs(field) ** 2
+                            squared.add(name)
                         run_buffers[name] = select_kx_ky_time(
-                            pyro.gk_output[name],
-                            kx_min=kx_min,
-                            time_mode=time_policy["fields"],
+                            field,
+                            sum_ky=sum_ky,
+                            sum_kx=sum_kx,
+                            time_mode=time_mode,
                             tolerance_time_range=tolerance_time_range,
                         )
                 for name, value in run_buffers.items():
@@ -848,6 +886,9 @@ class PyroScan:
 
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
+
+        # |field|**2 is not the field, so it is stored under its own name
+        ds = ds.rename({name: f"{name}_squared" for name in squared if name in ds})
 
         self.gk_output = PyroScanGKOutput(ds, norms=self.base_pyro.norms)
 
