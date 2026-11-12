@@ -204,6 +204,25 @@ def test_pyro_load_global_kinetics(kinetics_type):
     assert pyro.local_species is local_species
 
 
+@pytest.mark.parametrize("kinetics_type", ["TRANSP", "SCENE", "JETTO"])
+def test_pyro_load_global_eq_then_kinetics_syncs_kinetics_eq(kinetics_type):
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates[kinetics_type])
+    assert pyro.kinetics.eq is pyro.eq
+
+
+@pytest.mark.parametrize("kinetics_type", ["TRANSP", "SCENE", "JETTO"])
+def test_pyro_load_global_kinetics_then_eq_syncs_kinetics_eq(kinetics_type):
+    # Note: kinetics/equilibrium file reads are cached across the test session
+    # (see conftest._cache_kinetics / _cache_equilibria), so we only assert the
+    # post-condition here rather than that pyro.kinetics.eq starts out unset.
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    pyro.load_global_kinetics(kinetics_templates[kinetics_type])
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    assert pyro.kinetics.eq is pyro.eq
+
+
 @pytest.mark.parametrize("eq_type", ["GEQDSK", "TRANSP"])
 def test_pyro_load_local_geometry(eq_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])

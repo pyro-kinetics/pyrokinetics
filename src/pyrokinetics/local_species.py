@@ -7,6 +7,7 @@ from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import SimulationNormalisation as Normalisation
+from .units import ureg
 
 
 class LocalSpecies(CleverDict):
@@ -131,6 +132,16 @@ class LocalSpecies(CleverDict):
         self.normalise(norms=norm)
 
         self.set_zeff()
+
+        # A Kinetics that was merged with preserve_zeff=True carries the Zeff of the
+        # plasma before the merge. Prefer it, since the surviving species no longer
+        # represent the real electron-ion scattering. Set via the magnitude so the
+        # units stay whatever set_zeff produced.
+        zeff_profile = getattr(kinetics, "zeff_profile", None)
+        if zeff_profile is not None:
+            psi_q = psi_n if hasattr(psi_n, "units") else psi_n * ureg.dimensionless
+            self.zeff = float(zeff_profile(psi_q).m) * self.zeff.units
+
         self.check_quasineutrality(tol=1e-3)
 
     def set_zeff(self) -> None:
@@ -368,8 +379,10 @@ class LocalSpecies(CleverDict):
         merge_species: Iterable[str],
         keep_base_species_z: bool = False,
         keep_base_species_mass: bool = False,
+        update_zeff: bool = False,
+        update_nu: bool = False,
     ) -> None:
-        """
+        r"""
         Merge multiple species into one. Performs a weighted average depending on the
         densities of each species to preserve quasineutrality.
 
@@ -387,6 +400,52 @@ class LocalSpecies(CleverDict):
             Mass of new species
                 True keeps base_species mass
                 False/None results in a density-weighted average
+        update_zeff: bool, default False
+            Whether to recalculate ``zeff`` from the species remaining after the merge.
+
+            ``zeff`` is *not* derived on demand: it is set once by
+            :func:`from_kinetics` and then cached. By default a merge leaves that
+            cached value untouched, so ``zeff`` continues to describe the original
+            multi-species plasma even though the species carrying the impurity charge
+            have gone. Pass ``True`` to make ``zeff`` consistent with the species
+            actually present.
+
+            The default is ``False`` for backwards compatibility, and because the
+            stale value is often the one you want. Consumers such as
+            :class:`~pyrokinetics.diagnostics.neoclassical.Redl2021` and
+            :class:`~pyrokinetics.diagnostics.neoclassical.Sauter1999` treat
+            :math:`Z_{\rm eff}` as an *independent* key parameter describing
+            electron-ion pitch-angle scattering in the real plasma, alongside the
+            trapped fraction and collisionality -- not as a property of whichever
+            species list is being carried. Merging impurities into a hydrogenic
+            species for a gyrokinetic run does not change how strongly electrons
+            scatter in the experiment, so for those models the cached value remains
+            the physical one. Set ``update_zeff=True`` when you want a
+            self-consistent single-ion plasma instead.
+        update_nu: bool, default False
+            Whether to rescale the base species' collision frequency ``nu`` to match
+            its post-merge charge, density and mass.
+
+            ``nu`` is a *like-species* frequency,
+            :math:`\nu_s \propto z_s^4 n_s / (T_s^{3/2} \sqrt{m_s})`, set once by
+            :func:`from_kinetics` (or read from a gyrokinetic input file) and not
+            otherwise derived. By default the merge leaves it untouched, so the base
+            species keeps a ``nu`` belonging to its pre-merge density -- which is
+            inconsistent with the ``dens`` written alongside it. Pass ``True`` to
+            rescale it by the factor the merge implies.
+
+            The value is rescaled, not recomputed from scratch, so the Coulomb
+            logarithm and unit convention already carried by ``nu`` survive. That
+            matters because ``nu`` need not have come from ``from_kinetics`` at all:
+            for a ``LocalSpecies`` read from a gyrokinetic input file it is whatever
+            that file specified, and rebuilding it would silently substitute
+            pyrokinetics' own Coulomb logarithm -- which cannot even be evaluated
+            without physical densities and temperatures.
+
+            The default is ``False`` for backwards compatibility. Note that neither
+            setting reproduces the real main-ion collisionality: collisions against
+            the full ion mix go as :math:`Z^2 n_e Z_{\rm eff}`, which a single merged
+            species cannot represent. See also ``update_zeff``.
 
         Raises
         ------
@@ -433,14 +492,33 @@ class LocalSpecies(CleverDict):
                 / new_dens
             )
 
+        # collision frequency, rescaled rather than rebuilt so that whatever Coulomb
+        # logarithm and unit convention are already baked into ``nu`` are preserved.
+        # nu ~ z^4 dens / (temp^1.5 sqrt(mass)), and temp is unchanged by the merge.
+        if update_nu:
+            base = self[base_species]
+            new_nu = (
+                base.nu
+                * (new_z / base.z) ** 4
+                * (new_dens / base.dens)
+                * np.sqrt(base.mass / new_mass)
+            )
+
         self[base_species].dens = new_dens
         self[base_species].z = new_z
         self[base_species].inverse_ln = new_inverse_ln
         self[base_species].mass = new_mass
 
+        if update_nu:
+            self[base_species].nu = new_nu
+
         merge_species.remove(base_species)
 
         self.remove_species(*merge_species)
+
+        if update_zeff:
+            self.set_zeff()
+
         self.update_pressure()
         self.check_quasineutrality()
 
