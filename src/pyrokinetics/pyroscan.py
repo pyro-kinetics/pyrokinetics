@@ -78,13 +78,17 @@ def reduce_time(
 def select_kx_ky_time(
     da,
     *,
-    kx_min,
+    kx_min=None,
     sum_ky=False,
+    sum_kx=False,
     time_mode,
     tolerance_time_range=None,
 ):
     if "kx" in da.dims:
-        da = da.sel(kx=kx_min)
+        if sum_kx:
+            da = da.sum(dim="kx")
+        elif kx_min is not None:
+            da = da.sel(kx=kx_min)
 
     da = reduce_time(
         da,
@@ -624,6 +628,7 @@ class PyroScan:
         load_fluxes=True,
         load_moments=False,
         sum_ky=True,
+        sum_kx=False,
         drop_nan=False,
         **kwargs,
     ):
@@ -641,6 +646,8 @@ class PyroScan:
         load_fields (bool, default True) – Flag to load fields or not
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
+        sum_ky (bool, default True) – If True, sum fluxes and fields over ky. If False, preserve the ky dimension.
+        sum_kx (bool, default False) – Applies to fields (fluxes are already kx-integrated). If True, sum over kx; if False, preserve the kx dimension.
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
@@ -796,14 +803,12 @@ class PyroScan:
                             tolerance_time_range=tolerance_time_range,
                         )
 
-                data = data.isel(ky=[0]).squeeze()
-                pyro.gk_output.data = data
-
                 for name in spec["fields"]:
                     if name in pyro.gk_output:
                         run_buffers[name] = select_kx_ky_time(
                             pyro.gk_output[name],
-                            kx_min=kx_min,
+                            sum_ky=sum_ky,
+                            sum_kx=sum_kx,
                             time_mode=time_policy["fields"],
                             tolerance_time_range=tolerance_time_range,
                         )
