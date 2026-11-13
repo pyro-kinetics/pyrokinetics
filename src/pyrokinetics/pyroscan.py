@@ -38,6 +38,9 @@ def _resolve_path(path: str | pathlib.Path, base: pathlib.Path) -> pathlib.Path:
 
 
 # ---- time handling ----
+VALID_TIME_MODES = ("last", "average", "trace")
+
+
 def reduce_time(
     da,
     *,
@@ -50,6 +53,7 @@ def reduce_time(
     time_mode:
         "last"      → take final time
         "average"   → average over tolerance_time_range
+        "trace"     → preserve the full time series unchanged
     """
     if "time" not in da.dims:
         return da
@@ -71,7 +75,12 @@ def reduce_time(
             .drop_vars("time", errors="ignore")
         )
 
-    raise ValueError(f"Unknown time_mode={time_mode}")
+    if time_mode == "trace":
+        return da
+
+    raise ValueError(
+        f"Unknown time_mode={time_mode!r}; expected one of {VALID_TIME_MODES}"
+    )
 
 
 # ---- xarray selection ----
@@ -618,7 +627,9 @@ class PyroScan:
     def load_gk_output(
         self,
         output_convention="pyrokinetics",
-        tolerance_time_range=0.8,
+        tolerance_time_range=0.9,
+        linear_time_mode="average",
+        linear_time_range=None,
         netcdf_file=None,
         load_fields=True,
         load_fluxes=True,
@@ -634,8 +645,22 @@ class PyroScan:
         ----------
         output_convention: str default 'pyrokinetics'
             ConventionNormalisation to convert output to
-        tolerance_time_range: float default 0.8
-            Time window over which to calculate growth rate tolerance
+        tolerance_time_range: float default 0.9
+            Start fraction of the time axis used when computing the growth rate
+            tolerance (i.e. ``tolerance_time_range=0.9`` averages convergence
+            statistics over the last 10% of the simulation).
+        linear_time_mode: str default 'average'
+            How to reduce ``growth_rate`` and ``mode_frequency`` along the time
+            axis for linear runs. One of:
+
+            * ``"average"`` – mean over the window
+              ``[linear_time_range * t_max, t_max]`` (default).
+            * ``"last"``    – take the final time point (legacy behaviour).
+            * ``"trace"``   – preserve the full time trace, no reduction.
+        linear_time_range: float default None
+            Start fraction of the time axis used when averaging ``growth_rate``
+            and ``mode_frequency``. Defaults to ``tolerance_time_range`` when
+            not supplied, so that a single argument controls both windows.
         netcdf_file: PathLike default None
             If supplied then load PyroScanGKOutput from existing netCDF
         load_fields (bool, default True) – Flag to load fields or not
@@ -647,6 +672,15 @@ class PyroScan:
         -------
         None
         """
+        if linear_time_mode not in VALID_TIME_MODES:
+            raise ValueError(
+                f"linear_time_mode={linear_time_mode!r} is not valid; "
+                f"expected one of {VALID_TIME_MODES}"
+            )
+
+        if linear_time_range is None:
+            linear_time_range = tolerance_time_range
+
         # Load from netCDF is supplied
         if netcdf_file is not None:
             # Auto-detect a pyroscan_norms.json sitting alongside the scan
@@ -724,6 +758,17 @@ class PyroScan:
             },
         }
 
+        # Per-variable overrides for growth_rate / mode_frequency in linear runs.
+        # eigenfunctions intentionally stay on the scalars-default policy because
+        # they are spatial profiles, not time series we want to average.
+        scalar_time_mode_overrides = {
+            "linear": {
+                "growth_rate": linear_time_mode,
+                "mode_frequency": linear_time_mode,
+            },
+            "nonlinear": {},
+        }
+
         if self.base_pyro.gk_code == "TGLF":
             load_specs["nonlinear"]["scalars"].extend(["growth_rate", "mode_frequency"])
             load_specs["nonlinear"]["extras"].extend(["growth_rate_tolerance"])
@@ -738,6 +783,7 @@ class PyroScan:
 
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
+        scalar_overrides = scalar_time_mode_overrides[regime]
         time_policy = time_policy[regime]
 
         buffers = {
@@ -780,10 +826,12 @@ class PyroScan:
 
                 for name in spec["scalars"]:
                     if name in pyro.gk_output:
+                        scalar_mode = scalar_overrides.get(name, time_policy["scalars"])
                         run_buffers[name] = select_kx_ky_time(
                             pyro.gk_output[name],
                             kx_min=kx_min,
-                            time_mode=time_policy["scalars"],
+                            time_mode=scalar_mode,
+                            tolerance_time_range=linear_time_range,
                         )
 
                 for name in spec["fluxes"]:
