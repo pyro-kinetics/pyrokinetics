@@ -75,7 +75,9 @@ class _T3DStub:
     def __setstate__(self, state: Any) -> None:
         if isinstance(state, dict):
             self.__dict__.update(state)
-        elif isinstance(state, tuple) and len(state) == 2 and isinstance(state[1], dict):
+        elif (
+            isinstance(state, tuple) and len(state) == 2 and isinstance(state[1], dict)
+        ):
             self.__dict__.update(state[1])
         else:
             self._state = state
@@ -114,7 +116,9 @@ def load_t3d_log_npy(filename: PathLike) -> Dict[str, Any]:
         obj = _T3DUnpickler(f).load()
     data = obj.item() if isinstance(obj, np.ndarray) else obj
     if not isinstance(data, dict):
-        raise ValueError(f"Expected dict inside T3D .log.npy file {path}, got {type(data)!r}.")
+        raise ValueError(
+            f"Expected dict inside T3D .log.npy file {path}, got {type(data)!r}."
+        )
     return data
 
 
@@ -162,7 +166,9 @@ def _read_t3d_data(
     if head[:6] == b"\x93NUMPY":
         log = load_t3d_log_npy(path)
         if "t" not in log or "grid" not in log:
-            raise ValueError(f"{path} is a NumPy file, but is missing T3D 't'/'grid' keys.")
+            raise ValueError(
+                f"{path} is a NumPy file, but is missing T3D 't'/'grid' keys."
+            )
 
         grid_obj = log["grid"]
         grid_dict = grid_obj.__dict__ if hasattr(grid_obj, "__dict__") else grid_obj
@@ -177,9 +183,15 @@ def _read_t3d_data(
 
         # Extract per-species charge & mass metadata if SpeciesDict was logged
         sp_meta_by_tag: Dict[str, Dict[str, Any]] = {}
-        if "species" in log and isinstance(log["species"], list) and len(log["species"]) > 0:
+        if (
+            "species" in log
+            and isinstance(log["species"], list)
+            and len(log["species"]) > 0
+        ):
             sp_container = log["species"][idx]
-            sp_cdict = sp_container.__dict__ if hasattr(sp_container, "__dict__") else {}
+            sp_cdict = (
+                sp_container.__dict__ if hasattr(sp_container, "__dict__") else {}
+            )
             for sp_type, sp_obj in sp_cdict.get("species_dict", {}).items():
                 sd = sp_obj.__dict__ if hasattr(sp_obj, "__dict__") else {}
                 tag = str(sd.get("type_tag", sp_type))
@@ -191,9 +203,13 @@ def _read_t3d_data(
 
         tags = list(log.get("species_tags", []))
         if not tags:
-            tags = [k[2:] for k in log.keys() if k.startswith("n_") and f"T_{k[2:]}" in log]
+            tags = [
+                k[2:] for k in log.keys() if k.startswith("n_") and f"T_{k[2:]}" in log
+            ]
         if not tags:
-            raise ValueError(f"No T3D species profiles ('n_<tag>', 'T_<tag>') found in {path}.")
+            raise ValueError(
+                f"No T3D species profiles ('n_<tag>', 'T_<tag>') found in {path}."
+            )
 
         species_out: Dict[str, Dict[str, Any]] = {}
         for tag in tags:
@@ -204,7 +220,9 @@ def _read_t3d_data(
             temp_ev = _unwrap_profile(log[t_key][idx]) * 1e3
             meta = sp_meta_by_tag.get(tag, {})
             raw_name = meta.get("species_type", tag)
-            sp_name = _TAG_TO_SPECIES_NAME.get(raw_name, _TAG_TO_SPECIES_NAME.get(tag, str(raw_name)))
+            sp_name = _TAG_TO_SPECIES_NAME.get(
+                raw_name, _TAG_TO_SPECIES_NAME.get(tag, str(raw_name))
+            )
             if sp_name in species_out:
                 sp_name = f"{sp_name}_{tag}"
             z_val = meta.get("Z")
@@ -226,7 +244,9 @@ def _read_t3d_data(
         elif "rho" in ds.variables:
             rho_t3d = np.asarray(ds.variables["rho"][:], dtype=float)
         else:
-            raise ValueError(f"{path} is not a recognised T3D NetCDF file (missing 'grid/rho').")
+            raise ValueError(
+                f"{path} is not a recognised T3D NetCDF file (missing 'grid/rho')."
+            )
 
         if "time" in ds.groups and "t" in ds.groups["time"].variables:
             t_arr = np.asarray(ds.groups["time"].variables["t"][:], dtype=float)
@@ -242,10 +262,18 @@ def _read_t3d_data(
             t_ref = float(ds.t_ref)
 
         idx = _resolve_time_index(t_arr, t_ref, time_index=time_index, time=time)
-        sp_src = ds.groups["species"].variables if "species" in ds.groups else ds.variables
-        tags = [k[2:] for k in sp_src.keys() if k.startswith("n_") and f"T_{k[2:]}" in sp_src]
+        sp_src = (
+            ds.groups["species"].variables if "species" in ds.groups else ds.variables
+        )
+        tags = [
+            k[2:]
+            for k in sp_src.keys()
+            if k.startswith("n_") and f"T_{k[2:]}" in sp_src
+        ]
         if not tags:
-            raise ValueError(f"No T3D species profiles ('n_<tag>', 'T_<tag>') found in {path}.")
+            raise ValueError(
+                f"No T3D species profiles ('n_<tag>', 'T_<tag>') found in {path}."
+            )
 
         species_out = {}
         for tag in tags:
@@ -254,9 +282,15 @@ def _read_t3d_data(
             dens_m3 = np.asarray(n_var[idx, :], dtype=float) * 1e20
             temp_ev = np.asarray(t_var[idx, :], dtype=float) * 1e3
             sp_name = _TAG_TO_SPECIES_NAME.get(tag, str(tag))
-            z_val = float(getattr(n_var, "Z", _DEFAULT_CHARGE_MASS_AMU.get(sp_name, (1.0, 2.0))[0]))
+            z_val = float(
+                getattr(
+                    n_var, "Z", _DEFAULT_CHARGE_MASS_AMU.get(sp_name, (1.0, 2.0))[0]
+                )
+            )
             m_amu = getattr(n_var, "mass", None)
-            mass_qty = _species_mass_quantity(sp_name, float(m_amu) if m_amu is not None else None)
+            mass_qty = _species_mass_quantity(
+                sp_name, float(m_amu) if m_amu is not None else None
+            )
             species_out[sp_name] = {
                 "charge": z_val,
                 "mass": mass_qty,
@@ -266,7 +300,9 @@ def _read_t3d_data(
         return rho_t3d, species_out
 
 
-def _even_rho_spline(rho: np.ndarray, values: np.ndarray) -> InterpolatedUnivariateSpline:
+def _even_rho_spline(
+    rho: np.ndarray, values: np.ndarray
+) -> InterpolatedUnivariateSpline:
     """Construct an even-symmetric cubic spline in rho = r/a so df/drho(0) = 0 cleanly."""
     order = np.argsort(rho)
     r_pos = rho[order]
@@ -292,21 +328,24 @@ class KineticsReaderT3D(FileReader, file_type="T3D", reads=Kinetics):
         time: Optional[float] = None,
     ) -> Kinetics:
         if eq is None:
-            raise ValueError(
-                dedent(
-                    f"""\
+            raise ValueError(dedent(f"""\
                     {self.__class__.__name__} must be provided with an Equilibrium object via
                     the keyword argument 'eq'. Please load an Equilibrium.
-                    """
-                )
-            )
+                    """))
 
-        rho_t3d, species_raw = _read_t3d_data(filename, time_index=time_index, time=time)
+        rho_t3d, species_raw = _read_t3d_data(
+            filename, time_index=time_index, time=time
+        )
 
         psi_raw = eq["psi_n"].data
         rmin_raw = eq["r_minor"].data
-        psi_eq = np.asarray(psi_raw.magnitude if hasattr(psi_raw, "magnitude") else psi_raw, dtype=float)
-        rmin_eq = np.asarray(rmin_raw.magnitude if hasattr(rmin_raw, "magnitude") else rmin_raw, dtype=float)
+        psi_eq = np.asarray(
+            psi_raw.magnitude if hasattr(psi_raw, "magnitude") else psi_raw, dtype=float
+        )
+        rmin_eq = np.asarray(
+            rmin_raw.magnitude if hasattr(rmin_raw, "magnitude") else rmin_raw,
+            dtype=float,
+        )
         rho_eq = rmin_eq / rmin_eq[-1]
 
         # Build monotonic rho -> psi_n map so T3D's exact radial grid nodes are included in the spline knots
@@ -331,7 +370,9 @@ class KineticsReaderT3D(FileReader, file_type="T3D", reads=Kinetics):
 
         psi_q = psi_grid * units.dimensionless
         rho_func = UnitSpline(psi_q, rho_grid * units.lref_minor_radius)
-        omega_func = UnitSpline(psi_q, np.zeros_like(psi_grid) * units.radians / units.second)
+        omega_func = UnitSpline(
+            psi_q, np.zeros_like(psi_grid) * units.radians / units.second
+        )
         ones = np.ones_like(psi_grid)
 
         result: Dict[str, Species] = {}
@@ -340,7 +381,9 @@ class KineticsReaderT3D(FileReader, file_type="T3D", reads=Kinetics):
             temp_spl = _even_rho_spline(rho_t3d, sp_info["temp_ev"])
             dens_vals = np.maximum(dens_spl(rho_grid), 1e10) * units.meter**-3
             temp_vals = np.maximum(temp_spl(rho_grid), 1e-2) * units.eV
-            charge_func = UnitSpline(psi_q, sp_info["charge"] * ones * units.elementary_charge)
+            charge_func = UnitSpline(
+                psi_q, sp_info["charge"] * ones * units.elementary_charge
+            )
             result[sp_name] = Species(
                 species_type=sp_name,
                 charge=charge_func,
@@ -376,7 +419,9 @@ class KineticsReaderT3D(FileReader, file_type="T3D", reads=Kinetics):
                         and "rho" in ds.groups["grid"].variables
                     ) or hasattr(ds, "trinity_infile")
             except Exception as exc:
-                raise ValueError(f"{path} could not be read as a T3D NetCDF file.") from exc
+                raise ValueError(
+                    f"{path} could not be read as a T3D NetCDF file."
+                ) from exc
             if not is_t3d_nc:
                 raise ValueError(f"{path} is not a T3D NetCDF output file.")
             return
