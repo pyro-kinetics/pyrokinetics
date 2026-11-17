@@ -183,6 +183,7 @@ Sources of kinetic profile data currently supported are
 * PFILE
 * IMAS
 * ELITEINP
+* T3D
 
 Future codes to be add 
 * SimDB
