@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 from numpy.typing import ArrayLike
-from scipy.integrate import simpson
+from scipy.integrate import cumulative_trapezoid, simpson
 from scipy.interpolate import RectBivariateSpline
 from xrft import ifft
 
@@ -172,6 +172,52 @@ class FieldLine:
         length_per_turn = simpson_dLdtheta(dLdtheta, metric.regulartheta)
 
         return length_per_turn
+
+    def compute_basis_angle(self, theta: ArrayLike, ntheta: int = 2049) -> np.ndarray:
+        r"""
+        Ballooning angle measured by arc length along the field line,
+
+        .. math:: \theta_b(\theta) = 2\pi\,l_\parallel(\theta)/L_{\rm turn},
+            \qquad l_\parallel(\theta) = \int_0^\theta \sqrt{g_{\theta\theta}}\,d\theta'
+
+        the cumulative form of :meth:`compute_length_per_turn`. TGLF and GFTM
+        build their Hermite basis on this angle, :math:`x = \theta_b/\mathrm{WIDTH}`
+        (``tglf_geometry.f90``: :math:`\theta_b = 2\pi y/L_y` with
+        :math:`y = \int (B/B_p)\,dl_p`), so it converts a field on the
+        ballooning :math:`\theta` grid to the basis coordinate.
+        :math:`\theta_b(0) = 0` and
+        :math:`\theta_b(\theta + 2\pi) = \theta_b(\theta) + 2\pi`, so any
+        number of poloidal turns is covered.
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Ballooning angles to map, any range.
+        ntheta: int
+            Number of theta points per turn used for MetricTerms (odd, so
+            that :math:`\theta = 0` is a grid point).
+
+        Returns
+        -------
+        basis_angle : np.ndarray
+            :math:`\theta_b` at each ``theta``, same shape.
+        """
+        self.pyro.load_metric_terms(ntheta=ntheta)
+        metric = self.pyro.metric_terms
+        theta_turn = metric.regulartheta
+        dLdtheta = np.sqrt(metric.field_aligned_covariant_metric("theta", "theta"))
+        length = cumulative_trapezoid(
+            getattr(dLdtheta, "m", dLdtheta), theta_turn, initial=0
+        )
+        basis_turn = (
+            2 * np.pi * (length - np.interp(0.0, theta_turn, length)) / length[-1]
+        )
+
+        theta = np.asarray(theta, dtype=float)
+        turns = np.floor((theta + np.pi) / (2 * np.pi))
+        return 2 * np.pi * turns + np.interp(
+            theta - 2 * np.pi * turns, theta_turn, basis_turn
+        )
 
     def compute_half_displacement(
         self,
