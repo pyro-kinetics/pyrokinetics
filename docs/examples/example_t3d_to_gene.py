@@ -276,6 +276,9 @@ def prepare_gk_from_t3d(
             gamma_t3d_val * pyro.norms.gs2.vref / pyro.norms.gs2.lref
         ).to(norm_pyro)
 
+        # Enforce local MHD alpha / beta' consistency with the (possibly KEN-overridden) kinetic pressure gradient
+        pyro.enforce_consistent_beta_prime()
+
         tag = (
             f"tube_{tube_idx:02d}_rho_{rho_val:.4f}"
             if tube_idx is not None
