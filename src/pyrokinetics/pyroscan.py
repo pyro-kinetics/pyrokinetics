@@ -454,6 +454,7 @@ class PyroScan:
         self.pyro_dict = {}
         self.pyroscan_json = {}
         self.parameter_func = {}
+        self.consistency_steps = []
 
         self.base_directory = base_directory
 
@@ -836,6 +837,10 @@ class PyroScan:
                     **(kwargs or {})
                 )
 
+        # After every parameter is set, so each step sees the run's final values
+        for name, kwargs in self.consistency_steps:
+            CONSISTENCY_STEPS[name](pyro, **kwargs)
+
     def update_self_parameters(
         self,
     ):
@@ -962,6 +967,43 @@ class PyroScan:
             self.pyroscan_json["parameter_func"] = named
         else:
             self.pyroscan_json.pop("parameter_func", None)
+
+    def add_consistency_step(self, name, **kwargs):
+        """
+        Add a step that makes every run self-consistent, applied in order after
+        all of the run's parameters are set. Steps are saved to
+        ``pyroscan.json``, so ``sample_pyro`` on a reloaded scan re-applies them
+        and returns the Pyro that was written.
+
+        name: one of
+            ``"link"``: ``attr``, ``source``, ``target`` (paths in that Pyro
+                attribute) and ``mode``: ``"equal"`` sets target to source
+                (e.g. gradients), ``"scale"`` keeps target's ratio to source
+                from the base Pyro (e.g. collision frequencies).
+            ``"enforce_quasineutrality"``: ``species``, the one to adjust.
+            ``"enforce_consistent_beta_prime"``, ``"enforce_consistent_pvg"``.
+        """
+        if name not in CONSISTENCY_STEPS:
+            raise ValueError(
+                f"Unknown consistency step {name!r}: use one of {list(CONSISTENCY_STEPS)}"
+            )
+        if name == "link":
+            mode = kwargs.pop("mode", "equal")
+            if mode not in ("equal", "scale"):
+                raise ValueError(f"link mode {mode!r}: use 'equal' or 'scale'")
+            factor = 1.0
+            if mode == "scale":
+                base = getattr(self.base_pyro, kwargs["attr"])
+                ratio = get_from_dict(base, kwargs["target"]) / get_from_dict(
+                    base, kwargs["source"]
+                )
+                if hasattr(ratio, "units"):
+                    ratio = ratio.to("dimensionless")
+                factor = float(getattr(ratio, "magnitude", ratio))
+            # The factor is stored, so a reload does not depend on the base Pyro
+            kwargs["factor"] = factor
+        self.consistency_steps.append([name, kwargs])
+        self.pyroscan_json["consistency_steps"] = self.consistency_steps
 
     def load_default_parameter_keys(self):
         """
@@ -1437,6 +1479,22 @@ class PyroScan:
             dict(zip(self.parameter_dict, x))
             for x in product(*self.parameter_dict.values())
         )
+
+
+def _link(pyro, attr, source, target, factor=1.0):
+    obj = getattr(pyro, attr)
+    set_in_dict(obj, target, factor * get_from_dict(obj, source))
+
+
+# Named, so a scan's consistency steps can be saved to pyroscan.json
+CONSISTENCY_STEPS = {
+    "link": _link,
+    "enforce_quasineutrality": lambda pyro, species: (
+        pyro.local_species.enforce_quasineutrality(species)
+    ),
+    "enforce_consistent_beta_prime": lambda pyro: pyro.enforce_consistent_beta_prime(),
+    "enforce_consistent_pvg": lambda pyro: pyro.enforce_consistent_pvg(),
+}
 
 
 def get_from_dict(data_dict, map_list):

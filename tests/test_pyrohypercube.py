@@ -6,6 +6,7 @@ both apply — namely on a grid) and a run tree pyrokinetics did not write (whic
 is the case ``PyroScan`` cannot handle at all).
 """
 
+import copy
 import shutil
 import warnings
 
@@ -610,3 +611,101 @@ def test_from_directory_exclude_empty_is_noop(gs2_run_tree, exclude):
         exclude=exclude,
     )
     assert cube.n_samples == len(FOREIGN_KY)
+
+
+# ---------------------------------------------------------------------------
+# consistency steps: saved to pyroscan.json and re-applied by sample_pyro
+# ---------------------------------------------------------------------------
+def test_consistency_steps_roundtrip_to_written_deck(tmp_path):
+    base = Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in")
+    rng = np.random.default_rng(1)
+    n_samples = 4
+    lref = units.lref_minor_radius
+    nu_units = base.local_species.electron.nu.units
+    parameter_dict = {
+        "beta": rng.uniform(0.01, 0.1, n_samples),
+        "electron_dens_gradient": rng.uniform(0.5, 3.0, n_samples) / lref,
+        "ion_temp_gradient": rng.uniform(1.0, 5.0, n_samples) / lref,
+        "electron_nu": rng.uniform(0.01, 0.1, n_samples) * nu_units,
+    }
+    cube = PyroHypercube(base, parameter_dict=parameter_dict, base_directory=tmp_path)
+    cube.add_parameter_key("beta", "numerics", ["beta"])
+    cube.add_parameter_key(
+        "electron_dens_gradient", "local_species", ["electron", "inverse_ln"]
+    )
+    cube.add_parameter_key("ion_temp_gradient", "local_species", ["ion1", "inverse_lt"])
+    cube.add_parameter_key("electron_nu", "local_species", ["electron", "nu"])
+    for key, mode in (("inverse_ln", "equal"), ("nu", "scale")):
+        cube.add_consistency_step(
+            "link",
+            attr="local_species",
+            source=["electron", key],
+            target=["ion1", key],
+            mode=mode,
+        )
+    cube.add_consistency_step("enforce_quasineutrality", species="electron")
+    cube.add_consistency_step("enforce_consistent_beta_prime")
+    cube.write(file_name="gs2.in")
+
+    loaded = PyroHypercube(
+        pyroscan_json=tmp_path / "pyroscan.json", load_base_pyro=True
+    )
+    assert loaded.consistency_steps == cube.consistency_steps
+
+    nu_ratio = (base.local_species.ion1.nu / base.local_species.electron.nu).m
+    beta_primes = []
+    for i, name in enumerate(cube.sample_names):
+        got = loaded.sample_pyro(i)
+        deck = Pyro(gk_file=tmp_path / name / "gs2.in")
+        for species in ("electron", "ion1"):
+            for key in ("inverse_ln", "inverse_lt", "nu"):
+                assert got.local_species[species][key].m == pytest.approx(
+                    deck.local_species[species][key].m, rel=1e-6
+                )
+        assert got.local_geometry.beta_prime.m == pytest.approx(
+            deck.local_geometry.beta_prime.m, rel=1e-6
+        )
+        # the steps did what they say
+        assert got.local_species.ion1.inverse_ln.m == pytest.approx(
+            parameter_dict["electron_dens_gradient"][i].m
+        )
+        assert (got.local_species.ion1.nu / got.local_species.electron.nu).m == (
+            pytest.approx(nu_ratio)
+        )
+        expected = copy.deepcopy(got)
+        expected.enforce_consistent_beta_prime()
+        assert got.local_geometry.beta_prime.m == pytest.approx(
+            expected.local_geometry.beta_prime.m
+        )
+        beta_primes.append(got.local_geometry.beta_prime.m)
+    # beta' follows each sample's beta and gradients, not the base deck's value
+    assert len(set(np.round(beta_primes, 8))) == n_samples
+    assert base.local_geometry.beta_prime.m not in beta_primes
+
+
+def test_pyroscan_reload_keeps_consistent_beta_prime(tmp_path):
+    # Fusion_PhD-2fbc: a PyroScan rebuilt from pyroscan.json lost
+    # enforce_consistent_beta_prime, so its run Pyros kept the base beta'
+    base = Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in")
+    scan = PyroScan(base, {"beta": [0.02, 0.05]}, base_directory=tmp_path)
+    scan.add_parameter_key("beta", "numerics", ["beta"])
+    scan.add_consistency_step("enforce_consistent_beta_prime")
+    scan.write(file_name="gs2.in")
+
+    loaded = PyroScan(pyroscan_json=tmp_path / "pyroscan.json", load_base_pyro=True)
+    for i, name in enumerate(scan.pyro_dict):
+        got = loaded.sample_pyro(i)
+        assert got.local_geometry.beta_prime.m == pytest.approx(
+            scan.pyro_dict[name].local_geometry.beta_prime.m
+        )
+        assert got.local_geometry.beta_prime.m != pytest.approx(
+            base.local_geometry.beta_prime.m
+        )
+
+
+def test_unknown_consistency_step_rejected():
+    scan = PyroHypercube(
+        Pyro(gk_file=GS2_TEMPLATE_DIR / "gs2.in"), parameter_dict={"ky": [0.1]}
+    )
+    with pytest.raises(ValueError, match="Unknown consistency step"):
+        scan.add_consistency_step("make_it_physical")
