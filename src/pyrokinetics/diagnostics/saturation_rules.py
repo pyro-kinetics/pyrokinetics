@@ -354,7 +354,12 @@ class SaturationRules:
             for flux in ("heat", "particle")
             if f"{flux}_fraction" in ingredients
         } or {"heat": 1.0}
-        flux_ql = {flux: weight * ql_metric_full for flux, weight in weights.items()}
+        # Where Lambda_k is zero the fractions may be NaN (no flux output there):
+        # those points contribute nothing either way
+        flux_ql = {
+            flux: (weight * ql_metric_full).where(ql_metric_full != 0.0, 0.0)
+            for flux, weight in weights.items()
+        }
 
         # Find theta0_max
         # gamma_exb is in the units of the growth rate
