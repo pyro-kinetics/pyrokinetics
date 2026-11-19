@@ -107,10 +107,6 @@ class SaturationRules:
 
         data = self.pyro_scan.gk_output
         data = getattr(data, "data", data)
-        if "sample" in data.dims:
-            raise NotImplementedError(
-                "mg_ingredients needs a gridded scan; a hypercube has no ky dimension"
-            )
         added_theta0 = theta0_dim not in data.dims
         if added_theta0:
             data = data.expand_dims({theta0_dim: [0.0]})
@@ -140,7 +136,13 @@ class SaturationRules:
         field_squared = eigenfunctions_squared.where(converged, 0.0)
 
         geometry = self._geometry_profiles(data, ky_dim, theta0_dim)
-        k_perp = geometry["k_perp_over_ky"] * data[ky_dim] * data[ky_dim].units
+        ky = data[ky_dim]
+        # A hypercube's ky is a plain coordinate along sample; its units are
+        # those of the scan's parameter values
+        ky_units = getattr(ky, "units", None) or self.pyro_scan.parameter_dict[
+            ky_dim
+        ].units
+        k_perp = geometry["k_perp_over_ky"] * ky * ky_units
         jacobian = geometry["jacobian"]
 
         theta_min, theta_max = geometry.attrs["theta_range"]
@@ -201,6 +203,19 @@ class SaturationRules:
         metric terms. Points that differ only in ky or theta0 share them.
         """
         scan = self.pyro_scan
+        if "sample" in data.dims:
+            # A hypercube: every sample has its own geometry and one ky, which
+            # is a coordinate along ``sample``. Samples are in pyro_dict order
+            profiles = [
+                self._geometry_profile(
+                    copy.deepcopy(pyro), data["theta"], data[theta0_dim]
+                ).expand_dims(sample=[sample])
+                for sample, pyro in zip(data["sample"].data, scan.pyro_dict.values())
+            ]
+            theta_range = profiles[0].attrs["theta_range"]
+            combined = xr.concat(profiles, dim="sample", combine_attrs="drop_conflicts")
+            combined.attrs["theta_range"] = theta_range
+            return combined.pint.quantify(unit_registry=ureg)
         other_dims = [
             dim
             for dim in getattr(scan, "parameter_dict", {})
