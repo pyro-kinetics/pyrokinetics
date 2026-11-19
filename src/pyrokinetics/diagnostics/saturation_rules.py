@@ -131,7 +131,9 @@ class SaturationRules:
         if "growth_rate_tolerance" in data:
             converged = data["growth_rate_tolerance"] < gamma_tolerance
         else:
-            converged = xr.full_like(data["growth_rate"].pint.dequantify(), True, dtype=bool)
+            converged = xr.full_like(
+                data["growth_rate"].pint.dequantify(), True, dtype=bool
+            )
 
         growth_rate = data["growth_rate"].where(converged, 0.0)
         growth_rate = growth_rate.where(growth_rate > 0.0, 0.0)
@@ -154,7 +156,9 @@ class SaturationRules:
 
         # Account for GS2 field normalisation used in training
         bmag = geometry["bmag"]
-        field_correction = xr.where(field_squared.field == "bpar", bmag, 1.0 * bmag.pint.units)
+        field_correction = xr.where(
+            field_squared.field == "bpar", bmag, 1.0 * bmag.pint.units
+        )
         field_correction = xr.where(
             field_correction.field == "apar", field_correction * 0.5, field_correction
         )
@@ -373,7 +377,9 @@ class SaturationRules:
             ).integrate(coord=theta0_dim)
         else:
             # Select relevant theta0 only
-            flux_ky = {flux: value.isel({theta0_dim: 0}) for flux, value in flux_ql.items()}
+            flux_ky = {
+                flux: value.isel({theta0_dim: 0}) for flux, value in flux_ql.items()
+            }
             ql_metric_ky = ql_metric_full.isel({theta0_dim: 0})
 
         # Integrate over ky
@@ -385,7 +391,9 @@ class SaturationRules:
         ql_metric = ql_metric_ky.integrate(coord=ky_dim) * ky_units
 
         if not hasattr(Q0, "units"):
-            Q0 *= units.nref * units.tref * units.vref * (units.rhoref / units.lref) ** 2
+            Q0 *= (
+                units.nref * units.tref * units.vref * (units.rhoref / units.lref) ** 2
+            )
 
         G0 = Q0 / units.tref
 
