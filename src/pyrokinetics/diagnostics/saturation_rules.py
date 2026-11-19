@@ -139,9 +139,9 @@ class SaturationRules:
         ky = data[ky_dim]
         # A hypercube's ky is a plain coordinate along sample; its units are
         # those of the scan's parameter values
-        ky_units = getattr(ky, "units", None) or self.pyro_scan.parameter_dict[
-            ky_dim
-        ].units
+        ky_units = (
+            getattr(ky, "units", None) or self.pyro_scan.parameter_dict[ky_dim].units
+        )
         k_perp = geometry["k_perp_over_ky"] * ky * ky_units
         jacobian = geometry["jacobian"]
 
