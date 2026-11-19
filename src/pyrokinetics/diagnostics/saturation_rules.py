@@ -238,8 +238,9 @@ class SaturationRules:
         pyro.load_metric_terms(ntheta=1024)
         theta_metric = pyro.metric_terms.regulartheta
 
-        # Add one to cover additional theta grids (like in CGYRO)
-        nperiod = pyro.numerics.nperiod + 1
+        # Enough periods to cover the output's ballooning angle (a GFTM/TGLF
+        # output can extend beyond its deck's nperiod), plus one as a margin
+        nperiod = int(np.ceil((np.max(np.abs(theta)) / np.pi + 1) / 2)) + 1
         g_tt = pyro.metric_terms.field_aligned_covariant_metric("theta", "theta")
 
         l_theta = theta_metric
@@ -257,10 +258,17 @@ class SaturationRules:
         theta_geo_final = 2 * np.pi * (m[-1]) + np.pi
         theta_geo_long = np.append(theta_geo_long, theta_geo_final)
 
+        # MetricTerms works in the code's own normalisation: its B reference
+        # sets the binormal coordinate (Cy = dpsidr / B0), so k_perp(ky=1) is
+        # per unit ky of that convention. Rescale to the pyrokinetics B
+        # reference, so that k_perp is per unit ky of the output
+        own_units = getattr(pyro.norms, pyro.gk_input.norm_convention)
+        ky_in_own_units = (1.0 * own_units.bref).to(pyro.norms.pyrokinetics).m
+
         k_perp_over_ky = []
         for theta0 in np.atleast_1d(theta0s.data):
             theta_long, k_perp_long = pyro.metric_terms.k_perp(
-                ky=1.0, theta0=theta0, nperiod=nperiod
+                ky=ky_in_own_units, theta0=theta0, nperiod=nperiod
             )
             # NaN beyond the metric's theta range, rather than its end value
             k_perp_over_ky.append(
