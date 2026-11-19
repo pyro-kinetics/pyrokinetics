@@ -911,6 +911,38 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             gk_output.data["gaussian_width"] = xr.DataArray(
                 float(width[0].split("=")[-1]) * ureg.dimensionless
             )
+        # A transport run's quasilinear weights per mode (out.tglf.QL_flux_spectrum):
+        # each flux of each species and field divided by TGLF's sum of |phi|**2 over
+        # its Hermite nodes, in TGLF's own normalisation. Only ratios between them
+        # are convention-independent, hence no units.
+        if not coords["linear"] and "ql_flux" in raw_data:
+            lines = raw_data["ql_flux"].splitlines()[4:]
+            values = [
+                float(value)
+                for line in lines
+                if "species" not in line and "mode" not in line
+                for value in line.split()
+            ]
+            weights = np.reshape(
+                values,
+                (
+                    len(coords["species"]),
+                    len(coords["field"]),
+                    len(coords["mode"]),
+                    len(coords["ky"]),
+                    -1,
+                ),
+            )
+            for iflux, flux in enumerate(["particle", "heat", "momentum"]):
+                gk_output.data[f"{flux}_ql_weight"] = xr.DataArray(
+                    weights[..., iflux].transpose(1, 0, 3, 2) * ureg.dimensionless,
+                    dims=("field", "species", "ky", "mode"),
+                    coords={
+                        dim: gk_output.data[dim]
+                        for dim in ("field", "species", "ky", "mode")
+                    },
+                    attrs={"long_name": f"TGLF quasilinear {flux} weight"},
+                )
         return gk_output
 
     @staticmethod
