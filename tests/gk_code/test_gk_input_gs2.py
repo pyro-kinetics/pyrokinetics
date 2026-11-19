@@ -226,6 +226,13 @@ def test_gs2_linear_nesubsuper(tmp_path):
     assert numerics.nenergy == 26
 
 
+def test_gs2_negrid_wins_over_nesubsuper(tmp_path):
+    # GS2 le_grids.f90: a set negrid overrides nesub/nesuper, so add_flags(negrid) must persist
+    replacements = {"le_grids_knobs": {"nesub": 11, "nesuper": 15, "negrid": 16}}
+    gs2 = modified_gs2_input(replacements)
+    assert gs2.get_numerics().nenergy == 16
+
+
 def test_gs2_invalid_nonlinear(tmp_path):
     replacements = {
         "nonlinear_terms_knobs": {"nonlinear_mode": "on"},

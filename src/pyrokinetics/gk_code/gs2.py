@@ -576,14 +576,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
         numerics_data["nperiod"] = self.data["theta_grid_parameters"]["nperiod"]
 
-        # Velocity grid
-        try:
-            numerics_data["nenergy"] = (
-                self.data["le_grids_knobs"]["nesub"]
-                + self.data["le_grids_knobs"]["nesuper"]
-            )
-        except KeyError:
-            numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
+        # Velocity grid: as GS2 (le_grids.f90), a set negrid wins over nesub + nesuper
+        le_grids = self.data["le_grids_knobs"]
+        if le_grids.get("negrid", -10) != -10:
+            numerics_data["nenergy"] = le_grids["negrid"]
+        else:
+            numerics_data["nenergy"] = le_grids["nesub"] + le_grids["nesuper"]
 
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
