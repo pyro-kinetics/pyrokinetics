@@ -7,6 +7,7 @@ from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import SimulationNormalisation as Normalisation
+from .units import ureg
 
 
 class LocalSpecies(CleverDict):
@@ -131,6 +132,16 @@ class LocalSpecies(CleverDict):
         self.normalise(norms=norm)
 
         self.set_zeff()
+
+        # A Kinetics that was merged with preserve_zeff=True carries the Zeff of the
+        # plasma before the merge. Prefer it, since the surviving species no longer
+        # represent the real electron-ion scattering. Set via the magnitude so the
+        # units stay whatever set_zeff produced.
+        zeff_profile = getattr(kinetics, "zeff_profile", None)
+        if zeff_profile is not None:
+            psi_q = psi_n if hasattr(psi_n, "units") else psi_n * ureg.dimensionless
+            self.zeff = float(zeff_profile(psi_q).m) * self.zeff.units
+
         self.check_quasineutrality(tol=1e-3)
 
     def set_zeff(self) -> None:
