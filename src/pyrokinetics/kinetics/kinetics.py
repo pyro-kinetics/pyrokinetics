@@ -1,16 +1,33 @@
 from __future__ import annotations  # noqa
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 from cleverdict import CleverDict
 
 from ..file_utils import ReadableFromFile
-from ..typing import PathLike
+from ..typing import ArrayLike, PathLike
+from ..units import UnitSpline
 from ..units import ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
+    from pint import Quantity
+
+    from ..species import Species
+
+
+def _mass_kg(species: Species) -> float:
+    """
+    Magnitude of a species' mass in kg.
+
+    ``Species.mass`` is a ``pint`` quantity, but taking its bare ``.m`` would
+    trust whatever unit it happens to carry. Convert first so masses collected
+    from different species are always on the same scale.
+    """
+    mass = species.mass
+    return float(mass.to("kg").m) if hasattr(mass, "to") else float(mass)
 
 
 class Kinetics(ReadableFromFile):
@@ -71,6 +88,302 @@ class Kinetics(ReadableFromFile):
     def species_names(self):
         """Names of each species"""
         return self.species_data.keys()
+
+    @staticmethod
+    def _z_profile(species: Species, round_charge: bool, psi_q: Quantity) -> np.ndarray:
+        r"""
+        Charge number :math:`Z(\psi_N) = q(\psi_N) / e` of a species.
+
+        Parameters
+        ----------
+        species : Species
+            Species whose charge to evaluate
+        round_charge : bool
+            Whether to round to the nearest integer, to remove floating point
+            noise from charge profiles that should be integer
+        psi_q : pint.Quantity
+            Normalised poloidal flux, dimensionless
+
+        Returns
+        -------
+        np.ndarray
+            Signed charge number as a plain float array, so electrons give -1
+        """
+        z = species.get_charge(psi_q).to("elementary_charge").m
+        if round_charge:
+            z = np.rint(z)
+        return z.astype(float)
+
+    def enforce_quasineutrality(
+        self,
+        *,
+        adjust_species: str = "deuterium",
+        psi: ArrayLike | None = None,
+        npsi: int = 101,
+        floor: float | None = 0.0,
+        round_charge: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Enforce quasineutrality globally by adjusting one species density profile.
+
+        Uses Z(psi) := q(psi)/e from Species.get_charge(psi). By default it does NOT
+        force rounding, so ψ-dependent / fractional charge is preserved. If
+        round_charge=True, applies pointwise integer rounding after converting to e
+        (elementary_charge).
+
+        ne(psi) = sum_{ions} Z_i(psi) n_i(psi)
+        """
+        sp = self.species_data
+
+        if adjust_species not in sp:
+            raise ValueError(f"{adjust_species} not found in species_data")
+        if adjust_species == "electron":
+            raise ValueError("Refusing to use 'electron' as adjust_species")
+        if "electron" not in sp:
+            raise ValueError(
+                "Cannot enforce quasineutrality: 'electron' not in species_data"
+            )
+
+        if psi is None:
+            psi = np.linspace(0.0, 1.0, npsi)
+        else:
+            psi = np.asarray(psi, dtype=float)
+
+        psi_q = psi * units.dimensionless
+
+        ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
+
+        charge_sum_other = np.zeros_like(ne)
+        for name in list(sp.keys()):
+            if name in ("electron", adjust_species):
+                continue
+            s = sp[name]
+            Zi = self._z_profile(s, round_charge, psi_q)
+            ni = s.get_dens(psi_q).to("meter**-3").m
+            charge_sum_other += Zi * ni
+
+        Z_adj = self._z_profile(sp[adjust_species], round_charge, psi_q)
+        if np.any(Z_adj == 0.0):
+            raise ValueError(
+                f"Adjusted species '{adjust_species}' has Z=0 at some psi points."
+            )
+
+        n_adj_new = (ne - charge_sum_other) / Z_adj
+
+        if floor is not None:
+            n_adj_new = np.maximum(n_adj_new, float(floor))
+
+        sp[adjust_species].dens = sp[adjust_species].dens.__class__(
+            psi_q, n_adj_new * units("meter**-3")
+        )
+
+        return psi, n_adj_new
+
+    def merge_species_global(
+        self,
+        *,
+        base_species: str,
+        merge_species: Iterable[str],
+        psi: ArrayLike | None = None,
+        npsi: int = 101,
+        dens_floor: float | None = 0.0,
+        remove_merged: bool = True,
+        enforce_qn: bool = False,
+        keep_base_species_z: bool = True,
+        keep_base_species_mass: bool = True,
+        round_charge: bool = False,
+        preserve_zeff: bool = False,
+    ) -> tuple[np.ndarray, dict[str, str | list[str] | bool | np.ndarray]]:
+        """
+        Global merge analogue of LocalSpecies.merge_species(), implemented for global Species.
+
+        Uses profile charge Z(psi) := q(psi)/e from Species.get_charge(psi).
+        Default round_charge=False preserves ψ-dependent/fractional Z if present.
+        If round_charge=True, applies pointwise np.rint to reduce floating noise.
+
+        If keep_base_species_z=True:
+            n_base_new(psi) = sum_i [ Z_i(psi) n_i(psi) ] / Z_base(psi)
+            (Z_base is used as a profile, so quasineutrality is preserved pointwise.)
+
+        If keep_base_species_z=False:
+            n_new(psi) = sum_i n_i(psi)
+            Z_eff(psi) = sum_i [ Z_i(psi) n_i(psi) ] / n_new(psi)
+            and base.charge spline is replaced by q_eff(psi)=+Z_eff(psi)*e.
+
+        If keep_base_species_mass=False:
+            m_eff(psi) = sum_i [ m_i n_i(psi) ] / n_new(psi)
+            but Species.mass is scalar in this API (get_mass has no psi argument), so we
+            store a density-weighted scalar effective mass, and return m_eff(psi) for inspection.
+
+        If preserve_zeff=True:
+            Zeff(psi) = sum_ions [ n_i(psi) Z_i(psi)^2 ] / n_e(psi) is evaluated over
+            *all* ions before the merge and stored as ``self.zeff_profile``, which
+            LocalSpecies.from_kinetics then uses in place of its own calculation.
+
+            This exists because neither Kinetics nor Species carries a Zeff. It is
+            derived downstream in LocalSpecies.from_kinetics from whichever species
+            survive, so by default a global merge silently resets Zeff towards the
+            base species' charge -- merging every ion into deuterium gives Zeff = 1.
+            That differs from LocalSpecies.merge_species, which by default leaves its
+            cached Zeff untouched. Pass preserve_zeff=True to keep the real plasma's
+            electron-ion scattering, matching the local default.
+
+            Note there is no equivalent for the collision frequency: ``nu`` is also
+            built in from_kinetics, always self-consistently with the surviving
+            species, so a global merge has no stale value to correct.
+
+        Notes
+        -----
+        - No explicit gradient updates are needed: get_norm_dens_gradient is computed from self.dens
+          via _norm_gradient(self.dens, psi).
+        - Removal updates species_data only (species_names is derived from keys).
+        """
+        sp = self.species_data
+
+        if base_species not in sp:
+            raise ValueError(f"Unrecognised base_species {base_species}")
+        if base_species == "electron":
+            raise ValueError(
+                "Refusing to use 'electron' as base_species for ion merging"
+            )
+
+        merge_set = sorted(set(list(merge_species) + [base_species]))
+        missing = [n for n in merge_set if n not in sp]
+        if missing:
+            raise ValueError(f"Unrecognised merge_species: {missing}")
+
+        # psi grid
+        if psi is None:
+            psi = np.linspace(0.0, 1.0, npsi)
+        else:
+            psi = np.asarray(psi, dtype=float)
+
+        if psi.ndim != 1 or psi.size < 2:
+            raise ValueError("psi must be a 1D array with at least 2 points")
+        if np.any(np.diff(psi) <= 0):
+            raise ValueError("psi grid must be strictly increasing")
+
+        psi_q = psi * units.dimensionless
+
+        # Capture Zeff before anything is merged away. Neither Kinetics nor Species
+        # carries a Zeff: it is derived in LocalSpecies.from_kinetics from whichever
+        # species survive, so a global merge otherwise silently collapses it towards
+        # the base species' charge. Summing over every ion, not just merge_set, since
+        # species left out of the merge still scatter electrons.
+        if preserve_zeff:
+            if "electron" not in sp:
+                raise ValueError(
+                    "preserve_zeff requires an electron species to normalise against"
+                )
+            ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
+            zeff = np.zeros_like(psi, dtype=float)
+            for name in list(self.species_names):
+                if name == "electron":
+                    continue
+                s = sp[name]
+                zeff += (
+                    s.get_dens(psi_q).to("meter**-3").m
+                    * self._z_profile(s, round_charge, psi_q) ** 2
+                )
+            zeff /= np.maximum(ne, 1e-300)
+            self.zeff_profile = UnitSpline(psi_q, zeff * units.elementary_charge)
+
+        # Collect n_i(psi), Z_i(psi), and scalar masses
+        dens_arr = []
+        Z_arr = []
+        m_list = []
+
+        for name in merge_set:
+            s = sp[name]
+            dens_arr.append(s.get_dens(psi_q).to("meter**-3").m)
+            Z_arr.append(self._z_profile(s, round_charge, psi_q))
+            m_list.append(_mass_kg(s))  # scalar mass, in kg
+
+        dens_arr = np.stack(dens_arr, axis=0)  # (ns, npsi)
+        Z_arr = np.stack(Z_arr, axis=0)  # (ns, npsi)
+        m_arr = np.asarray(m_list, dtype=float)[:, None]  # (ns, 1)
+
+        base = sp[base_species]
+
+        # --- Merge density & charge ---
+        if keep_base_species_z:
+            Zb = self._z_profile(base, round_charge, psi_q)  # profile Z_base(psi)
+            if np.any(Zb == 0.0):
+                raise ValueError(
+                    f"Base species '{base_species}' has Z=0 at some psi points."
+                )
+            n_new = np.sum(dens_arr * Z_arr, axis=0) / Zb
+            Z_eff_profile = Zb.copy()  # unchanged base charge profile
+            # charge spline unchanged in this branch
+        else:
+            n_new = np.sum(dens_arr, axis=0)
+            Z_eff_profile = np.sum(dens_arr * Z_arr, axis=0) / np.maximum(n_new, 1e-300)
+
+            # Replace base.charge spline by q_eff(psi)=+Z_eff(psi)*e
+            q_eff = Z_eff_profile * units.elementary_charge
+
+            # Use the existing charge spline class if possible, else fall back to UnitSpline
+            if getattr(base, "charge", None) is not None:
+                base.charge = base.charge.__class__(psi_q, q_eff)
+            else:
+                base.charge = UnitSpline(psi_q, q_eff)
+
+        # Apply density floor (after computing Z_eff where needed)
+        if dens_floor is not None:
+            n_new = np.maximum(n_new, float(dens_floor))
+
+        # Write back density spline
+        base.dens = base.dens.__class__(psi_q, n_new * units("meter**-3"))
+
+        # --- Mass merge ---
+        if keep_base_species_mass:
+            m_eff_profile = np.full_like(n_new, _mass_kg(base), dtype=float)
+            # base.mass unchanged
+        else:
+            # m_eff(psi) = sum(m_i n_i)/sum(n_i)
+            m_eff_profile = np.sum(m_arr * dens_arr, axis=0) / np.maximum(n_new, 1e-300)
+            # Store a scalar effective mass (density-weighted over psi). Must be
+            # a pint quantity: every other Species.mass is one, and the plain
+            # float this used to assign silently propagated into any expression
+            # that combined it with a dimensional quantity.
+            w = np.maximum(n_new, 0.0)
+            m_store = float(np.sum(m_eff_profile * w) / np.sum(w))
+            base.mass = m_store * units.kg
+
+        # --- Remove or zero merged-away species ---
+        merged_away = [n for n in merge_set if n != base_species]
+        if remove_merged:
+            for n in merged_away:
+                sp.pop(n, None)
+        else:
+            for n in merged_away:
+                s = sp[n]
+                s.dens = s.dens.__class__(
+                    psi_q, np.zeros_like(psi) * units("meter**-3")
+                )
+
+        # --- Optional enforce quasineutrality by adjusting base density on same psi grid ---
+        if enforce_qn:
+            self.enforce_quasineutrality(
+                adjust_species=base_species,
+                psi=psi,
+                npsi=len(psi),
+                floor=dens_floor,
+                round_charge=round_charge,
+            )
+
+        return psi, {
+            "base_species": base_species,
+            "merged": merge_set,
+            "removed": merged_away if remove_merged else [],
+            "zeroed": merged_away if (not remove_merged) else [],
+            "keep_base_species_z": keep_base_species_z,
+            "keep_base_species_mass": keep_base_species_mass,
+            "round_charge": round_charge,
+            "Z_eff_profile": Z_eff_profile,
+            "m_eff_profile": m_eff_profile,
+            "enforce_qn": enforce_qn,
+        }
 
     def __deepcopy__(self, memodict):
         """
