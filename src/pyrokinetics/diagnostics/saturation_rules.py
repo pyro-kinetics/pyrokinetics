@@ -204,6 +204,13 @@ class SaturationRules:
         """
         scan = self.pyro_scan
         if "sample" in data.dims:
+            if len(data["sample"]) != len(scan.pyro_dict):
+                # A cube crossed with a grid axis has more runs than samples;
+                # zip would silently pair samples with the wrong runs
+                raise NotImplementedError(
+                    f"{len(data['sample'])} samples but {len(scan.pyro_dict)} runs: "
+                    "saturation rules are not yet implemented for a cube with grid axes"
+                )
             # A hypercube: every sample has its own geometry and one ky, which
             # is a coordinate along ``sample``. Samples are in pyro_dict order
             profiles = [

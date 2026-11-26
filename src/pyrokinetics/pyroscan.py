@@ -430,6 +430,7 @@ class PyroScan:
         "runfile_dict",
         "p_prime_type",
         "parameter_map",
+        "joint_axes",
     ]
 
     def __init__(
@@ -446,6 +447,9 @@ class PyroScan:
         pyroscan_json=None,
         runfile_dict=None,
         load_base_pyro=False,
+        joint_axes=None,
+        grid=None,
+        cube=None,
     ):
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
@@ -455,6 +459,13 @@ class PyroScan:
         self.pyroscan_json = {}
         self.parameter_func = {}
         self.consistency_steps = []
+        # {axis name: [parameters varied together along it]}; every parameter
+        # not in a joint axis is its own (grid) axis
+        self.joint_axes = {k: list(v) for k, v in (joint_axes or {}).items()}
+        # {grid axis: [run-directory label per value]}, from the values as typed
+        self.axis_labels = {}
+        if not hasattr(self, "sample_names"):
+            self.sample_names = None
 
         self.base_directory = base_directory
 
@@ -481,6 +492,14 @@ class PyroScan:
             self.parameter_dict = {}
         else:
             self.parameter_dict = parameter_dict
+        if cube or grid:
+            # cube: one value per sample, varied together along ``sample``;
+            # grid: each its own axis, crossed with every sample
+            if parameter_dict:
+                raise ValueError("give parameter_dict, or cube and grid, not both")
+            self.parameter_dict = {**(cube or {}), **(grid or {})}
+            if cube:
+                self.joint_axes["sample"] = list(cube)
 
         self.p_prime_type = p_prime_type
 
@@ -508,6 +527,9 @@ class PyroScan:
                 elif key == "parameter_func":
                     self.parameter_func = {k: tuple(v) for k, v in value.items()}
                     continue
+                elif key == "joint_axes":
+                    self.joint_axes = {k: list(v) for k, v in value.items()}
+                    continue
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -520,6 +542,9 @@ class PyroScan:
                     continue
 
                 setattr(self, key, value)
+            # A hypercube written before joint_axes existed: one flat sample axis
+            if "joint_axes" not in self.pyroscan_json and self.sample_names:
+                self.joint_axes = {"sample": list(self.parameter_dict)}
         else:
             self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
 
@@ -558,6 +583,14 @@ class PyroScan:
         # there (new-format JSONs are already in pyro sim units, and old-format
         # fixtures pair their magnitudes with their on-disk directory names).
         if pyroscan_json is None:
+            self._check_joint_axes()
+            # Run directories of a scan with joint axes are named from the grid
+            # values as typed (e.g. GS2 ``aky``), before conversion to pyro units
+            if self.joint_axes:
+                for axis, params in self.axes():
+                    if axis not in self.joint_axes:
+                        self.axis_labels[axis] = self._grid_labels(axis)
+                self.pyroscan_json["axis_labels"] = self.axis_labels
             # Pass the pyrokinetics convention explicitly: base_pyro.norms.default_convention
             # is set to whichever gk_code was read (gs2/gene/cgyro/...), which would
             # otherwise make run-directory names code-dependent.
@@ -577,13 +610,94 @@ class PyroScan:
         """
         Create one Pyro per run of the scan, and record their run directories.
         """
-        if not self.runfile_dict:
-            self.ensure_unique_run_names()
-
-        self.pyro_dict = dict(
-            self.create_single_run(run) for run in self.outer_product()
-        )
+        if "sample" in self.joint_axes and not self.sample_names:
+            self.sample_names = self.labels("sample")
+            self.pyroscan_json["sample_names"] = self.sample_names
+        if self.joint_axes:
+            # sample_0000/ky_0.1/...: one label per axis, joined in axis order
+            labels = [self.labels(axis) for axis, _ in self.axes()]
+            names = (self.parameter_separator.join(x) for x in product(*labels))
+            self.pyro_dict = dict(
+                self.create_single_run(run, name=name)
+                for name, run in zip(names, self.outer_product())
+            )
+        else:
+            if not self.runfile_dict:
+                self.ensure_unique_run_names()
+            self.pyro_dict = dict(
+                self.create_single_run(run) for run in self.outer_product()
+            )
         self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
+
+    # ---- axes ----
+    def axes(self):
+        """
+        The axes of the scan, in output order: ``[(axis, [parameters])]``.
+
+        A joint axis varies its parameters together (one value per point, as a
+        Latin hypercube); every other parameter is a grid axis of its own. The
+        runs are the outer product over axes. Axes are ordered by the first
+        appearance of one of their parameters in ``parameter_dict``.
+        """
+        owner = {p: axis for axis, ps in self.joint_axes.items() for p in ps}
+        axes = {}
+        for param in self.parameter_dict:
+            axis = owner.get(param, param)
+            axes.setdefault(axis, self.joint_axes.get(axis, [param]))
+        # A joint axis whose values are not known yet (``from_directory``)
+        for axis, params in self.joint_axes.items():
+            axes.setdefault(axis, params)
+        return list(axes.items())
+
+    def axis_length(self, axis):
+        params = dict(self.axes())[axis]
+        if params:
+            return len(self.parameter_dict[params[0]])
+        return len(self.sample_names or []) if axis == "sample" else 0
+
+    @property
+    def n_samples(self) -> int:
+        """Number of points on the ``sample`` axis (not the number of runs)."""
+        if "sample" in self.joint_axes:
+            return self.axis_length("sample")
+        return len(self.pyro_dict)
+
+    def _check_joint_axes(self):
+        for axis, params in self.joint_axes.items():
+            missing = [p for p in params if p not in self.parameter_dict]
+            if missing:
+                raise ValueError(f"joint axis {axis!r} names unknown {missing}")
+            sizes = {p: len(self.parameter_dict[p]) for p in params}
+            if len(set(sizes.values())) > 1:
+                raise ValueError(
+                    f"parameters of joint axis {axis!r} vary together, so need "
+                    f"one value per point each; got lengths {sizes}"
+                )
+
+    def _grid_labels(self, param):
+        values = getattr(
+            self.parameter_dict[param], "magnitude", self.parameter_dict[param]
+        )
+        labels = [
+            f"{param}{self.value_separator}{value:{self.value_fmt}}" for value in values
+        ]
+        if len(set(labels)) != len(labels):
+            raise ValueError(
+                f"{param} values {list(values)} give repeated run directories "
+                f"{labels} at value_fmt={self.value_fmt!r}; pass a finer value_fmt"
+            )
+        return labels
+
+    def labels(self, axis):
+        """Run-directory component of each point on ``axis``."""
+        if axis in self.axis_labels:
+            return self.axis_labels[axis]
+        if axis == "sample" and self.sample_names:
+            return self.sample_names
+        if axis in self.joint_axes:
+            n = self.axis_length(axis)
+            return [f"{axis}_{i:0{max(4, len(str(n - 1)))}d}" for i in range(n)]
+        return self._grid_labels(axis)
 
     def _format_single_run_name_with_fmt(self, parameters, fmt):
         return self.parameter_separator.join(
@@ -849,8 +963,45 @@ class PyroScan:
         """
         for parameter, pyro in zip(self.outer_product(), self.pyro_dict.values()):
             self._apply_parameters(parameter, pyro)
+        self._warn_joint_values_vary()
 
-    def sample_pyro(self, sample, gk_output=None) -> Pyro:
+    def _warn_joint_values_vary(self):
+        """
+        Warn if a joint parameter's applied value differs between runs of the
+        same point, i.e. a consistency step made it depend on a grid axis.
+        """
+        dims = [axis for axis, _ in self.axes()]
+        if len(dims) < 2:
+            return
+        shape = [self.axis_length(axis) for axis in dims]
+        for axis, params in self.axes():
+            if axis not in self.joint_axes:
+                continue
+            for param in params:
+                attr, location = self.parameter_map[param]
+                values = np.array(
+                    [
+                        float(
+                            getattr(
+                                v := get_from_dict(getattr(pyro, attr), location),
+                                "magnitude",
+                                v,
+                            )
+                        )
+                        for pyro in self.pyro_dict.values()
+                    ]
+                ).reshape(shape)
+                values = np.moveaxis(values, dims.index(axis), 0).reshape(
+                    shape[dims.index(axis)], -1
+                )
+                if not np.allclose(values, values[:, :1]):
+                    warnings.warn(
+                        f"{param} differs between runs of the same {axis} point "
+                        "after the consistency steps: a step depends on a grid axis",
+                        stacklevel=3,
+                    )
+
+    def sample_pyro(self, sample, gk_output=None, **indices) -> Pyro:
         """
         The Pyro of one run of this scan, with that run's parameters applied
         (``parameter_map`` and ``parameter_func``) and, if there is output, its
@@ -862,7 +1013,10 @@ class PyroScan:
         Parameters
         ----------
         sample: int or str
-            Position of the run in ``pyro_dict``, or its name.
+            Position of the run in ``pyro_dict``, or its name. On a scan with a
+            joint ``sample`` axis and grid axes, the position on ``sample``,
+            and ``indices`` must give a position on every other axis, e.g.
+            ``sample_pyro(2, ky=1)``.
         gk_output: xarray.Dataset, default None
             Scan output to slice. Defaults to ``self.gk_output.data`` if loaded,
             and no output is attached if neither exists. A hypercube is sliced
@@ -874,7 +1028,25 @@ class PyroScan:
             A copy, so the scan's own ``pyro_dict`` is left untouched.
         """
         names = list(self.pyro_dict)
-        i = names.index(sample) if isinstance(sample, str) else int(sample)
+        dims = [axis for axis, _ in self.axes()]
+        position = None
+        if "sample" in self.joint_axes and len(dims) > 1:
+            position = {"sample": int(sample), **indices}
+            missing = [axis for axis in dims if axis not in position]
+            unknown = [axis for axis in position if axis not in dims]
+            if missing or unknown:
+                raise ValueError(
+                    f"sample_pyro needs one index on every axis {dims}: "
+                    f"missing {missing}, unknown {unknown}"
+                )
+            shape = [self.axis_length(axis) for axis in dims]
+            i = int(np.ravel_multi_index([position[axis] for axis in dims], shape))
+        elif indices:
+            raise ValueError(
+                f"{list(indices)}: this scan has no grid axes besides {dims}"
+            )
+        else:
+            i = names.index(sample) if isinstance(sample, str) else int(sample)
         pyro = copy.deepcopy(self.pyro_dict[names[i]])
         parameter = next(p for j, p in enumerate(self.outer_product()) if j == i)
         self._apply_parameters(parameter, pyro)
@@ -882,7 +1054,9 @@ class PyroScan:
         if gk_output is None and getattr(self, "gk_output", None) is not None:
             gk_output = self.gk_output.data
         if gk_output is not None:
-            if "sample" in gk_output.dims:
+            if position is not None:
+                gk_output = gk_output.isel(position)
+            elif "sample" in gk_output.dims:
                 gk_output = gk_output.isel(sample=i)
             else:
                 gk_output = gk_output.sel(
@@ -1388,23 +1562,35 @@ class PyroScan:
         """
         coords = {}
         coord_units = {}
-        for name, values in self.parameter_dict.items():
-            vals, unit = magnitude_and_units(values)
-            # Carry the units on the coordinate itself: a coordinate rebuilt
-            # from bare values when each quantity is stacked would otherwise
-            # lose them again.
-            coords[name] = ((name,), vals, {"units": unit})
-            coord_units[name] = unit
+        axes = self.axes()
+        for axis, params in axes:
+            if axis in self.joint_axes:
+                coords[axis] = np.arange(self.axis_length(axis))
+            for name in params:
+                vals, unit = magnitude_and_units(self.parameter_dict[name])
+                # Carry the units on the coordinate itself: a coordinate rebuilt
+                # from bare values when each quantity is stacked would otherwise
+                # lose them again.
+                coords[name] = ((axis,), vals, {"units": unit})
+                coord_units[name] = unit
 
-        dims = tuple(self.parameter_dict.keys())
-        shape = tuple(len(values) for values in self.parameter_dict.values())
+        dims = tuple(axis for axis, _ in axes)
+        shape = tuple(self.axis_length(axis) for axis in dims)
+
+        if "sample" in self.joint_axes and self.sample_names:
+            coords["sample_name"] = ("sample", np.asarray(self.sample_names, dtype=str))
+        if self.joint_axes and len(dims) > 1:
+            coords["run_name"] = (
+                dims,
+                np.asarray(list(self.pyro_dict), dtype=str).reshape(shape),
+            )
 
         return ScanLayout(
             coords=coords,
             coord_units=coord_units,
             shape=shape,
             dims=dims,
-            squeeze_dims=dims,
+            squeeze_dims=tuple(self.parameter_dict),
         )
 
     @property
@@ -1473,11 +1659,19 @@ class PyroScan:
 
     def outer_product(self):
         """
-        Creates generator of outer product for all parameter permutations
+        Generator of ``{parameter: value}`` for every run: the outer product
+        over axes, with the parameters of a joint axis taken together.
         """
+        points = [
+            [
+                {p: self.parameter_dict[p][i] for p in params}
+                for i in range(self.axis_length(axis))
+            ]
+            for axis, params in self.axes()
+        ]
         return (
-            dict(zip(self.parameter_dict, x))
-            for x in product(*self.parameter_dict.values())
+            {k: v for point in run for k, v in point.items()}
+            for run in product(*points)
         )
 
 
