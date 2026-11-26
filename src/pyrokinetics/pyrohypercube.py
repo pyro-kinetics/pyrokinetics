@@ -41,7 +41,7 @@ from pint import Quantity
 
 from .gk_code import GKInput
 from .pyro import Pyro
-from .pyroscan import PyroScan, ScanLayout, get_from_dict, magnitude_and_units
+from .pyroscan import PyroScan, get_from_dict
 from .typing import PathLike
 
 __all__ = ["PyroHypercube"]
@@ -138,6 +138,11 @@ class PyroHypercube(PyroScan):
         gridded scan, sample values do not make useful directory names — nearby
         samples round onto the same name — so they are not used by default.
         :meth:`from_directory` passes the directory names it found.
+    grid: dict, default None
+        ``{parameter: [values]}``, each its own axis crossed with every sample,
+        e.g. ``grid={"ky": ky_values}`` runs every sample at every ky. The
+        output then has dims ``(sample, ky, ...)``. Equivalent to
+        ``PyroScan(cube=parameter_dict, grid=grid)``.
     run_pyros: list of Pyro, default None
         Pyro object for each sample, in sample order, used instead of copying
         the base Pyro. :meth:`from_directory` passes the Pyros it read from
@@ -173,6 +178,7 @@ class PyroHypercube(PyroScan):
         parameter_dict: Optional[Dict[str, Any]] = None,
         sample_names: Optional[Iterable[str]] = None,
         run_pyros: Optional[Iterable[Pyro]] = None,
+        grid: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         self._sample_names = None
@@ -183,7 +189,15 @@ class PyroHypercube(PyroScan):
 
         self.sample_names = sample_names
 
-        super().__init__(pyro=pyro, parameter_dict=parameter_dict, **kwargs)
+        # parameter_dict is the joint ``sample`` axis; grid parameters cross it
+        if grid and set(grid) & set(parameter_dict or {}):
+            raise ValueError("a parameter cannot be on both the cube and the grid")
+        super().__init__(
+            pyro=pyro,
+            parameter_dict={**(parameter_dict or {}), **(grid or {})} or None,
+            joint_axes={"sample": list(parameter_dict or {})},
+            **kwargs,
+        )
 
     # ------------------------------------------------------------------
     # Samples
@@ -200,17 +214,6 @@ class PyroHypercube(PyroScan):
                 "value lists, use PyroScan.)"
             )
         return next(iter(sizes.values()), 0)
-
-    @property
-    def n_samples(self) -> int:
-        """Number of sample points."""
-        if self.parameter_dict:
-            return self._validate_parameter_dict(self.parameter_dict)
-        if self._sample_names is not None:
-            return len(self._sample_names)
-        if self._run_pyros is not None:
-            return len(self._run_pyros)
-        return 0
 
     @property
     def sample_names(self) -> Optional[List[str]]:
@@ -240,49 +243,21 @@ class PyroHypercube(PyroScan):
         return [f"sample_{i:0{width}d}" for i in range(self.n_samples)]
 
     def sample_points(self):
-        """
-        Generator of ``{parameter: value}`` for each sample, in sample order.
-
-        This is the non-gridded replacement for ``PyroScan.outer_product``.
-        """
-        names = list(self.parameter_dict.keys())
-        if not names:
-            return ({} for _ in range(self.n_samples))
-        return (
-            dict(zip(names, values))
-            for values in zip(*(self.parameter_dict[name] for name in names))
-        )
-
-    def outer_product(self):
-        """
-        The runs of this parameter set: its samples, *not* an outer product.
-
-        Kept under ``PyroScan``'s name so that everything built on it (writing
-        input files, updating the run Pyros, loading outputs) is inherited
-        unchanged. Prefer :meth:`sample_points` in new code.
-        """
-        return self.sample_points()
+        """Generator of ``{parameter: value}`` for each run, in run order."""
+        return self.outer_product()
 
     def build_pyro_dict(self):
         """
-        Create one Pyro per sample, named by ``sample_names``.
+        Create one Pyro per run; with ``run_pyros``, the Pyros read from disk.
         """
-        if not self.sample_names:
-            self.sample_names = self.default_sample_names()
-
-        if self._run_pyros is not None:
-            if len(self._run_pyros) != len(self.sample_names):
-                raise ValueError(
-                    f"Got {len(self._run_pyros)} run Pyros for "
-                    f"{len(self.sample_names)} samples."
-                )
-            self.pyro_dict = dict(zip(self.sample_names, self._run_pyros))
-        else:
-            self.pyro_dict = dict(
-                self.create_single_run(parameters, name=name)
-                for name, parameters in zip(self.sample_names, self.sample_points())
+        if self._run_pyros is None:
+            return super().build_pyro_dict()
+        if len(self._run_pyros) != len(self.sample_names):
+            raise ValueError(
+                f"Got {len(self._run_pyros)} run Pyros for "
+                f"{len(self.sample_names)} samples."
             )
-
+        self.pyro_dict = dict(zip(self.sample_names, self._run_pyros))
         self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
 
     def set_parameter_dict(self, parameter_dict: Dict[str, Any]) -> None:
@@ -309,38 +284,8 @@ class PyroHypercube(PyroScan):
             for name, values in parameter_dict.items()
         }
         self.pyroscan_json["parameter_dict"] = self.parameter_dict
+        self.joint_axes["sample"] = list(self.parameter_dict)
         self.value_size = [len(values) for values in self.parameter_dict.values()]
-
-    # ------------------------------------------------------------------
-    # Output layout
-    # ------------------------------------------------------------------
-    def output_layout(self) -> ScanLayout:
-        """
-        Map the samples onto the dimensions of the output Dataset.
-
-        Scattered points have no grid to lie on, so there is a single ``sample``
-        dimension and every varied parameter becomes a non-dimension coordinate
-        along it, alongside ``sample_name`` (the run directory each sample came
-        from).
-        """
-        coords: Dict[str, Any] = {"sample": np.arange(self.n_samples)}
-        coord_units = {}
-
-        for name, values in self.parameter_dict.items():
-            magnitude, unit = magnitude_and_units(values)
-            coords[name] = (("sample",), magnitude, {"units": unit})
-            coord_units[name] = unit
-
-        if self.sample_names:
-            coords["sample_name"] = ("sample", np.asarray(self.sample_names, dtype=str))
-
-        return ScanLayout(
-            coords=coords,
-            coord_units=coord_units,
-            shape=(self.n_samples,),
-            dims=("sample",),
-            squeeze_dims=tuple(self.parameter_dict.keys()),
-        )
 
     # ------------------------------------------------------------------
     # Reading an existing run tree
