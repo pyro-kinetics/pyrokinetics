@@ -705,7 +705,9 @@ def test_z_profile_preserves_sign(scene_file: Path) -> None:
     assert np.isclose(deuterium_z, 1.0)
 
 
-def test_enforce_quasineutrality_rejects_electron_adjust_species(scene_file: Path) -> None:
+def test_enforce_quasineutrality_rejects_electron_adjust_species(
+    scene_file: Path,
+) -> None:
     kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
 
     with pytest.raises(ValueError):

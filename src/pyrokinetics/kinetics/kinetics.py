@@ -90,9 +90,7 @@ class Kinetics(ReadableFromFile):
         return self.species_data.keys()
 
     @staticmethod
-    def _z_profile(
-        species: Species, round_charge: bool, psi_q: Quantity
-    ) -> np.ndarray:
+    def _z_profile(species: Species, round_charge: bool, psi_q: Quantity) -> np.ndarray:
         r"""
         Charge number :math:`Z(\psi_N) = q(\psi_N) / e` of a species.
 
