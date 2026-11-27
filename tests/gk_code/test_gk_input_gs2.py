@@ -103,6 +103,20 @@ def test_add_flags(gs2):
     assert gs2.data["foo"]["bar"] == "baz"
 
 
+def test_add_flags_rejects_ungrouped(gs2):
+    n_groups = len(gs2.data)
+    with pytest.raises(TypeError):
+        gs2.add_flags({"new_group": {"foo": 1}, "delt": 0.1})
+    assert len(gs2.data) == n_groups
+
+
+def test_add_flags_case_insensitive(gs2):
+    n_groups = len(gs2.data)
+    gs2.add_flags({"KNOBS": {"DELT": 0.1}})
+    assert len(gs2.data) == n_groups
+    assert gs2.data["knobs"]["delt"] == 0.1
+
+
 def test_get_local_geometry(gs2):
     # TODO test it has the correct values
     local_geometry = gs2.get_local_geometry()

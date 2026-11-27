@@ -1,0 +1,13 @@
+[Parsing data in input.gftm]
+no mpi
+  D(R) = -5.5555E-05  D(I) = -5.5555E-05
+  kinetic species =          2
+  non-kinetic species =          0
+     ky                                      =   7.0000E-02
+     Guassian width                          =   1.7400E+00
+     parallel grid resolution: nbasis        =          4
+     parallel velocity space resolution:  nu =          7
+     perpendicular energy resolution:     ne =          3
+     linear eigenvalues:              nmodes =          2
+      (wr,wi): -5.5555E-05  5.5555E-05
+      (wr,wi):  0.0000E+00  0.0000E+00

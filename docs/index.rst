@@ -35,8 +35,8 @@ are supported:
 - `GENE <http://www.genecode.org>`_
 - `STELLA <https://stellagk.github.io/stella/index.html>`_
 - `TGLF <http://gafusion.github.io/doc/tglf.html>`_
-- `GKW <http://https://bitbucket.org/gkw/gkw/src>`_
-- `GX <http://https://bitbucket.org/gyrokinetics/gx/src>`_
+- `GKW <https://bitbucket.org/gkw/gkw/src>`_
+- `GX <https://bitbucket.org/gyrokinetics/gx/src>`_
 
 It is also possible to load in global data from the following codes, from which
 local parameters can be calculated.
@@ -50,6 +50,9 @@ local parameters can be calculated.
 - ITERDB
 - `GEQDSK <https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf>`_
 - PFILE
+
+Questions are welcome on `GitHub Discussions <https://github.com/pyro-kinetics/pyrokinetics/discussions>`_
+or the `pyrokinetics Slack <https://join.slack.com/t/pyrokinetics/shared_invite/zt-27fr7ze07-i5~zRmrluaUOVqByjQXsqQ>`_.
 
 
 .. toctree::

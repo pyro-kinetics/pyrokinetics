@@ -39,7 +39,7 @@ The Grad-Shafranov equation [1]_ may be written:
 
 The :math:`r` coordinate is the major radius, the distance from the central column
 of a tokamak, and :math:`z` is the height within the tokamak (often defined as the
-vertical distance about the tokamak midplane, but other reference points may be used
+vertical distance above the tokamak midplane, but other reference points may be used
 instead).
 
 :math:`\psi` is the poloidal magnetic flux function, defined as:
@@ -232,7 +232,7 @@ respectively. We'll choose a surface close to the LCFS:
 
     >>> fs = eq.flux_surface(0.95)
 
-Similarly to ``Equilbrium``, the created ``FluxSurface`` objects wrap an Xarray dataset:
+Similarly to ``Equilibrium``, the created ``FluxSurface`` objects wrap an Xarray dataset:
 
 .. code-block:: python
 
@@ -350,7 +350,7 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
     # Set x_label and y_label to "" to avoid changing axes labels
     fs.plot_path(ax=big_ax, x_label="", y_label="")
 
-    # Plot b_poloidal and b_toroidal over this path
+    # Plot b_poloidal over this path
     fs.plot("b_poloidal", ax=axs[2])
 
     # Save figure, show

@@ -12,6 +12,9 @@ Using GS2 as our example code:
 
 .. code:: python
 
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     from pyrokinetics import Pyro, template_dir
 
     # Point to GS2 input file
@@ -64,7 +67,7 @@ This approach is strongly recommended when:
 * Sharing processed datasets with collaborators
 
 
-Here we have loaded up the `gk_output` object, which is an `xarray Dataset`_. More information about this can be obtained by printing:
+In the GS2 example above, ``data`` is the ``gk_output`` object, which wraps an `xarray Dataset`_. More information about this can be obtained by printing:
 
 .. code-block:: python
 

@@ -13,7 +13,7 @@ This would generate the following figure
 .. image:: figures/ideal_ballooning.png
   :width: 400
 
-Note this works for any `pyro` object independant of the `LocalGeometry`
+Note this works for any `pyro` object independent of the `LocalGeometry`
 chosen. 
 
 The algorithm used to solve the ideal ballooning equation was taken from 

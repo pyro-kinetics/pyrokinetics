@@ -182,12 +182,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         except KeyError:
             return False
 
-    def add_flags(self, flags) -> None:
-        """
-        Add extra flags to GS2 input file
-        """
-        super().add_flags(flags)
-
     def get_local_geometry(self) -> LocalGeometry:
         """
         Returns local geometry. Delegates to more specific functions

@@ -32,7 +32,7 @@ There are typically two main classes involved in the process of reading data fro
 For example, :class:`~pyrokinetics.equilibrium.equilibrium.Equilibrium` is a readable,
 and it is instantiated and returned by reader classes such as
 :class:`~pyrokinetics.equilibrium.geqdsk.EquilibriumReaderGEQDSK`. In this tutorial, we
-will set up a readable class ``Foo``, along with a reader classes that reads from
+will set up a readable class ``Foo``, along with a reader class that reads from
 ``.csv`` files.
 
 To begin, we must mark ``Foo`` as being readable. This is achieved as so:
@@ -119,7 +119,7 @@ We'll now demonstrate how we might implement these functions:
             # Also check that any required data is present. In this
             # case, we only need to check for the presence of the
             # column 'x'
-            if not "x" in df:
+            if "x" not in df:
                 raise RuntimeError("Foo csv needs an 'x' column")
             # If we get here, it's probably a Foo csv. Exit normally
             # without returning.
@@ -166,7 +166,7 @@ of related types. The way they typically work is as follows:
   registered key. ``my_factory.create("A1", *args, **kwargs)`` may be used as an
   alternative to ``A1(*args, **kwargs)``.
 
-Some of the benefit of using factories over using classes directly are:
+Some of the benefits of using factories over using classes directly are:
 
 - The user doesn't need to know exact class names, and doesn't need to import each
   class they might want to build independently -- they only need to import the factory.
@@ -206,7 +206,7 @@ The additional bit of magic in Pyrokinetics is provided by the ``verify_file_typ
 functions defined by each reader class. If the user doesn't pass ``file_type`` to
 ``from_file``, the internal factory instead searches through each registered reader
 class and calls ``verify_file_type`` for each reader in turn. If, for some reader, this
-function exits normally without raising an exception, that reader it is then used to
+function exits normally without raising an exception, that reader is then used to
 read the provided file. This can take a long time if ``verify_file_type`` functions are
 slow to execute, so it is best for these functions to be very short and not to perform
 any unnecessary additional processing.
@@ -217,7 +217,7 @@ any unnecessary additional processing.
 -------------------------------------
 
 :class:`~pyrokinetics.gk_code.gk_input.GKInput` fits strangely into this scheme, as
-while :class:`~pyrokinetics.gk_code.gk_input.GKInput` itself is a 'readable', it's
+while :class:`~pyrokinetics.gk_code.gk_input.GKInput` itself is a 'readable', its
 'readers' are its own subclasses. This is because the reader classes fill in their
 attributes as a side effect of calling ``read_from_file``. These readers should usually
 be retained after use, as they provide further functionality besides that offered by
@@ -252,7 +252,7 @@ directly:
    # If MyEqReader reads Equilibrium and has file type "MyFileType":
    eq = pyrokinetics.read_equilibrium(filename, "MyFileType")
 
-Provided ``MyFileReader`` subclasses :class:`~pyrokinetics.file_utils.FileReader` and
+Provided ``MyEqReader`` subclasses :class:`~pyrokinetics.file_utils.FileReader` and
 provides the keyword arguments ``file_type`` and ``reads``, it will be registered
 alongside the Pyrokinetics classes.
 

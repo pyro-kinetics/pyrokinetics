@@ -40,7 +40,7 @@ normalised poloidal flux:
 
 where `\psi_N = 0` corresponds to the magnetic axis and `\psi_N = 1` corresponds
 to the last closed flux surface (LCFS). Note charge is usually constant for a given
-species but in some heavy impurity cases it can be vary due differing charge states
+species but in some heavy impurity cases it can vary due to differing charge states.
 
 Gradients with respect to the normalised minor radius `\rho = r/a` are also
 frequently used in gyrokinetics, for example:

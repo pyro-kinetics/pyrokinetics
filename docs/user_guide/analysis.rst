@@ -6,7 +6,7 @@ Once you have a completed simulation, you can read the output into a
 `Pyro` object. By default, some common analysis is either read from
 the output file(s) or automatically performed for you.
 
-- :class:`GKOutputReader`
+- :class:`.GKOutput`
 
   - Accessed via ``pyro.gk_output``
   - Stores output from a GK simulation

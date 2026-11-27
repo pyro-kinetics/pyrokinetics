@@ -1,26 +1,26 @@
 .. _sec-nd-parameter-scans:
 
-============================================
- Perform a N-D scan in parameters A,B,C etc.
-============================================
+=============================================
+ Perform an N-D scan in parameters A,B,C etc.
+=============================================
 
-It is often common to perform parameters scan when running gyrokinetic analysis. The `PyroScan` object allows for easy
+It is common to perform parameter scans when running gyrokinetic analysis. The `PyroScan` object allows for easy
 generation of input files for an N-D parameter scan along with the ability to read in the outputs for all the runs.
 
 
 Simple 1-D scan
 ---------------
 
-To start of you need a fully initialised `Pyro` object and a dictionary object that outlines the variable to scan
+To start off you need a fully initialised `Pyro` object and a dictionary object that outlines the variable to scan
 through. Here we scan through :math:`k_y\rho_s`
 
 .. code:: python
 
     # Initialise a Pyro object
     from pyrokinetics import Pyro, PyroScan, template_dir
-    pyro = Pyro(gk_file= template_dir / "input.cgyro")
+    pyro = Pyro(gk_file=template_dir / "input.cgyro")
 
-    # Write input files
+    # Define the parameter to scan through
     param_dict = {"ky": [0.1, 0.2, 0.3]}
 
     # Create PyroScan object
@@ -36,13 +36,13 @@ through. Here we scan through :math:`k_y\rho_s`
 This will write 3 different input files where the parameter :py:attr:`pyrokinetics.numerics.Numerics.ky` has been
 changed, with each input file in its own directory under a base directory of ``run_directory``.
 
-The variable here is always defined in pyrokinetics default units, so when using a code that has a different normalised
-be aware that the values defined here will be converted to the code own units. See `normalisations`.
+The variable here is always defined in pyrokinetics default units, so when using a code that has a different normalisation,
+be aware that the values defined here will be converted to the code's own units. See :ref:`sec-normalisation-docs`.
 
-This also created a ``pyroscan.json`` file that can be used to initialise a run
+This also creates a ``pyroscan.json`` file that can be used to initialise a run.
 
 Note ``ky`` here is a default parameter key to scan through with others listed here
-:py:meth:`pyrokinetics.pyroscan.PyroScan.load_default_parameter_keys`. To do a bespoke parameter see below
+:py:meth:`pyrokinetics.pyroscan.PyroScan.load_default_parameter_keys`. To scan a bespoke parameter, see below.
 
 
 Running/Submitting simulations
@@ -59,30 +59,29 @@ run/submit from there. These directories are stored in ``pyro_scan.run_directori
 
     for run_dir in pyro_scan.run_directories:
 
+        # Copy (existing) batch script into the run directory
+        copy("batch.src", run_dir)
+
         # Use pyroscan change directory method to go into each run directory
         with cd(run_dir):
-            # Run a simulation
-            os.system('cgyro -n 32 -nomp 3 ')
+            # Either run a simulation directly...
+            os.system("cgyro -n 32 -nomp 3")
 
-            # Copy (existing) batch script and submit
-            copy("batch.src", run_dir)
-            with cd(run_dir):
-
-                # Submit job with run directory names
-                os.system(f"sbatch -J pyroscan_{rel_path} batch.src")
+            # ...or submit the batch script, naming the job after the run directory
+            os.system(f"sbatch -J pyroscan_{run_dir.name} batch.src")
 
 
 Analysing output
 -----------------
 
 Once the simulations are complete the output data is stored as an xarray ``Dataset``. The dimensions
-of the ``Dataset`` are the parameter values names specified in ``params_dict`` along with the original
+of the ``Dataset`` are the parameter names specified in ``param_dict`` along with the original
 dimensions of the data
 
 
 .. code:: python
 
-    # Load output from
+    # Load output from all runs
     pyro_scan.load_gk_output()
 
     data = pyro_scan.gk_output
@@ -129,7 +128,7 @@ pairs
 
     # Initialise a Pyro object
     from pyrokinetics import Pyro, PyroScan, template_dir
-    pyro = Pyro(gk_file= template_dir / "input.cgyro")
+    pyro = Pyro(gk_file=template_dir / "input.cgyro")
 
     # Define parameters
     param_1 = "ky"
@@ -164,7 +163,7 @@ Here we have specified:
 
 If we wanted to have each run in its own directory then we could set ``parameter_separator="/"``
 
-Outputs are loaded in the same with, but now with the elongation (:attr:`pyrokinetics.local_geometry.miller.LocalGeometryMiller.kappa`) as a dimension too
+Outputs are loaded in the same way, but now with the elongation (:attr:`pyrokinetics.local_geometry.miller.LocalGeometryMiller.kappa`) as a dimension too
 
 
 Bespoke parameters/functions

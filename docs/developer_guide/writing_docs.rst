@@ -34,6 +34,10 @@ Running Sphinx is as simple as:
 
 This is exactly equivalent to running the following from the top-level directory:
 
+.. code:: console
+
+    $ sphinx-build -b html docs/ docs/_build/html
+
 .. important::
 
    There are currently seven expected warnings when building the docs,
@@ -45,10 +49,6 @@ This is exactly equivalent to running the following from the top-level directory
    and one more also related to ``pint.facets.plain.unit``. These are
    all due to the version of ``pint`` we're using. If you get more
    warnings than this, you should fix them!
-
-.. code:: console
-
-    $ sphinx-build -b html docs/ docs/_build/html
 
 You can then view the built documentation by opening
 ``docs/_build/html/index.html`` in your browser.
@@ -63,7 +63,7 @@ we'll cover some of the common "gotchas" and more specific syntax.
 Backticks
 ---------
 
-The most common gotcha is the use of backtick. In Markdown, single backticks
+The most common gotcha is the use of backticks. In Markdown, single backticks
 are used for inline ``monospace``. To achieve the same in RST, we have to use
 double backticks ````monospace````: ``monospace``.
 

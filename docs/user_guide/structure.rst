@@ -15,7 +15,7 @@ components are as follows:
 
   - Accessed via ``pyro.local_geometry``
   - Represents local geometry of a flux surface
-  - Current supported :class:`.LocalGeometry` subclasses are:
+  - Currently supported :class:`.LocalGeometry` subclasses are:
 
     - :class:`.LocalGeometryMiller` (see also :ref:`sec-miller`)
     - :class:`.LocalGeometryMillerTurnbull`
@@ -46,11 +46,11 @@ components are as follows:
   - Can be used to directly populate :py:class:`.LocalGeometry` and `LocalSpecies`
   - Used to set `Numerics`
 
-* `normalisation`
+- `normalisation`
 
-  * Accessed via ``pyro.norms``
-  * Holds physical reference values
-  * Allows automatic conversion between different normalisation conventions
+  - Accessed via ``pyro.norms``
+  - Holds physical reference values
+  - Allows automatic conversion between different normalisation conventions
 
 .. image:: figures/pyro_structure.png
   :width: 600

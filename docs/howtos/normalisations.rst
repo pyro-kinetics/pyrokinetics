@@ -6,7 +6,7 @@ Normalisation conventions
 
 Different gyrokinetic codes use different default `Normalisation` conventions and pyrokinetics allows for the conversion
 between different conventions. Where possible variables in pyrokinetics have assigned units via the `Pint`_ python
-library. Currently these objects all have assigned units.
+library. Currently the following objects have assigned units:
 
  - `Equilibrium`
  - `Kinetics`
@@ -19,8 +19,8 @@ library. Currently these objects all have assigned units.
 Using Units
 ===========
 
-When loading in the `Equilibrium` and `Kinetics` objects variables will be in SI units ``Quantity``. Objects with units must be
-treated consistently, meaning that it is not possible to add two ``Quantity`` objects with different ``Units``
+When loading in the `Equilibrium` and `Kinetics` objects, variables will be SI ``Quantity`` objects. Objects with units must be
+treated consistently, meaning that it is not possible to add two ``Quantity`` objects with different ``Units``.
 
 .. code-block:: python
 
@@ -37,7 +37,7 @@ treated consistently, meaning that it is not possible to add two ``Quantity`` ob
         kinetics_file=kinetics_file,
     )
 
-    # Has units of  / meter ** -3
+    # Has units of meter ** -3
     density = pyro.kinetics.species_data.electron.get_dens(0.5)
     print(f"Density = {density}")
 
@@ -59,7 +59,7 @@ convert to another pint ``Unit``
 .. code-block:: console
 
     Electron density magnitude = 2.0617094330890322e+20
-    Electron density (/cm^3)) = 206170943308903.25 / centimeter ** 3
+    Electron density (/cm^3) = 206170943308903.25 / centimeter ** 3
 
 ================
 Reference values
@@ -71,7 +71,7 @@ conversion between different conventions.
 
 So any local parameters will be defined in these reference units. When creating a pyro object from a
 kinetics/equilibrium object then it is possible to map these values back in to SI units using ``to_base_units``
-or to back to reference values
+or back to reference values:
 
 .. code-block:: python
 
@@ -96,7 +96,7 @@ or to back to reference values
 
 
 Each code has a different default normalisation and it is possible to map from one code to another by "converting" the
-units. For example below we see that the collisionality has different units for different codes with different magnitude
+units. For example below we see that the collisionality has different units for different codes with different magnitudes
 
 .. code-block:: python
 
@@ -118,9 +118,9 @@ stored. In this scenario it is only possible to convert quantities between diffe
 units.
 
 The following reference values are defined in pyrokinetics under ``pyro.norms``, with each code convention being stored
-within that i.e. CGYRO conventions/normalisations are under ``pyro.norms.cgyro``
+within that, i.e. CGYRO conventions/normalisations are under ``pyro.norms.cgyro``
 
-.. list-table:: Pyrokinetic references
+.. list-table:: Pyrokinetics references
    :widths: 34 33 33
    :header-rows: 1
 
@@ -154,7 +154,7 @@ within that i.e. CGYRO conventions/normalisations are under ``pyro.norms.cgyro``
 Outputs
 =======
 
-Pyrokinetics stores everything in its own normalisation. When reading/write `GKInput` and `GKOutput`, the data is read
+Pyrokinetics stores everything in its own normalisation. When reading/writing `GKInput` and `GKOutput`, the data is read
 in and then converted into pyrokinetics normalisation. The output data is stored in the format of an xarray ``Dataset``
 so to convert all of the output into a different convention do the following
 
@@ -171,7 +171,7 @@ so to convert all of the output into a different convention do the following
     # Load in CGYRO output data
     pyro.load_gk_output()
 
-    # Data current in pyrokinetics units
+    # Data currently in pyrokinetics units
     data = pyro.gk_output
 
     # This converts the data to CGYRO units
@@ -335,9 +335,9 @@ The table below summarises the reference choices used by each supported code.
      - :math:`B_{\mathrm{unit}}`
 
 
------------------------------------------
+------------------------------------------
 Conversion to and from SI units (contexts)
------------------------------------------
+------------------------------------------
 
 Conversion between simulation (normalised) units and SI units is only possible
 when the underlying physical reference values are known. This typically occurs
