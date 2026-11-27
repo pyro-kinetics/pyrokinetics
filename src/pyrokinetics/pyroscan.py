@@ -395,17 +395,26 @@ class PyroScan:
 
     def write(
         self,
-        file_name=None,
-        base_directory=None,
-        template_file=None,
-        relative_path=True,
-    ):
+        file_name: str | None = None,
+        base_directory: str | os.PathLike | None = None,
+        template_file: str | os.PathLike | None = None,
+        relative_path: bool = True,
+    ) -> None:
         """
-        Creates and writes GK input files for parameters in scan
+        Creates and writes GK input files for parameters in scan.
+
+        After converting GK codes, explicitly set ``file_name`` here or on the
+        scan before writing. Raises ``ValueError`` if no filename is set.
         """
 
         if file_name is not None:
             self.file_name = file_name
+
+        if not self.file_name:
+            raise ValueError(
+                "An explicit file_name is required after converting GK codes. "
+                "Pass file_name to write() or set scan.file_name before writing."
+            )
 
         if base_directory is not None:
             self.base_directory = pathlib.Path(base_directory)
@@ -860,14 +869,31 @@ class PyroScan:
         #      The setter has been replaced by the function 'convert_gk_code'
         return self.base_pyro.gk_code
 
-    def convert_gk_code(self, gk_code: str) -> None:
+    def convert_gk_code(
+        self, gk_code: str, template_file: str | os.PathLike | None = None
+    ) -> None:
         """
         Converts all gyrokinetics codes to the code type 'gk_code'. This can be any
         viable GKInput type (GS2, CGYRO, GENE,...)
+
+        Clears ``file_name`` so a following ``write`` requires an explicit name
+        for the new code's input files. Pass ``file_name`` to ``write`` or set
+        ``scan.file_name`` after conversion. Pass ``base_directory`` to ``write``
+        to keep the original runs.
+
+        Parameters
+        ----------
+        gk_code: str
+            The gyrokinetics code to convert to.
+        template_file: PathLike, default None
+            Template used to populate each new input file. If unset, the default
+            template for ``gk_code`` is used.
         """
-        self.base_pyro.convert_gk_code(gk_code)
+        self.base_pyro.convert_gk_code(gk_code, template_file=template_file)
         for pyro in self.pyro_dict.values():
-            pyro.convert_gk_code(gk_code)
+            pyro.convert_gk_code(gk_code, template_file=template_file)
+
+        self.file_name = None
 
     @property
     def base_directory(self):

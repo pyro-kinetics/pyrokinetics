@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   - Changed Pyro kwarg from `gk_type` to  `gk_code`
  
 ### Fixed
+  - `PyroScan.convert_gk_code` now clears `file_name`, requiring an explicit
+    filename before writing the converted scan. It also takes `template_file`.
   - `add_flags` for TGLF, CGYRO and NEO matches keys case-insensitively, so e.g. `NBASIS_MAX` overwrites the existing TGLF `nbasis_max` instead of writing it twice. New keys take the code's stored case (`flag_key_case`: lowercase for TGLF, uppercase for CGYRO/NEO)
   - `add_flags` raises `TypeError` when flags do not match the input structure (a dict of groups for namelist/TOML codes, a flat dict for TGLF/CGYRO/NEO) instead of crashing or writing an invalid file
 

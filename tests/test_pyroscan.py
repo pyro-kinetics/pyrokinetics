@@ -565,3 +565,45 @@ def test_parameter_func_not_applied_twice(tmp_path):
         val = pyro_obj.local_species.electron.inverse_lt
 
         assert np.isclose(val.magnitude, 2.0)
+
+
+@pytest.mark.parametrize("set_filename_on_scan", [False, True])
+def test_pyroscan_convert_gk_code(tmp_path: Path, set_filename_on_scan: bool) -> None:
+    """A converted scan requires a new filename before any files are written."""
+    pyro = Pyro(gk_file=template_dir / "input.gs2")
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"kappa": [1.5, 2.0]},
+        file_name="original.gs2",
+        base_directory=tmp_path / "gs2",
+    )
+
+    scan.convert_gk_code("TGLF", template_file=template_dir / "input.tglf")
+    assert scan.file_name is None
+    assert scan.pyroscan_json["file_name"] is None
+    assert scan.gk_code == "TGLF"
+    assert all(run.gk_code == "TGLF" for run in scan.pyro_dict.values())
+
+    with pytest.raises(ValueError, match="explicit file_name is required"):
+        scan.write(base_directory=tmp_path / "tglf")
+    assert scan.base_directory == tmp_path / "gs2"
+    assert not list(tmp_path.iterdir())
+
+    if set_filename_on_scan:
+        scan.file_name = "custom.tglf"
+        scan.write(base_directory=tmp_path / "tglf")
+    else:
+        scan.write(file_name="custom.tglf", base_directory=tmp_path / "tglf")
+
+    for name, run in scan.pyro_dict.items():
+        expected_file = tmp_path / "tglf" / name / "custom.tglf"
+        assert run.gk_file == expected_file
+        assert Pyro(gk_file=expected_file, gk_code="TGLF").gk_code == "TGLF"
+
+    # Once explicitly named, subsequent writes can reuse that filename.
+    scan.write()
+
+    # Converting back must invalidate even an explicitly chosen filename.
+    scan.convert_gk_code("GS2")
+    with pytest.raises(ValueError, match="explicit file_name is required"):
+        scan.write()
