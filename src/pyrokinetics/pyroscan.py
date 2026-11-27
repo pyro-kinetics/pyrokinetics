@@ -646,16 +646,17 @@ class PyroScan:
         self,
         output_convention="pyrokinetics",
         tolerance_time_range=0.8,
-        time_mode="average",
         netcdf_file=None,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
         sum_ky=False,
-        sum_kx=False,
         drop_nan=False,
+        *,
+        time_mode: str = "average",
+        sum_kx: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """
         Load PyroScanGKOutput into self.gk_output.
 
@@ -669,6 +670,14 @@ class PyroScan:
             Start fraction of the time axis used for time averages and the
             growth rate tolerance (i.e. ``tolerance_time_range=0.8`` averages
             over the last 20% of the simulation).
+        netcdf_file: PathLike default None
+            If supplied then load PyroScanGKOutput from existing netCDF
+        load_fields (bool, default True) – Flag to load fields or not
+        load_fluxes (bool, default True) – Flag to load fluxes or not
+        load_moments (bool, default False) – Flag to load moments or not
+        sum_ky (bool, default False) – If True, sum fluxes, fields and eigenfunctions
+            over ky. If False, preserve the ky dimension.
+        drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         time_mode: str default 'average'
             How to reduce the outputs along the time axis, whether the runs are
             linear or nonlinear. One of:
@@ -683,17 +692,9 @@ class PyroScan:
               (with squared units), not under the field names.
             * ``"last"``    – take the final time point.
             * ``"trace"``   – preserve the full time trace, no reduction.
-        netcdf_file: PathLike default None
-            If supplied then load PyroScanGKOutput from existing netCDF
-        load_fields (bool, default True) – Flag to load fields or not
-        load_fluxes (bool, default True) – Flag to load fluxes or not
-        load_moments (bool, default False) – Flag to load moments or not
-        sum_ky (bool, default False) – If True, sum fluxes, fields and eigenfunctions
-            over ky. If False, preserve the ky dimension.
         sum_kx (bool, default False) – Applies to fields and eigenfunctions (fluxes
             are already kx-integrated). If True, sum over kx; if False, preserve the
             kx dimension.
-        drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------

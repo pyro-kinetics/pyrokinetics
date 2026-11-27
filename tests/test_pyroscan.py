@@ -195,7 +195,7 @@ def test_pyroscan_netcdf_with_physical_units(nonlinear_tmp_path):
     )
     fresh_ps.add_parameter_key("alte", "local_species", ["electron", "inverse_lt"])
 
-    fresh_ps.load_gk_output(netcdf_file=nc_path)
+    fresh_ps.load_gk_output("pyrokinetics", 0.8, nc_path)
 
     loaded = fresh_ps.gk_output.data
     assert "particle" in loaded.data_vars
