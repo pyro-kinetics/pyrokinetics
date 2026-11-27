@@ -4,9 +4,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import xarray as xr
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.pyroscan import PyroScan
+from pyrokinetics.pyroscan import PyroScan, add_quantity
 from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
@@ -586,6 +587,16 @@ def test_parameter_func_not_applied_twice(tmp_path):
         val = pyro_obj.local_species.electron.inverse_lt
 
         assert np.isclose(val.magnitude, 2.0)
+
+
+@pytest.mark.parametrize("dim", ["time", "kx"])
+def test_pyroscan_rejects_mismatched_grids(dim: str) -> None:
+    first = xr.DataArray([1.0, 2.0], dims=dim, coords={dim: [0.0, 1.0]})
+    second = first.assign_coords({dim: [0.0, 2.0]})
+    scan_coords = {"kappa": np.array([1.0, 1.1])}
+
+    with pytest.raises(ValueError, match=f"different grids along '{dim}'"):
+        add_quantity(xr.Dataset(), "phi", [first, second], (2,), scan_coords)
 
 
 # Linear outputs with phi, apar and bpar; GX's has more than one ky

@@ -138,7 +138,13 @@ def normalize_failed_runs(buffers: dict[str, list]) -> None:
 
 
 # ---- dataset assembly ----
-def add_quantity(ds, name, arrays, base_shape, scan_coords):
+def add_quantity(
+    ds: xr.Dataset,
+    name: str,
+    arrays: list[xr.DataArray | None],
+    base_shape: tuple[int, ...],
+    scan_coords: dict[str, np.ndarray],
+) -> xr.Dataset:
     if not any(isinstance(a, xr.DataArray) for a in arrays):
         return ds
 
@@ -157,6 +163,14 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
     units = None
 
     for a in arrays:
+        if a.dims != last.dims:
+            raise ValueError(f"Cannot stack {name!r}: runs have different dimensions")
+        for dim in last.dims:
+            if not a.get_index(dim).equals(last.get_index(dim)):
+                raise ValueError(
+                    f"Cannot stack {name!r}: runs have different grids along {dim!r}"
+                )
+
         data = a.data
         if hasattr(data, "magnitude"):
             raw.append(data.magnitude)
@@ -643,7 +657,9 @@ class PyroScan:
         **kwargs,
     ):
         """
-        Loads PyroScanGKOutput into self.gk_output
+        Load PyroScanGKOutput into self.gk_output.
+
+        Retained output dimensions must share the same grid across runs.
 
         Parameters
         ----------
