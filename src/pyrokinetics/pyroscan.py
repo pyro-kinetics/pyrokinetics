@@ -85,25 +85,24 @@ def reduce_time(
 
 # ---- xarray selection ----
 def select_kx_ky_time(
-    da,
+    da: xr.DataArray,
     *,
-    kx_min=None,
-    sum_ky=False,
-    sum_kx=False,
-    time_mode,
-    tolerance_time_range=None,
-):
-    if "kx" in da.dims:
-        if sum_kx:
-            da = da.sum(dim="kx")
-        elif kx_min is not None:
-            da = da.sel(kx=kx_min)
+    kx_min: float | None = None,
+    sum_ky: bool = False,
+    sum_kx: bool = False,
+    time_mode: str,
+    tolerance_time_range: float | None = None,
+) -> xr.DataArray:
+    if "kx" in da.dims and kx_min is not None and not sum_kx:
+        da = da.sel(kx=kx_min)
 
     da = reduce_time(
         da,
         time_mode=time_mode,
         tolerance_time_range=tolerance_time_range,
     )
+    if sum_kx and "kx" in da.dims:
+        da = da.sum(dim="kx")
     if sum_ky and "ky" in da.dims:
         da = da.sum(dim="ky")
 

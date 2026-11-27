@@ -7,7 +7,7 @@ import pytest
 import xarray as xr
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.pyroscan import PyroScan, add_quantity
+from pyrokinetics.pyroscan import PyroScan, add_quantity, select_kx_ky_time
 from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
@@ -597,6 +597,16 @@ def test_pyroscan_rejects_mismatched_grids(dim: str) -> None:
 
     with pytest.raises(ValueError, match=f"different grids along '{dim}'"):
         add_quantity(xr.Dataset(), "phi", [first, second], (2,), scan_coords)
+
+
+def test_pyroscan_averages_before_summing_kx() -> None:
+    field_power = xr.DataArray(
+        [[np.nan, 2.0], [np.nan, 2.0]], dims=("kx", "time"), coords={"time": [0, 1]}
+    )
+    result = select_kx_ky_time(
+        field_power, sum_kx=True, time_mode="average", tolerance_time_range=0.0
+    )
+    assert result.item() == 4.0
 
 
 # Linear outputs with phi, apar and bpar; GX's has more than one ky
