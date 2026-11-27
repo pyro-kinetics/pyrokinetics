@@ -23,9 +23,12 @@ class SaturationRules:
         gamma_tolerance: float = 0.001,
         ky_dim: str = "ky",
         theta0_dim: str = "theta0",
-    ):
+    ) -> xr.Dataset:
         """
         Please see doi:10.1017/S0022377824001107 for details on this quasi-linear model.
+
+        For time traces, use the final time point for all inputs. If the scan
+        has already been averaged, use those averaged inputs.
 
         Parameters
         ----------
@@ -54,7 +57,9 @@ class SaturationRules:
         if not hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(output_convention=output_convention)
 
-        data = self.pyro_scan.gk_output
+        data = self.pyro_scan.gk_output.data
+        if "time" in data.dims:
+            data = data.isel(time=-1, drop=True)
         pyro = self.pyro_scan.base_pyro
 
         # Units factor to account for training done in pyro units
@@ -71,7 +76,15 @@ class SaturationRules:
         shat = pyro.local_geometry.shat
 
         theta = data["theta"].data
-        eigenfunctions = data["eigenfunctions"]
+        # Averaged scans already store the eigenfunction power.
+        if "eigenfunctions_squared" in data:
+            eigenfunctions_squared = data["eigenfunctions_squared"]
+        else:
+            eigenfunctions_squared = np.abs(data["eigenfunctions"]) ** 2
+        # The scan keeps kx; the rule uses one kx
+        if "kx" in eigenfunctions_squared.dims:
+            kx_min = abs(eigenfunctions_squared["kx"]).argmin().item()
+            eigenfunctions_squared = eigenfunctions_squared.isel(kx=kx_min, drop=True)
         growth_rate_tolerance = data["growth_rate_tolerance"]
 
         growth_rate = data["growth_rate"].where(
@@ -92,9 +105,8 @@ class SaturationRules:
             / heat_tot
         )
 
-        field_squared = (
-            np.abs(eigenfunctions.where(growth_rate_tolerance < gamma_tolerance, 0.0))
-            ** 2
+        field_squared = eigenfunctions_squared.where(
+            growth_rate_tolerance < gamma_tolerance, 0.0
         )
 
         # Set up Jacobian and k_perp
