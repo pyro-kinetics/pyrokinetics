@@ -395,17 +395,26 @@ class PyroScan:
 
     def write(
         self,
-        file_name=None,
-        base_directory=None,
-        template_file=None,
-        relative_path=True,
-    ):
+        file_name: str | None = None,
+        base_directory: str | os.PathLike | None = None,
+        template_file: str | os.PathLike | None = None,
+        relative_path: bool = True,
+    ) -> None:
         """
-        Creates and writes GK input files for parameters in scan
+        Creates and writes GK input files for parameters in scan.
+
+        After converting GK codes, explicitly set ``file_name`` here or on the
+        scan before writing. Raises ``ValueError`` if no filename is set.
         """
 
         if file_name is not None:
             self.file_name = file_name
+
+        if not self.file_name:
+            raise ValueError(
+                "An explicit file_name is required after converting GK codes. "
+                "Pass file_name to write() or set scan.file_name before writing."
+            )
 
         if base_directory is not None:
             self.base_directory = pathlib.Path(base_directory)
@@ -860,14 +869,17 @@ class PyroScan:
         #      The setter has been replaced by the function 'convert_gk_code'
         return self.base_pyro.gk_code
 
-    def convert_gk_code(self, gk_code: str, template_file=None) -> None:
+    def convert_gk_code(
+        self, gk_code: str, template_file: str | os.PathLike | None = None
+    ) -> None:
         """
         Converts all gyrokinetics codes to the code type 'gk_code'. This can be any
         viable GKInput type (GS2, CGYRO, GENE,...)
 
-        ``file_name`` becomes the new code's default, and every run keeps its run
-        directory, so a following ``write`` writes one input file per run for the
-        new code. Pass ``base_directory`` to ``write`` to keep the original runs.
+        Clears ``file_name`` so a following ``write`` requires an explicit name
+        for the new code's input files. Pass ``file_name`` to ``write`` or set
+        ``scan.file_name`` after conversion. Pass ``base_directory`` to ``write``
+        to keep the original runs.
 
         Parameters
         ----------
@@ -881,9 +893,7 @@ class PyroScan:
         for pyro in self.pyro_dict.values():
             pyro.convert_gk_code(gk_code, template_file=template_file)
 
-        self.file_name = GKInput._factory[gk_code].default_file_name
-        for name, pyro in self.pyro_dict.items():
-            pyro.gk_file = self.base_directory / name / self.file_name
+        self.file_name = None
 
     @property
     def base_directory(self):
